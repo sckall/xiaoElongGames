@@ -1,0 +1,310 @@
+/**
+ * 房间：封装大厅 → 对局 → 结算的完整生命周期。
+ * 断线/离开的座位由服务端 AI 自动托管，游戏不中断。
+ */
+import { randomUUID } from 'node:crypto';
+import {
+  Game,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  chooseAiAction,
+  type Magic,
+  type PlayerView,
+} from '@tm/rules';
+import type { LobbyInfo } from '@tm/rules';
+import type { Server, Socket } from 'socket.io';
+import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
+
+const BOT_NAMES = ['阿呆', '梅林', '小圆', '老巴'];
+const BOT_RISKS = [0.15, 0.28, 0.42, 0.55];
+
+const AI_DELAY_MS = 900;
+const ROUND_DELAY_MS = 3500;
+
+export type RoomSocket = Socket<ClientToServerEvents, ServerToClientEvents, object, RoomSocketData>;
+
+export interface RoomSocketData {
+  roomCode?: string;
+  playerId?: string;
+}
+
+interface Seat {
+  id: string;
+  name: string;
+  isBot: boolean;
+  connected: boolean;
+  autoPlay: boolean; // 断线/离开后由服务端托管
+  socketId: string | null;
+}
+
+export function sanitizeName(raw: unknown): string {
+  const s = String(raw ?? '').trim().slice(0, 12);
+  return s || '无名法师';
+}
+
+export function genRoomCode(): string {
+  // 去掉易混淆字符 0/O/1/I/L
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return code;
+}
+
+export class Room {
+  readonly code: string;
+  hostId: string;
+  status: 'lobby' | 'playing' = 'lobby';
+  seats: Seat[] = [];
+  game: Game | null = null;
+
+  private io: Server<ClientToServerEvents, ServerToClientEvents>;
+  private onEmpty: (code: string) => void;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
+  private roundTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    code: string,
+    hostId: string,
+    hostName: string,
+    io: Server<ClientToServerEvents, ServerToClientEvents>,
+    onEmpty: (code: string) => void,
+  ) {
+    this.code = code;
+    this.hostId = hostId;
+    this.io = io;
+    this.onEmpty = onEmpty;
+    this.seats.push({ id: hostId, name: hostName, isBot: false, connected: true, autoPlay: false, socketId: null });
+  }
+
+  private seat(id: string): Seat | undefined {
+    return this.seats.find((s) => s.id === id);
+  }
+
+  attach(socketId: string, playerId: string): void {
+    const s = this.seat(playerId);
+    if (s) s.socketId = socketId;
+  }
+
+  lobbyInfo(): LobbyInfo {
+    return {
+      code: this.code,
+      hostId: this.hostId,
+      status: this.status,
+      players: this.seats.map((s) => ({
+        id: s.id,
+        name: s.name,
+        isBot: s.isBot,
+        isHost: s.id === this.hostId,
+        connected: s.connected,
+      })),
+      botCount: this.seats.filter((s) => s.isBot).length,
+      humanCount: this.seats.filter((s) => !s.isBot).length,
+    };
+  }
+
+  broadcastLobby(): void {
+    this.io.to(this.code).emit('lobby', this.lobbyInfo());
+  }
+
+  broadcastViews(): void {
+    if (!this.game) return;
+    for (const s of this.seats) {
+      if (!s.isBot && s.connected && s.socketId) {
+        this.io.to(s.socketId).emit('state', this.game.getView(s.id));
+      }
+    }
+  }
+
+  emitViewTo(socketId: string, playerId: string): void {
+    if (!this.game) return;
+    this.io.to(socketId).emit('state', this.game.getView(playerId));
+  }
+
+  private emitError(socketId: string | null, message: string): void {
+    if (socketId) this.io.to(socketId).emit('error', message);
+  }
+
+  /** 加入房间（支持断线重连 token） */
+  join(nameRaw: string, token: string | undefined, socketId: string):
+    | { ok: true; playerId: string; rejoin: boolean }
+    | { ok: false; error: string } {
+    const name = sanitizeName(nameRaw);
+    if (token) {
+      const existing = this.seat(token);
+      if (existing) {
+        existing.connected = true;
+        existing.autoPlay = false;
+        existing.name = existing.isBot ? existing.name : name;
+        existing.socketId = socketId;
+        return { ok: true, playerId: token, rejoin: true };
+      }
+    }
+    if (this.status === 'playing') return { ok: false, error: '对局已开始，无法加入新玩家' };
+    if (this.seats.filter((s) => !s.isBot).length >= MAX_PLAYERS) {
+      return { ok: false, error: '房间已满' };
+    }
+    const id = randomUUID();
+    this.seats.push({ id, name, isBot: false, connected: true, autoPlay: false, socketId });
+    return { ok: true, playerId: id, rejoin: false };
+  }
+
+  /** 设置 AI 座位数（仅房主、仅大厅） */
+  setBots(actorId: string, count: number, actorSocketId: string): void {
+    if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以调整 AI');
+    if (this.status !== 'lobby') return;
+    const humans = this.seats.filter((s) => !s.isBot);
+    const bots = this.seats.filter((s) => s.isBot);
+    const maxBots = MAX_PLAYERS - humans.length;
+    const c = Math.max(0, Math.min(maxBots, Math.floor(count)));
+    // 移除多余的 bot
+    this.seats = this.seats.filter((s) => !s.isBot || bots.indexOf(s) < c);
+    const have = this.seats.filter((s) => s.isBot).length;
+    for (let i = have; i < c; i++) {
+      this.seats.push({
+        id: `bot-${this.code}-${i + 1}`,
+        name: BOT_NAMES[i % BOT_NAMES.length],
+        isBot: true,
+        connected: true,
+        autoPlay: true,
+        socketId: null,
+      });
+    }
+    this.broadcastLobby();
+  }
+
+  /** 开始对局（仅房主，总人数 2~5） */
+  start(actorId: string, actorSocketId: string): void {
+    if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以开始游戏');
+    if (this.status === 'playing') return;
+    const total = this.seats.length;
+    if (total < MIN_PLAYERS || total > MAX_PLAYERS) {
+      return this.emitError(actorSocketId, `需要 ${MIN_PLAYERS}-${MAX_PLAYERS} 名玩家（可添加 AI）`);
+    }
+    this.game = new Game({
+      players: this.seats.map((s) => ({ id: s.id, name: s.name, isBot: s.isBot })),
+    });
+    this.status = 'playing';
+    this.game.log('🎮 联机对局开始');
+    this.broadcastViews();
+    this.broadcastLobby();
+    this.schedule();
+  }
+
+  declareSpell(playerId: string, magic: Magic, socketId: string): void {
+    if (!this.game || this.status !== 'playing') return;
+    const r = this.game.declareSpell(playerId, magic);
+    if (!r.ok) {
+      this.emitError(socketId, r.error);
+      return;
+    }
+    this.broadcastViews();
+    this.schedule();
+  }
+
+  endTurn(playerId: string, socketId: string): void {
+    if (!this.game || this.status !== 'playing') return;
+    const r = this.game.endTurn(playerId);
+    if (!r.ok) {
+      this.emitError(socketId, r.error);
+      return;
+    }
+    this.broadcastViews();
+    this.schedule();
+  }
+
+  /** 调度：AI 回合 / 托管回合 / 轮末自动下一轮 */
+  private schedule(): void {
+    this.clearTimers();
+    const game = this.game;
+    if (!game || this.status !== 'playing') return;
+    if (game.phase === 'gameOver') return;
+    if (game.phase === 'roundEnd') {
+      this.roundTimer = setTimeout(() => {
+        game.nextRound();
+        this.broadcastViews();
+        this.schedule();
+      }, ROUND_DELAY_MS);
+      return;
+    }
+    const cur = game.current;
+    const seat = this.seat(cur.id);
+    if (seat && (seat.isBot || seat.autoPlay || !seat.connected)) {
+      const idx = this.seats.indexOf(seat);
+      const risk = BOT_RISKS[Math.max(0, idx) % BOT_RISKS.length];
+      this.botTimer = setTimeout(() => {
+        const a = chooseAiAction(game.getView(cur.id), { risk });
+        if (a.type === 'declare') game.declareSpell(cur.id, a.magic);
+        else game.endTurn(cur.id);
+        this.broadcastViews();
+        this.schedule();
+      }, AI_DELAY_MS);
+    }
+  }
+
+  private clearTimers(): void {
+    if (this.botTimer) clearTimeout(this.botTimer);
+    if (this.roundTimer) clearTimeout(this.roundTimer);
+    this.botTimer = null;
+    this.roundTimer = null;
+  }
+
+  /** 断线：座位保留，游戏由服务端托管 */
+  onDisconnect(playerId: string): void {
+    const s = this.seat(playerId);
+    if (!s) return;
+    s.connected = false;
+    s.socketId = null;
+    if (this.status === 'playing') {
+      this.game?.log(`${s.name} 断线，由服务端托管 ⚠️`);
+      this.broadcastViews();
+      this.schedule();
+    } else {
+      this.broadcastLobby();
+    }
+    this.maybeClose();
+  }
+
+  /** 主动离开：大厅直接移除；对局中转为托管 */
+  onLeave(playerId: string): void {
+    const s = this.seat(playerId);
+    if (!s) return;
+    if (this.status === 'lobby') {
+      this.seats = this.seats.filter((x) => x.id !== playerId);
+      if (this.seats.length === 0) {
+        this.close();
+        return;
+      }
+      if (this.hostId === playerId) {
+        const next = this.seats.find((x) => !x.isBot);
+        this.hostId = next ? next.id : this.seats[0].id;
+      }
+      this.broadcastLobby();
+      return;
+    }
+    // 对局中：托管
+    s.connected = false;
+    s.socketId = null;
+    s.autoPlay = true;
+    this.game?.log(`${s.name} 离开对局，由服务端托管 🤖`);
+    this.broadcastViews();
+    this.schedule();
+    this.maybeClose();
+  }
+
+  private maybeClose(): void {
+    const anyHumanConnected = this.seats.some((s) => !s.isBot && s.connected);
+    if (!anyHumanConnected) this.close();
+  }
+
+  private close(): void {
+    this.clearTimers();
+    this.onEmpty(this.code);
+  }
+
+  /** 供注册表在解散前清理 */
+  destroy(): void {
+    this.clearTimers();
+  }
+}

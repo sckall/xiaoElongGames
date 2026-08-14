@@ -5,6 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    proxy: {
+      // 联机：开发时把 Socket.IO 转发到本地服务端
+      '/socket.io': {
+        target: 'http://127.0.0.1:8787',
+        ws: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',

@@ -112,6 +112,11 @@ export class Game {
     this.events.push({ ...e, seq: this.seq++ });
   }
 
+  /** 服务端/外部注入提示事件（如玩家断线、托管等） */
+  log(text: string): void {
+    this.pushEvent({ type: 'info', text });
+  }
+
   /** 当前玩家的上家与下家（2 人时上家=下家=对手） */
   private neighbors(): { prev: PlayerState; next: PlayerState } {
     const n = this.players.length;

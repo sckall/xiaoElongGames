@@ -4,15 +4,22 @@ import {
   MAGIC_LIST,
   type EffectEvent,
   type Magic,
+  type PlayerView,
   type SeatView,
 } from '@tm/rules';
-import { useLocalGame } from './useLocalGame';
 import { HpBar, MagicCard } from './components';
 import { playSfx, setSoundEnabled } from './fx';
+import type { GameSettings } from './GameSettings';
 
-export interface GameSettings {
-  fx: boolean;
-  sound: boolean;
+/** 本地与联机共用的游戏操作接口 */
+export interface GameApi {
+  view: PlayerView | null;
+  start: () => void;
+  declare: (magic: Magic) => void;
+  endTurn: () => void;
+  advanceRound: () => void;
+  /** true = 轮末由服务端自动推进（联机） */
+  autoRound: boolean;
 }
 
 interface FloatFx {
@@ -72,15 +79,21 @@ function Seat({
       className={`seat ${isYou ? 'you' : ''} ${isCurrent ? 'current' : ''} ${seat.alive ? '' : 'dead'} ${shaking ? 'shaking' : ''}`}
     >
       <div className="seat-top">
-        <div className={`avatar av-${seat.id === 'you' ? 'you' : (seat.isBot ? 'bot' : 'human')}`}>
-          {seat.name.slice(0, 1)}
-        </div>
+        <div className={`avatar av-${seat.isBot ? 'bot' : 'human'}`}>{seat.name.slice(0, 1)}</div>
         <div className="seat-info">
           <div className="seat-name">
             {seat.name}
             {seat.isBot && <span className="bot-tag">🤖</span>}
-            {isPrev && <span className="rel-tag" title="你的上家">🌨️上家</span>}
-            {isNext && <span className="rel-tag" title="你的下家">🔥下家</span>}
+            {isPrev && (
+              <span className="rel-tag" title="你的上家">
+                🌨️上家
+              </span>
+            )}
+            {isNext && (
+              <span className="rel-tag" title="你的下家">
+                🔥下家
+              </span>
+            )}
             {isCurrent && <span className="turn-tag">⏳施法中</span>}
           </div>
           <HpBar hp={seat.hp} shaking={shaking} />
@@ -106,24 +119,21 @@ function Seat({
   );
 }
 
-export default function GameScreen({
-  playerCount,
-  myName,
+export default function GameTable({
+  api,
   settings,
   onExit,
-  onRestart,
+  onRematch,
   onToggleSound,
   onToggleFx,
 }: {
-  playerCount: number;
-  myName: string;
+  api: GameApi;
   settings: GameSettings;
   onExit: () => void;
-  onRestart: () => void;
+  onRematch?: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
 }) {
-  const game = useLocalGame(playerCount, myName);
   const [floats, setFloats] = useState<FloatFx[]>([]);
   const [shake, setShake] = useState<{ seatId: string; key: number } | null>(null);
   const [banner, setBanner] = useState<{ magic: Magic; fail: boolean; key: number } | null>(null);
@@ -139,11 +149,11 @@ export default function GameScreen({
   }, [settings.sound]);
 
   useEffect(() => {
-    game.start();
+    api.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const view = game.view;
+  const view = api.view;
 
   // 事件增量 → 特效/音效
   useEffect(() => {
@@ -157,7 +167,7 @@ export default function GameScreen({
     prevSeq.current = last;
     for (const e of fresh) handleFx(e);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view?.turnNo]);
+  }, [view?.turnNo, view?.events.length]);
 
   // 战报自动滚动
   useEffect(() => {
@@ -239,7 +249,7 @@ export default function GameScreen({
         delay: Math.random() * 1.4,
         dur: 2.2 + Math.random() * 2,
         size: 6 + Math.random() * 8,
-        color: ['#ffb84d', '#7c5cff', '#43d17a', '#ff5d73', '#4dd8ff'][i % 5],
+        color: ['#ffb84d', '#8a6bff', '#43d17a', '#ff5d73', '#4dd8ff'][i % 5],
         rot: Math.random() * 720,
       })),
     [],
@@ -263,19 +273,12 @@ export default function GameScreen({
           <span className="chip-info">🎴 牌堆 {view.deckCount}</span>
           <span className="chip-info">🤫 秘密 {view.secretPileCount}</span>
           <span className="chip-info">🗑️ 弃牌 {view.discard.length}</span>
+          {api.autoRound && <span className="chip-info online">🌐 联机</span>}
         </div>
-        <button
-          className="ghost-btn"
-          title={settings.sound ? '关闭音效' : '开启音效'}
-          onClick={() => onToggleSound()}
-        >
+        <button className="ghost-btn" title={settings.sound ? '关闭音效' : '开启音效'} onClick={onToggleSound}>
           {settings.sound ? '🔊' : '🔇'}
         </button>
-        <button
-          className="ghost-btn"
-          title={settings.fx ? '关闭动画' : '开启动画'}
-          onClick={() => onToggleFx()}
-        >
+        <button className="ghost-btn" title={settings.fx ? '关闭动画' : '开启动画'} onClick={onToggleFx}>
           {settings.fx ? '✨' : '💤'}
         </button>
         <button className="ghost-btn" onClick={onExit}>
@@ -305,11 +308,7 @@ export default function GameScreen({
               <span className="your-turn">✨ 轮到你施法了！大声喊出魔法名！</span>
             ) : (
               <span className="wait-turn">
-                ⏳ 等待{' '}
-                {view.currentPlayerId
-                  ? view.seats.find((s) => s.id === view.currentPlayerId)?.name
-                  : '……'}
-                {' '}施法中
+                ⏳ 等待 {view.currentPlayerId ? view.seats.find((s) => s.id === view.currentPlayerId)?.name : '……'} 施法中
               </span>
             )}
           </div>
@@ -331,7 +330,7 @@ export default function GameScreen({
                   key={m.key}
                   className={`magic-btn card-btn-${m.key} ${legal ? '' : 'illegal'} ${isLast ? 'last' : ''}`}
                   disabled={!view.isYourTurn || !legal}
-                  onClick={() => game.declare(m.key)}
+                  onClick={() => api.declare(m.key)}
                   title={m.desc}
                 >
                   <span className="mb-emoji">{m.emoji}</span>
@@ -341,7 +340,7 @@ export default function GameScreen({
                 </button>
               );
             })}
-            <button className="end-btn" disabled={!view.isYourTurn} onClick={game.endTurn}>
+            <button className="end-btn" disabled={!view.isYourTurn} onClick={api.endTurn}>
               ⏭️ 结束回合
             </button>
           </div>
@@ -415,15 +414,21 @@ export default function GameScreen({
                   {s.name}：
                   <b className={view.roundResult!.points[s.id] > 0 ? 'gain' : ''}>
                     +{view.roundResult!.points[s.id] ?? 0}
-                  </b>
-                  {' '}（累计 ⭐{s.score}）
+                  </b>{' '}
+                  （累计 ⭐{s.score}）
                 </li>
               ))}
             </ul>
-            <p className="muted">3 秒后自动开始下一轮……</p>
-            <button className="primary-btn" onClick={game.advanceRound}>
-              ▶️ 立即开始下一轮
-            </button>
+            {api.autoRound ? (
+              <p className="muted">等待服务器自动开始下一轮……</p>
+            ) : (
+              <>
+                <p className="muted">3 秒后自动开始下一轮……</p>
+                <button className="primary-btn" onClick={api.advanceRound}>
+                  ▶️ 立即开始下一轮
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -447,11 +452,13 @@ export default function GameScreen({
                 ))}
             </ul>
             <div className="overlay-btns">
-              <button className="primary-btn" onClick={onRestart}>
-                🔁 再来一局
-              </button>
+              {onRematch && (
+                <button className="primary-btn" onClick={onRematch}>
+                  🔁 再来一局
+                </button>
+              )}
               <button className="ghost-btn" onClick={onExit}>
-                返回设置
+                {api.autoRound ? '离开房间' : '返回设置'}
               </button>
             </div>
           </div>
