@@ -8,6 +8,8 @@
 - 开发者文档体系：ARCHITECTURE / AGENTS / CHANGELOG / README 索引 / DEPLOY 扩充
 - 发布打包脚本 `scripts/pack-release.mjs`（4.4MB 单包，含服务端+前端静态产物）
 - 明文 IP 审计：仓库无公网 IP 硬编码；gitignore 完善（release/、*.tgz、*.tsbuildinfo 等）
+- 🐛 修复限流计数泄漏：房间销毁不回退建房计数，同 IP 连续建房会误触「建房过多」上限
+  （回归验证：同 IP 连续 3 次完整冒烟通过）
 
 ## v8 — 入口层级重构 + 安全加固
 

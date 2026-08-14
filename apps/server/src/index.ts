@@ -98,6 +98,7 @@ io.on('connection', (socket: RoomSocket) => {
       const name = sanitizeName(payload?.name);
       const playerId = randomUUID();
       const code = uniqueCode();
+      const creatorIp = ip;
       const room = new Room(
         code,
         playerId,
@@ -106,7 +107,13 @@ io.on('connection', (socket: RoomSocket) => {
         payload?.password,
         payload?.botCount,
         io,
-        (c) => rooms.delete(c),
+        (c) => {
+          // 房间销毁时回退该 IP 的建房计数（防计数泄漏导致误限流）
+          rooms.delete(c);
+          const n = (roomsByIp.get(creatorIp) ?? 1) - 1;
+          if (n <= 0) roomsByIp.delete(creatorIp);
+          else roomsByIp.set(creatorIp, n);
+        },
       );
       rooms.set(code, room);
       roomsByIp.set(ip, (roomsByIp.get(ip) ?? 0) + 1);
