@@ -33,14 +33,20 @@ try {
   await shot(page, '02-game');
   console.log('✅ 02-game');
 
-  // 施法特效：先点巨龙（仅 1 张，大概率失败 → 失败特效），再点药水（大概率成功）
-  const dragon = page.locator('.magic-btn:not(:disabled)').filter({ hasText: '巨龙' });
-  if ((await dragon.count()) > 0) {
+  // 施法特效：先点巨龙（仅 1 张，大概率失败 → 失败特效），失败后重试直到拍到
+  let failShot = false;
+  for (let attempt = 0; attempt < 12 && !failShot; attempt++) {
+    const dragon = page.locator('.magic-btn:not(:disabled)').filter({ hasText: '巨龙' });
+    for (let i = 0; i < 30 && (await dragon.count()) === 0; i++) await sleep(800);
+    if ((await dragon.count()) === 0) break;
     await dragon.click();
-    await sleep(350);
-    await shot(page, '04-fx-fail');
-    console.log('✅ 04-fx-fail');
-    await sleep(1600);
+    await sleep(380);
+    if (await page.locator('.full-fx.fail').count()) {
+      await shot(page, '04-fx-fail');
+      console.log('✅ 04-fx-fail');
+      failShot = true;
+    }
+    await sleep(1500);
   }
   // 等轮到自己且药水可选时点击（成功特效）
   const potion = page.locator('.magic-btn:not(:disabled)').filter({ hasText: '药水' });
