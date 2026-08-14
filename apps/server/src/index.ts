@@ -16,13 +16,40 @@ import { Room, RoomSocket, genRoomCode, sanitizeName } from './room';
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '0.0.0.0';
 
+// ---- 资源限制（防滥用/耗尽攻击） ----
+const MAX_ROOMS = 200; // 全局房间数上限
+const MAX_ROOMS_PER_IP = 5; // 每个 IP 可同时创建的房间数
+const MAX_CONNS_PER_IP = 8; // 每个 IP 最大并发连接数
+
 const app = express();
 const server = http.createServer(app);
+
+// CORS：默认仅同源（vite 代理/同端口部署均同源）；前后端分离部署时用 CORS_ORIGIN 配白名单
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
+  : false;
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
-  cors: { origin: true, credentials: true },
+  cors: { origin: corsOrigin },
 });
 
 const rooms = new Map<string, Room>();
+const connByIp = new Map<string, number>();
+const roomsByIp = new Map<string, number>();
+
+function ipOf(socket: RoomSocket): string {
+  // 经反代部署时由 X-Forwarded-For 提供真实 IP（需信任代理）
+  const fwd = socket.handshake.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim();
+  return socket.handshake.address ?? 'unknown';
+}
+
+function guard<T>(fn: () => T): void {
+  try {
+    fn();
+  } catch (err) {
+    console.error('[server] handler error:', err);
+  }
+}
 
 // 健康检查（部署探活用）
 app.get('/healthz', (_req, res) => {
@@ -40,16 +67,34 @@ function uniqueCode(): string {
 io.on('connection', (socket: RoomSocket) => {
   socket.data = {};
 
+  // 每 IP 并发连接限制（防单机刷连接）
+  const ip = ipOf(socket);
+  const conns = connByIp.get(ip) ?? 0;
+  if (conns >= MAX_CONNS_PER_IP) {
+    socket.disconnect(true);
+    return;
+  }
+  connByIp.set(ip, conns + 1);
+  const releaseConn = () => {
+    const n = (connByIp.get(ip) ?? 1) - 1;
+    if (n <= 0) connByIp.delete(ip);
+    else connByIp.set(ip, n);
+  };
+
   socket.on('listRooms', (cb) => {
-    try {
-      cb({ rooms: [...rooms.values()].map((r) => r.listItem()) });
-    } catch (err) {
-      cb({ rooms: [] });
-    }
+    guard(() => cb({ rooms: [...rooms.values()].map((r) => r.listItem()) }));
   });
 
   socket.on('createRoom', (payload, cb) => {
-    try {
+    guard(() => {
+      if (rooms.size >= MAX_ROOMS) {
+        cb({ ok: false, error: '服务器繁忙，请稍后再试' });
+        return;
+      }
+      if ((roomsByIp.get(ip) ?? 0) >= MAX_ROOMS_PER_IP) {
+        cb({ ok: false, error: '创建的进行中房间过多，请稍后再试' });
+        return;
+      }
       const name = sanitizeName(payload?.name);
       const playerId = randomUUID();
       const code = uniqueCode();
@@ -64,18 +109,17 @@ io.on('connection', (socket: RoomSocket) => {
         (c) => rooms.delete(c),
       );
       rooms.set(code, room);
+      roomsByIp.set(ip, (roomsByIp.get(ip) ?? 0) + 1);
       socket.join(code);
       socket.data = { roomCode: code, playerId };
       room.attach(socket.id, playerId);
       cb({ ok: true, code, playerId });
       room.broadcastLobby();
-    } catch (err) {
-      cb({ ok: false, error: `创建房间失败：${(err as Error).message}` });
-    }
+    });
   });
 
   socket.on('joinRoom', (payload, cb) => {
-    try {
+    guard(() => {
       const code = String(payload?.code ?? '').trim().toUpperCase();
       const name = sanitizeName(payload?.name);
       const room = rooms.get(code);
@@ -98,65 +142,80 @@ io.on('connection', (socket: RoomSocket) => {
       } else {
         room.broadcastLobby();
       }
-    } catch (err) {
-      cb({ ok: false, error: `加入失败：${(err as Error).message}` });
-    }
+    });
   });
 
   socket.on('setBots', (payload) => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.setBots(d.playerId, payload?.count ?? 0, socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.setBots(d.playerId, payload?.count ?? 0, socket.id);
+    });
   });
 
   socket.on('updateSettings', (payload) => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.updateSettings(d.playerId, payload?.settings ?? {}, socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.updateSettings(d.playerId, payload?.settings ?? {}, socket.id);
+    });
   });
 
   socket.on('setPassword', (payload) => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.setPassword(d.playerId, payload?.password ?? '', socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.setPassword(d.playerId, payload?.password ?? '', socket.id);
+    });
   });
 
   socket.on('startGame', () => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.start(d.playerId, socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.start(d.playerId, socket.id);
+    });
   });
 
   socket.on('nextRound', () => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.nextRound(d.playerId, socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.nextRound(d.playerId, socket.id);
+    });
   });
 
   socket.on('declareSpell', (payload) => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId || !payload?.magic) return;
-    rooms.get(d.roomCode)?.declareSpell(d.playerId, payload.magic, socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId || !payload?.magic) return;
+      rooms.get(d.roomCode)?.declareSpell(d.playerId, payload.magic, socket.id);
+    });
   });
 
   socket.on('endTurn', () => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.endTurn(d.playerId, socket.id);
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.endTurn(d.playerId, socket.id);
+    });
   });
 
   socket.on('leaveRoom', () => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.onLeave(d.playerId);
-    socket.leave(d.roomCode);
-    socket.data = {};
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      rooms.get(d.roomCode)?.onLeave(d.playerId);
+      socket.leave(d.roomCode);
+      socket.data = {};
+    });
   });
 
   socket.on('disconnect', () => {
-    const d = socket.data;
-    if (!d.roomCode || !d.playerId) return;
-    rooms.get(d.roomCode)?.onDisconnect(d.playerId);
+    releaseConn();
+    const { roomCode, playerId } = socket.data;
+    if (!roomCode || !playerId) return;
+    guard(() => rooms.get(roomCode)?.onDisconnect(playerId));
   });
 });
 

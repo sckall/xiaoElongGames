@@ -18,15 +18,16 @@ const browser = await chromium.launch();
 try {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 
-  // 进入联机页面的公共路径：设置页（填昵称）→ 联机 → 游戏大厅 → 出包魔法师
+  // 进入联机页面的公共路径：设置页（填昵称）→ 游戏大厅 → 出包魔法师 → 联机对战
   async function enterOnline(page, name) {
     await page.goto(BASE);
     await page.waitForSelector('.setup-panel');
     await page.fill('.setup-panel input:first-of-type', name);
-    await page.click('text=🌐 联机对战');
-    await page.click('button.primary-btn.big');
+    await page.click('button.primary-btn.big'); // 进入游戏大厅
     await page.waitForSelector('.hall-page');
-    await page.click('.hall-card.playable');
+    await page.click('.hall-card.playable'); // 出包魔法师
+    await page.waitForSelector('.detail-panel');
+    await page.click('button:has-text("🌐 进入联机大厅")');
     await page.waitForSelector('.lobby-panel');
   }
 

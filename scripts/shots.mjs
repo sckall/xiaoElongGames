@@ -26,8 +26,12 @@ try {
   await shot(page, '01-setup');
   console.log('✅ 01-setup');
 
-  // ---- 本地对局 ----
-  await page.click('button.primary-btn.big');
+  // ---- 本地对局（经大厅 → 出包魔法师 → 单人） ----
+  await page.click('button.primary-btn.big'); // 进入游戏大厅
+  await page.waitForSelector('.hall-page');
+  await page.click('.hall-card.playable');
+  await page.waitForSelector('.detail-panel');
+  await page.click('button:has-text("开始（本地 vs AI）")');
   await page.waitForSelector('.game-page');
   await sleep(900);
   await shot(page, '02-game');
@@ -64,13 +68,14 @@ try {
   const page2 = await ctx2.newPage();
   await page2.goto(BASE);
   await page2.waitForSelector('.setup-panel');
-  await page2.click('text=🌐 联机对战');
   await page2.click('button.primary-btn.big');
   await page2.waitForSelector('.hall-page');
   await sleep(400);
   await shot(page2, '05-hall');
   console.log('✅ 05-hall');
   await page2.click('.hall-card.playable');
+  await page2.waitForSelector('.detail-panel');
+  await page2.click('button:has-text("🌐 进入联机大厅")');
   await page2.waitForSelector('.lobby-panel');
   await sleep(400);
   await shot(page2, '05-lobby');

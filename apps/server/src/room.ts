@@ -247,11 +247,19 @@ export class Room {
     this.broadcastLobby();
   }
 
-  /** 房间设置（仅房主；大厅/对局均可改） */
+  /** 房间设置（仅房主；大厅/对局均可改；白名单校验防伪造） */
   updateSettings(actorId: string, patch: Partial<RoomSettings>, actorSocketId: string): void {
     if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以修改房间设置');
-    const next: RoomSettings = { ...this.settings, ...patch };
-    next.aiSpeed = Math.max(AI_SPEED_MIN, Math.min(AI_SPEED_MAX, Math.floor(next.aiSpeed)));
+    const next: RoomSettings = { ...this.settings };
+    if (patch.aiSpeed != null) {
+      const v = Math.floor(Number(patch.aiSpeed));
+      if (Number.isFinite(v)) {
+        next.aiSpeed = Math.max(AI_SPEED_MIN, Math.min(AI_SPEED_MAX, v));
+      }
+    }
+    if (patch.autopilot != null && patch.autopilot in AUTOPILOT_DELAYS) {
+      next.autopilot = patch.autopilot;
+    }
     this.settings = next;
     this.broadcastLobby();
     this.schedule();

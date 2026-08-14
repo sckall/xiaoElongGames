@@ -209,6 +209,14 @@ describe('回合与补牌', () => {
     expect(g.endTurn('p1').ok).toBe(false);
   });
 
+  it('非法魔法值被拒绝（联机可伪造 payload，不能崩溃）', () => {
+    const g = makeGame(4, 7);
+    const r = g.declareSpell('p0', 'hack' as never);
+    expect(r.ok).toBe(false);
+    expect(g.phase).toBe('playing');
+    expect(g.player('p0').hp).toBe(6);
+  });
+
   it('牌堆耗尽时不再补牌', () => {
     const g = makeGame(4, 7);
     forceHand(g, 'p0', ['fire', 'fire']);

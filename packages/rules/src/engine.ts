@@ -224,6 +224,8 @@ export class Game {
 
   /** 声明施法：成功则打出并结算效果；失败则扣血并强制结束回合 */
   declareSpell(playerId: string, magic: Magic): ActionResult {
+    // 防御非法魔法值（联机时客户端可伪造任意 payload）
+    if (!(magic in MAGIC_DEFS)) return { ok: false, error: '未知魔法' };
     if (this.phase !== 'playing') return { ok: false, error: '当前不在行动阶段' };
     if (playerId !== this.current.id) return { ok: false, error: '还没轮到你' };
     if (this.lastMagic) {

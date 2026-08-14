@@ -1789,6 +1789,73 @@ input {
   text-align: left;
 }
 
+/* ---------- 游戏详情页 ---------- */
+.detail-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 4vh;
+}
+
+.detail-panel {
+  width: min(620px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: fadeUp 0.4s ease;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.detail-emoji {
+  font-size: 64px;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.45));
+}
+
+.detail-title h1 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.detail-meta {
+  color: #4dd8ff;
+  font-size: 13px;
+}
+
+.detail-desc {
+  color: var(--muted);
+  line-height: 1.8;
+  margin: 0;
+}
+
+.detail-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(30, 27, 75, 0.55);
+  border: 1px solid rgba(138, 107, 255, 0.35);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.detail-mode h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.detail-mode .primary-btn {
+  align-self: flex-start;
+}
+
 /* ---------- 弹层 ---------- */
 .overlay {
   position: fixed;

@@ -1,0 +1,121 @@
+import { MAGIC_LIST, MAX_PLAYERS, MIN_PLAYERS } from '@tm/rules';
+import { AI_SPEED_PRESETS } from './GameSettings';
+
+/** 游戏详情页：出包魔法师 → 单人 vs AI / 联机对战 */
+export default function GameDetailScreen({
+  playerCount,
+  onPlayerCountChange,
+  aiSpeed,
+  onAiSpeedChange,
+  onPlayLocal,
+  onPlayOnline,
+  onBack,
+}: {
+  playerCount: number;
+  onPlayerCountChange: (n: number) => void;
+  aiSpeed: number;
+  onAiSpeedChange: (ms: number) => void;
+  onPlayLocal: () => void;
+  onPlayOnline: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="page detail-page">
+      <div className="panel detail-panel">
+        <div className="detail-head">
+          <span className="detail-emoji">🧙</span>
+          <div className="detail-title">
+            <h1>出包魔法师</h1>
+            <span className="detail-meta">回合制 · 实时房间｜2-5 人｜8 种魔法 · 36 张牌</span>
+          </div>
+        </div>
+        <p className="detail-desc">
+          见习魔法师聚在一起乱放魔法：你的手牌背对自己，看不到自己会什么，只能靠观察别人来猜。
+          喊对 → 魔法生效；喊错 → 出包扣血！先到 8 分且分数最高者获胜。
+        </p>
+
+        <div className="detail-modes">
+          <section className="detail-mode">
+            <h2>🎮 单人 vs AI</h2>
+            <div className="field">
+              <span>玩家总数（其余为 AI）</span>
+              <div className="count-picker">
+                {Array.from(
+                  { length: MAX_PLAYERS - MIN_PLAYERS + 1 },
+                  (_, i) => MIN_PLAYERS + i,
+                ).map((n) => (
+                  <button
+                    key={n}
+                    className={n === playerCount ? 'count-btn active' : 'count-btn'}
+                    onClick={() => onPlayerCountChange(n)}
+                  >
+                    {n} 人
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <span>AI 行动节奏</span>
+              <select
+                className="bot-select"
+                value={aiSpeed}
+                onChange={(e) => onAiSpeedChange(Number(e.target.value))}
+              >
+                {AI_SPEED_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}（{p.value}ms）
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="primary-btn big" onClick={onPlayLocal}>
+              🎮 开始（本地 vs AI）
+            </button>
+          </section>
+
+          <section className="detail-mode">
+            <h2>🌐 联机对战</h2>
+            <p className="muted">
+              创建房间分享房间码，或从房间列表加入；支持 AI 补位、房间密码、断线托管。
+            </p>
+            <button className="primary-btn big" onClick={onPlayOnline}>
+              🌐 进入联机大厅
+            </button>
+          </section>
+        </div>
+
+        <details className="rules">
+          <summary>📜 规则速览</summary>
+          <ul>
+            <li>共 36 张魔法牌、8 种魔法，每种 1~8 张不等。</li>
+            <li>你的手牌背对自己：你看不到自己的牌，但能看到所有人的牌。</li>
+            <li>
+              轮到你说出一个魔法名：有 → 打出并生效，可继续施法（但不能比上一张更稀有）；没有 →
+              出包！扣 1 生命并结束回合（巨龙失败扣 1~3）。
+            </li>
+            <li>回合结束补牌到 5 张。生命上限 6，每轮开始重置。</li>
+            <li>
+              一轮结束：击杀他人 +3（存活者 +1）；放完所有魔法 +3；自杀则其他人 +1。猫头鹰秘密牌存活时每张再 +1。
+            </li>
+            <li>先到 8 分且分数最高者获胜。</li>
+          </ul>
+          <div className="magic-list">
+            {MAGIC_LIST.map((m) => (
+              <div key={m.key} className="magic-line">
+                <span className="magic-emoji">{m.emoji}</span>
+                <span className="magic-name">
+                  {m.name} ×{m.count}
+                </span>
+                <span className="magic-desc">{m.desc}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+
+        <button className="ghost-btn" onClick={onBack}>
+          ← 返回游戏大厅
+        </button>
+      </div>
+    </div>
+  );
+}

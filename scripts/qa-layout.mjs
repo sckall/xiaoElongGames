@@ -30,8 +30,12 @@ try {
     let overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (overflow > 1) fail(`设置页 ${vp.name}(${vp.w}px) 横向溢出 ${overflow}px`);
 
-    // 对局页
+    // 对局页（经大厅 → 出包魔法师 → 单人）
     await page.click('button.primary-btn.big');
+    await page.waitForSelector('.hall-page');
+    await page.click('.hall-card.playable');
+    await page.waitForSelector('.detail-panel');
+    await page.click('button:has-text("开始（本地 vs AI）")');
     await page.waitForSelector('.game-page');
     await page.waitForTimeout(400);
     overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

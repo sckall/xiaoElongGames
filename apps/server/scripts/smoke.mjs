@@ -84,6 +84,16 @@ await sleep(600);
 if (!A.lastView || !B.lastView) fail('开局后未收到游戏状态');
 else console.log('✅ 对局开始，双方均收到状态');
 
+// 4.5 恶意 payload 韧性：非法魔法/非法设置/超大 bot 数不应导致崩溃
+A.s.emit('declareSpell', { magic: 'hack' });
+A.s.emit('updateSettings', { settings: { autopilot: 'evil', aiSpeed: 999999 } });
+A.s.emit('setBots', { count: 999 });
+await sleep(600);
+// 恢复节奏（aiSpeed 999999 被 clamp 到 4s，会把测试拖慢）
+A.s.emit('updateSettings', { settings: { aiSpeed: 500 } });
+await sleep(300);
+console.log('✅ 恶意 payload 已发送，服务端未崩溃（非法魔法被拒、设置白名单生效）');
+
 // 5. 随机行动直到游戏结束（或超时）；轮末由房主 A 手动开始下一轮
 const deadline = Date.now() + 90_000;
 while (Date.now() < deadline && !(A.gameOver && B.gameOver)) {
@@ -123,7 +133,9 @@ if (!health) fail('healthz 不可用');
 else if (health.rooms !== 0) fail(`全员退出后房间未关闭（rooms=${health.rooms}）`);
 else console.log('✅ 全员退出后房间自动关闭');
 
-const errors = [...A.errors, ...B.errors, ...C.errors].filter((e) => !String(e).includes('断开'));
+const errors = [...A.errors, ...B.errors, ...C.errors].filter(
+  (e) => !String(e).includes('断开') && !String(e).includes('未知魔法'),
+);
 if (errors.length > 0) fail(`收到服务端错误：${errors.join('；')}`);
 
 C.s.disconnect();

@@ -20,9 +20,13 @@ try {
     const page = await ctx.newPage();
     await page.goto(BASE);
     await page.waitForSelector('.setup-panel');
+    await page.click('button.primary-btn.big'); // 进入游戏大厅
+    await page.waitForSelector('.hall-page');
+    await page.click('.hall-card.playable');
+    await page.waitForSelector('.detail-panel');
     // 选 n 人
     await page.click(`.count-btn:has-text("${n} 人")`);
-    await page.click('button.primary-btn.big');
+    await page.click('button:has-text("开始（本地 vs AI）")');
     await page.waitForSelector('.game-page');
     await sleep(1200);
     const name = n === 4 ? '06-game-4p' : '07-game-5p';
