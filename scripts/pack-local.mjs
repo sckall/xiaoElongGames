@@ -28,23 +28,67 @@ fs.rmSync(pkgDir, { recursive: true, force: true });
 fs.mkdirSync(pkgDir, { recursive: true });
 fs.cpSync(path.join(root, 'apps/web/dist'), pkgDir, { recursive: true });
 
-// 3. 启动脚本（macOS 双击 / Windows 双击）
+// 3. 迷你静态服务器（仅监听 127.0.0.1；闲置超时自动退出；Ctrl+C/关窗口立即停）
+fs.writeFileSync(
+  path.join(pkgDir, 'server.py'),
+  `import http.server
+import socketserver
+import threading
+import time
+import os
+
+PORT = 8123
+# 闲置多少秒后自动退出（可用环境变量覆盖，方便测试）
+IDLE_LIMIT = int(os.environ.get("TM_IDLE", "600"))
+
+last_request = time.time()
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        global last_request
+        last_request = time.time()
+        return super().do_GET()
+
+    def log_message(self, *args):
+        pass  # 安静模式
+
+class Server(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+
+with Server(("127.0.0.1", PORT), Handler) as httpd:
+    def watcher():
+        while True:
+            time.sleep(10)
+            if time.time() - last_request > IDLE_LIMIT:
+                httpd.shutdown()
+                return
+
+    threading.Thread(target=watcher, daemon=True).start()
+    print(f"[Gator Hall] local server: http://127.0.0.1:{PORT}")
+    print(f"[Gator Hall] auto-stops after {IDLE_LIMIT}s idle, or Ctrl+C / close this window.")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+print("[Gator Hall] server stopped.")
+`,
+);
+
+// 4. 启动脚本（macOS 双击 / Windows 双击）
 fs.writeFileSync(
   path.join(pkgDir, '启动.command'),
   `#!/bin/bash
-# 小鳄龙之家 · 单机版启动器（macOS 双击运行；首次需右键→打开 或在终端 chmod +x）
+# 小鳄龙之家 · 单机版启动器
+# 双击运行；首次如被拦截请右键→打开（或在终端执行 chmod +x 启动.command）
 cd "$(dirname "$0")"
-PORT=8123
-if ! lsof -i :$PORT >/dev/null 2>&1; then
-  (python3 -m http.server $PORT >/dev/null 2>&1 &)
-fi
-sleep 1
-open "http://127.0.0.1:$PORT"
+open "http://127.0.0.1:8123"
+exec python3 server.py
+# 玩完关掉这个终端窗口（或 Ctrl+C）即停止服务；闲置 10 分钟也会自动退出
 `,
 );
 fs.writeFileSync(
   path.join(pkgDir, '启动.bat'),
-  `@echo off\r\ncd /d "%%~dp0"\r\nwhere python >nul 2>&1\r\nif %%errorlevel%% neq 0 (\r\n  echo [小鳄龙之家] 未检测到 Python，单机启动需要它：\r\n  echo   方法1（推荐）：winget install Python.Python.3.12\r\n  echo   方法2：浏览器打开 https://www.python.org/downloads/ 安装，勾选 "Add Python to PATH"\r\n  echo   装好后重新双击本脚本\r\n  pause\r\n  exit /b 1\r\n)\r\nstart "" cmd /c "python -m http.server 8123 >nul 2>&1"\r\ntimeout /t 1 /nobreak >nul\r\nstart http://127.0.0.1:8123\r\n`,
+  `@echo off\r\nchcp 65001 >nul\r\ncd /d "%%~dp0"\r\nwhere python >nul 2>&1\r\nif %%errorlevel%% neq 0 (\r\n  echo [小鳄龙之家] 未检测到 Python，单机启动需要它：\r\n  echo   方法1（推荐）：winget install Python.Python.3.12\r\n  echo   方法2：浏览器打开 https://www.python.org/downloads/ 安装，勾选 "Add Python to PATH"\r\n  echo   装好后重新双击本脚本\r\n  pause\r\n  exit /b 1\r\n)\r\nstart http://127.0.0.1:8123\r\npython server.py\r\necho [小鳄龙之家] 服务已停止（闲置自动退出或你关闭了窗口）\r\npause\r\n`,
 );
 fs.writeFileSync(
   path.join(pkgDir, '使用说明.txt'),
@@ -53,6 +97,11 @@ fs.writeFileSync(
 【怎么玩】
 - macOS：双击「启动.command」（如被拦截：右键→打开；或首次在终端执行 chmod +x 启动.command）
 - Windows：双击「启动.bat」，浏览器自动打开 http://127.0.0.1:8123
+
+【服务会自动关闭，不留后台进程】
+- 玩完关掉启动时弹出的那个小窗口（或按 Ctrl+C），服务立即停止
+- 即使忘记关：闲置 10 分钟无操作也会自动退出
+- 服务只监听本机（127.0.0.1），不对外暴露
 
 【运行依赖】
 - 现代浏览器（Chrome/Edge/Safari/Firefox 均可）
