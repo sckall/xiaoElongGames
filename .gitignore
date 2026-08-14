@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.dsh/
+.env
+.env.*
+!.env.example
+tools/.vision.env
+tools/vision-results/
