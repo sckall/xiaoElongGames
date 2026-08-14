@@ -44,22 +44,29 @@ open "http://127.0.0.1:$PORT"
 );
 fs.writeFileSync(
   path.join(pkgDir, '启动.bat'),
-  `@echo off\r\ncd /d "%%~dp0"\r\nstart "" cmd /c "python -m http.server 8123 >nul 2>&1"\r\nstart http://127.0.0.1:8123\r\n`,
+  `@echo off\r\ncd /d "%%~dp0"\r\nwhere python >nul 2>&1\r\nif %%errorlevel%% neq 0 (\r\n  echo [小鳄龙之家] 未检测到 Python，单机启动需要它：\r\n  echo   方法1（推荐）：winget install Python.Python.3.12\r\n  echo   方法2：浏览器打开 https://www.python.org/downloads/ 安装，勾选 "Add Python to PATH"\r\n  echo   装好后重新双击本脚本\r\n  pause\r\n  exit /b 1\r\n)\r\nstart "" cmd /c "python -m http.server 8123 >nul 2>&1"\r\ntimeout /t 1 /nobreak >nul\r\nstart http://127.0.0.1:8123\r\n`,
 );
 fs.writeFileSync(
   path.join(pkgDir, '使用说明.txt'),
   `小鳄龙之家 · 单机版 v${version}
 
 【怎么玩】
-- macOS：双击「启动.command」（如被拦截，右键→打开；或首次在终端执行 chmod +x 启动.command）
-- Windows：双击「启动.bat」（需要系统装有 Python）
-- 浏览器会自动打开 http://127.0.0.1:8123
+- macOS：双击「启动.command」（如被拦截：右键→打开；或首次在终端执行 chmod +x 启动.command）
+- Windows：双击「启动.bat」，浏览器自动打开 http://127.0.0.1:8123
 
-【说明】
-- 单人 vs AI 模式完全本地运行，不需要网络、不需要游戏服务器。
-- 联机对战需要连接已部署的公网服务器：游戏内「联机大厅 → 服务器地址」填入
-  http://<服务器IP或域名>:<端口> 即可。
-- 依赖：仅 Python3（macOS 自带；Windows 需自行安装或改用手动方式托管本目录）。
+【运行依赖】
+- 现代浏览器（Chrome/Edge/Safari/Firefox 均可）
+- Python3（仅用于托管本目录静态文件，不含任何游戏逻辑）：
+  macOS 系统自带；Windows 需安装（启动.bat 会检测并给出安装指引）
+- 不需要 Node.js / pnpm / npm，不需要联网（单人模式完全离线）
+
+【为什么包这么小（约 0.1MB）】
+前端构建时已把游戏全部代码（规则引擎、AI、界面）打包进一个 JS 文件，
+运行时无任何外部依赖。
+
+【联机】
+单人 vs AI 完全本地。想联机：游戏内「联机大厅 → 服务器地址」填入
+已部署的公网服务器地址（http://<IP或域名>:<端口>）即可。
 `,
 );
 
