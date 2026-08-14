@@ -58,7 +58,7 @@ button {
   color: #33200a;
   font-weight: 700;
   font-size: 16px;
-  padding: 12px 20px;
+  padding: 13px 26px;
   cursor: pointer;
   transition: transform 0.12s ease, filter 0.12s ease;
 }
@@ -125,7 +125,7 @@ button {
 .card-emoji {
   font-size: 27px;
   line-height: 1;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+  filter: saturate(1.15) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
 }
 
 .card.small .card-emoji {
@@ -234,9 +234,9 @@ button {
 }
 
 .setup-panel h1 {
-  margin: 0;
+  margin: 0 0 2px;
   text-align: center;
-  font-size: 36px;
+  font-size: 40px;
   background: linear-gradient(120deg, #ffe9b0, #ffb84d 45%, #ff8a4d);
   -webkit-background-clip: text;
   background-clip: text;
@@ -246,7 +246,8 @@ button {
 
 .subtitle {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
+  margin-top: 4px;
   color: var(--muted2);
   letter-spacing: 3px;
 }
@@ -261,7 +262,7 @@ button {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   font-size: 15px;
   color: var(--muted);
 }
@@ -330,9 +331,11 @@ button {
 
 .count-btn.active {
   background: var(--accent2);
-  border-color: var(--accent2);
+  border-color: #c9b8ff;
   color: #fff;
-  box-shadow: 0 0 16px rgba(138, 107, 255, 0.45);
+  font-weight: 700;
+  transform: scale(1.03);
+  box-shadow: 0 0 18px rgba(138, 107, 255, 0.55);
 }
 
 .pref-btn {
@@ -644,9 +647,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.8);
 }
 
 /* ---------- 手牌 ---------- */
@@ -747,7 +750,7 @@ button {
 }
 
 .mb-emoji {
-  font-size: 26px;
+  font-size: 30px;
   line-height: 1;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
 }
@@ -795,7 +798,7 @@ button {
 }
 
 .restrict-hint {
-  color: var(--accent);
+  color: #ffd9a0;
   font-size: 13px;
   background: rgba(255, 184, 77, 0.08);
   border: 1px solid rgba(255, 184, 77, 0.25);
@@ -826,9 +829,9 @@ button {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   font-size: 13.5px;
-  line-height: 1.65;
+  line-height: 1.75;
   flex: 1;
   scrollbar-width: thin;
 }
@@ -981,7 +984,7 @@ button {
   border-radius: 10px;
   border: 1px solid rgba(138, 107, 255, 0.4);
   background: var(--input-bg);
-  color: var(--muted);
+  color: #e6defa;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -1135,7 +1138,7 @@ button {
 .join-block {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .create-row {
@@ -1148,7 +1151,11 @@ button {
 }
 
 .bot-select,
-.code-input {
+.code-input::placeholder {
+  color: var(--muted2);
+}
+
+input {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1201,8 +1208,8 @@ button {
   background: radial-gradient(
     circle at 50% 45%,
     rgba(255, 214, 102, 0.5),
-    rgba(67, 209, 122, 0.28) 35%,
-    rgba(10, 5, 25, 0.82) 75%
+    rgba(67, 209, 122, 0.26) 32%,
+    rgba(10, 5, 25, 0.55) 70%
   );
 }
 
@@ -1210,15 +1217,15 @@ button {
   background: radial-gradient(
     circle at 50% 45%,
     rgba(255, 93, 115, 0.55),
-    rgba(120, 10, 30, 0.45) 40%,
-    rgba(10, 5, 25, 0.85) 78%
+    rgba(120, 10, 30, 0.42) 38%,
+    rgba(10, 5, 25, 0.6) 72%
   );
 }
 
 .fx-burst {
   position: absolute;
-  width: 360px;
-  height: 360px;
+  width: 300px;
+  height: 300px;
   border-radius: 50%;
   animation: ffxBurst 0.7s ease-out forwards;
 }
