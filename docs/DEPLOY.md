@@ -121,7 +121,7 @@ node apps/server/scripts/smoke.mjs http://127.0.0.1:<端口>
 | WebSocket 失败（nginx 场景） | 确认含 `Upgrade`/`Connection` 两条头 |
 | 端口被占用 | `lsof -i :<端口>` 找到进程处理 |
 | 想换端口 | 改 `PORT` 环境变量（docker-compose/systemd/启动命令），并同步防火墙 |
-| 想限制暴露面 | 服务端已内置每 IP 连接/建房上限与全局房间上限，见 `docs/SECURITY-REVIEW.md` |
+| 想限制暴露面 | 服务端已内置每 IP 连接/建房上限与全局房间上限 |
 
 ## 10. 升级更新
 

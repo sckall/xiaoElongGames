@@ -15,9 +15,6 @@
 | [AGENTS.md](AGENTS.md) | **Agent（AI 开发规范）** | 开发流程、架构约束、测试要求、提交规范、风险日志铁律 |
 | [CHANGELOG.md](CHANGELOG.md) | 所有人 | 版本更新日志（v1 ~ 最新） |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端详细部署（系统要求/依赖/命令/测试/发布包） |
-| [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md) | 开发者 | 安全审查报告与 IP 暴露防护指南 |
-| [docs/UI-DIRECTION.md](docs/UI-DIRECTION.md) | 设计 | UI 精致化方向建议 |
-| [docs/ONLINE-PLATFORM.md](docs/ONLINE-PLATFORM.md) | 架构 | 多游戏平台化演进路线（回合制/异步/同步三模式） |
 | [RISK_LOG.md](RISK_LOG.md) | Agent | 工作区外操作风险日志（铁律：先记录后执行） |
 
 ## 🎮 客户端形态（重要）
@@ -96,7 +93,7 @@ node scripts/pack-release.mjs   # 生成 release/trouble-magician-<版本>.tar.g
 
 1. **开发与生产端口不同**：dev 前端 5173（经代理连 8787）；生产只有服务端一个端口（托管静态产物）。
 2. **服务端无持久化**：对局即开即散，重启清空所有房间（无数据库，属预期设计）。
-3. **房间码 4 位**（约 100 万组合）：当前规模够用；公开运营前建议按 SECURITY-REVIEW 扩位/加账号。
+3. **房间码 4 位**（约 100 万组合）：当前规模够用；公开运营前建议扩位/加账号体系。
 4. **联机对局是权威服务端**：客户端只收「以我为视角」的投影状态，防作弊依赖此设计，改协议时勿破坏。
 5. **战报日志默认隐藏**：这是玩法设计（逼迫玩家记忆出牌），不是 bug；设置里可开。
 6. 系统开启「减弱动态效果」时全屏施法特效以静态形式呈现（已适配，见 v7 变更）。
