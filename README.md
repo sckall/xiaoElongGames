@@ -74,6 +74,11 @@ node scripts/e2e-twowindow.mjs
 - **轮末手动推进**：每轮结束不自动跳转，由房主点「开始下一轮」；结算面板不遮挡手牌，
   并展示所有玩家手牌供复盘（你自己的手牌在轮末揭晓）。
 
+## 界面截图
+
+测试截图保存在 [docs/screenshots/](docs/screenshots/)（由 playwright 自动截取，含设置页、对局页、
+全屏特效成功/失败、游戏大厅、联机大厅、4/5 人局布局）。截图脚本：`scripts/shots.mjs`、`scripts/shots-5p.mjs`。
+
 ## 目录结构
 
 ```
