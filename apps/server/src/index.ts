@@ -24,6 +24,11 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
 
 const rooms = new Map<string, Room>();
 
+// 健康检查（部署探活用）
+app.get('/healthz', (_req, res) => {
+  res.json({ ok: true, rooms: rooms.size, uptime: Math.round(process.uptime()) });
+});
+
 function uniqueCode(): string {
   for (let i = 0; i < 20; i++) {
     const code = genRoomCode();

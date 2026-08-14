@@ -4,8 +4,7 @@ coverage/
 *.log
 .DS_Store
 .dsh/
+tools/
 .env
 .env.*
 !.env.example
-tools/.vision.env
-tools/vision-results/
