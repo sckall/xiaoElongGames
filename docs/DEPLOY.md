@@ -49,9 +49,26 @@ pnpm install --frozen-lockfile --prod
 PORT=8080 HOST=0.0.0.0 pnpm --filter @tm/server start
 # 另开终端：curl http://127.0.0.1:8080/healthz  → {"ok":true,...}
 
-# 3.4 常驻（systemd）
-sudo cp docs/tm-server.service /etc/systemd/system/
-sudo nano /etc/systemd/system/tm-server.service   # 改 User/WorkingDirectory/Environment
+# 3.4 常驻（systemd）：创建 /etc/systemd/system/tm-server.service，内容：
+cat <<'EOF' | sudo tee /etc/systemd/system/tm-server.service
+[Unit]
+Description=Trouble Magician game server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/trouble-magician-<版本>
+Environment=PORT=8080
+Environment=HOST=0.0.0.0
+ExecStart=/usr/bin/pnpm --filter @tm/server start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+# 按实际路径修改 User/WorkingDirectory 后：
 sudo systemctl daemon-reload && sudo systemctl enable --now tm-server
 journalctl -u tm-server -f    # 看日志
 ```
@@ -68,15 +85,13 @@ docker compose up -d --build     # 端口映射 8080:8080（见 docker-compose.y
 curl http://127.0.0.1:8080/healthz
 ```
 
-## 5. 方式 C：源码 + systemd
+## 5. 方式 C：源码 + systemd（systemd 单元内容见方式 A 3.4 节，按路径修改）
 
 ```bash
 git clone <仓库> && cd <仓库>
 pnpm install --frozen-lockfile
 pnpm --filter @tm/web build
-sudo cp docs/tm-server.service /etc/systemd/system/
-sudo nano /etc/systemd/system/tm-server.service   # 修改 User/WorkingDirectory
-sudo systemctl daemon-reload && sudo systemctl enable --now tm-server
+# 然后创建 systemd 单元（内容见上方 3.4 节）并 enable --now
 ```
 
 ## 6. 配置项
@@ -108,9 +123,34 @@ node apps/server/scripts/smoke.mjs http://127.0.0.1:<端口>
 ## 8. 域名 + HTTPS（可选）
 
 1. 域名 A 记录解析到服务器公网 IP。
-2. `sudo apt install -y nginx`，参考 `docs/nginx.conf` 配置反代（含 WebSocket 两条头）。
-3. `sudo apt install -y certbot python3-certbot-nginx && sudo certbot --nginx -d 你的域名`。
-4. 防火墙放行 80/443；游戏端口可改为仅本机监听（`HOST=127.0.0.1`）。
+2. `sudo apt install -y nginx`，创建 `/etc/nginx/sites-available/tm`（含 WebSocket 两条头），内容：
+
+```nginx
+server {
+    listen 80;
+    server_name tm.example.com;   # ← 改成你的域名
+
+    client_max_body_size 1m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;   # ← 改成服务端实际端口
+        proxy_http_version 1.1;
+
+        # Socket.IO 必需的两条头
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 60s;
+    }
+}
+```
+
+3. `sudo ln -s /etc/nginx/sites-available/tm /etc/nginx/sites-enabled/ && sudo nginx -t && sudo systemctl reload nginx`。
+4. `sudo apt install -y certbot python3-certbot-nginx && sudo certbot --nginx -d 你的域名`。
+5. 防火墙放行 80/443；游戏端口可改为仅本机监听（`HOST=127.0.0.1`）。
 
 ## 9. 常见问题
 

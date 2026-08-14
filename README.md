@@ -5,17 +5,14 @@
 喊对魔法生效，喊错就出包扣血。支持本地 vs AI 与联机房间对战。
 
 - 游戏规则规格：`出包魔法师桌游基本规则.md`
-- 界面截图：[docs/screenshots/](docs/screenshots/)
 
 ## 📚 文档索引
 
 | 文档 | 面向 | 内容 |
 |------|------|------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 开发者 / Agent | 项目架构、前后端职责、数据流、文件与接口说明 |
-| [AGENTS.md](AGENTS.md) | **Agent（AI 开发规范）** | 开发流程、架构约束、测试要求、提交规范、风险日志铁律 |
 | [CHANGELOG.md](CHANGELOG.md) | 所有人 | 版本更新日志（v1 ~ 最新） |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端详细部署（系统要求/依赖/命令/测试/发布包） |
-| [RISK_LOG.md](RISK_LOG.md) | Agent | 工作区外操作风险日志（铁律：先记录后执行） |
 
 ## 🎮 客户端形态（重要）
 

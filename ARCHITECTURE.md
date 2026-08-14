@@ -102,4 +102,3 @@ apps/server  Socket.IO
 2. **引擎保持零依赖、可注入随机**：便于单测与未来迁移（如 boardgame.io）。
 3. **协议改动 = 双端一起改**：`protocol.ts` 是唯一事件契约；服务端对所有入参做白名单/数值校验。
 4. **本地/联机 UI 共用**：新界面逻辑放 `GameTable`/组件，行为差异通过 `GameApi` 适配。
-5. 提交规范与开发流程见 [AGENTS.md](AGENTS.md)。
