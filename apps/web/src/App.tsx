@@ -1,12 +1,38 @@
 import { useState } from 'react';
 import { MAGIC_LIST, MAX_PLAYERS, MIN_PLAYERS } from '@tm/rules';
-import GameScreen from './GameScreen';
+import GameScreen, { type GameSettings } from './GameScreen';
+
+function loadSettings(): GameSettings {
+  try {
+    const raw = localStorage.getItem('tm-settings');
+    if (raw) {
+      const s = JSON.parse(raw) as Partial<GameSettings>;
+      return { fx: s.fx !== false, sound: s.sound !== false };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { fx: true, sound: true };
+}
 
 export default function App() {
   const [screen, setScreen] = useState<'setup' | 'game'>('setup');
   const [playerCount, setPlayerCount] = useState(4);
   const [myName, setMyName] = useState('你');
   const [sessionKey, setSessionKey] = useState(0);
+  const [settings, setSettings] = useState<GameSettings>(loadSettings);
+
+  const updateSettings = (patch: Partial<GameSettings>) => {
+    setSettings((s) => {
+      const next = { ...s, ...patch };
+      try {
+        localStorage.setItem('tm-settings', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   if (screen === 'game') {
     return (
@@ -14,8 +40,11 @@ export default function App() {
         key={sessionKey}
         playerCount={playerCount}
         myName={myName}
+        settings={settings}
         onExit={() => setScreen('setup')}
         onRestart={() => setSessionKey((k) => k + 1)}
+        onToggleSound={() => updateSettings({ sound: !settings.sound })}
+        onToggleFx={() => updateSettings({ fx: !settings.fx })}
       />
     );
   }
@@ -30,11 +59,7 @@ export default function App() {
 
         <label className="field">
           <span>你的名字</span>
-          <input
-            value={myName}
-            maxLength={8}
-            onChange={(e) => setMyName(e.target.value)}
-          />
+          <input value={myName} maxLength={8} onChange={(e) => setMyName(e.target.value)} />
         </label>
 
         <div className="field">
@@ -54,8 +79,32 @@ export default function App() {
           </div>
         </div>
 
-        <button className="primary-btn big" onClick={() => { setSessionKey((k) => k + 1); setScreen('game'); }}>
-          🎮 开始游戏
+        <div className="field">
+          <span>偏好</span>
+          <div className="pref-row">
+            <button
+              className={`pref-btn ${settings.sound ? 'active' : ''}`}
+              onClick={() => updateSettings({ sound: !settings.sound })}
+            >
+              {settings.sound ? '🔊 音效开' : '🔇 音效关'}
+            </button>
+            <button
+              className={`pref-btn ${settings.fx ? 'active' : ''}`}
+              onClick={() => updateSettings({ fx: !settings.fx })}
+            >
+              {settings.fx ? '✨ 动画开' : '💤 动画关'}
+            </button>
+          </div>
+        </div>
+
+        <button
+          className="primary-btn big"
+          onClick={() => {
+            setSessionKey((k) => k + 1);
+            setScreen('game');
+          }}
+        >
+          🎮 开始游戏（本地 vs AI）
         </button>
 
         <details className="rules">
@@ -72,7 +121,9 @@ export default function App() {
             {MAGIC_LIST.map((m) => (
               <div key={m.key} className="magic-line">
                 <span className="magic-emoji">{m.emoji}</span>
-                <span className="magic-name">{m.name} ×{m.count}</span>
+                <span className="magic-name">
+                  {m.name} ×{m.count}
+                </span>
                 <span className="magic-desc">{m.desc}</span>
               </div>
             ))}

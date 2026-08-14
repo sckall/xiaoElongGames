@@ -1,12 +1,26 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MAGIC_DEFS,
   MAGIC_LIST,
-  MAX_HP,
+  type EffectEvent,
   type Magic,
   type SeatView,
 } from '@tm/rules';
 import { useLocalGame } from './useLocalGame';
+import { HpBar, MagicCard } from './components';
+import { playSfx, setSoundEnabled } from './fx';
+
+export interface GameSettings {
+  fx: boolean;
+  sound: boolean;
+}
+
+interface FloatFx {
+  key: number;
+  seatId: string;
+  text: string;
+  kind: 'damage' | 'heal';
+}
 
 const EVENT_ICONS: Record<string, string> = {
   roundStart: '🎬',
@@ -24,67 +38,70 @@ const EVENT_ICONS: Record<string, string> = {
   info: '💬',
 };
 
-function HpBar({ hp }: { hp: number }) {
-  return (
-    <span className="hp">
-      {'❤️'.repeat(hp)}
-      {'🖤'.repeat(MAX_HP - hp)}
-    </span>
-  );
-}
-
-function MagicChip({ magic }: { magic: Magic }) {
-  const def = MAGIC_DEFS[magic];
-  return (
-    <span className="chip" title={`${def.name} ×${def.count}：${def.desc}`}>
-      {def.emoji}
-    </span>
-  );
-}
-
 function SecretBadge({ seat, isYou }: { seat: SeatView; isYou: boolean }) {
   if (seat.secretCount === 0) return null;
   if (isYou) {
     return (
-      <span className="secret-badge" title="你的秘密牌（存活时每张 +1 分）">
-        🤫{' '}
-        {seat.secrets.map((m, i) =>
-          m ? <MagicChip key={i} magic={m} /> : null,
-        )}
-      </span>
+      <div className="secret-badge" title="你的秘密牌（本轮存活时每张 +1 分）">
+        🤫 {seat.secrets.map((m, i) => (m ? <MagicCard key={i} magic={m} small /> : null))}
+      </div>
     );
   }
-  return <span className="secret-badge">🤫×{seat.secretCount}</span>;
+  return <div className="secret-badge">🤫 ×{seat.secretCount}</div>;
 }
 
-function Seat({ seat, isYou, isCurrent }: { seat: SeatView; isYou: boolean; isCurrent: boolean }) {
+function Seat({
+  seat,
+  isYou,
+  isCurrent,
+  isPrev,
+  isNext,
+  shaking,
+  floats,
+}: {
+  seat: SeatView;
+  isYou: boolean;
+  isCurrent: boolean;
+  isPrev: boolean;
+  isNext: boolean;
+  shaking: boolean;
+  floats: FloatFx[];
+}) {
   return (
-    <div className={`seat ${isYou ? 'you' : ''} ${isCurrent ? 'current' : ''} ${seat.alive ? '' : 'dead'}`}>
-      <div className="seat-head">
-        <span className="seat-name">
-          {seat.name}
-          {seat.isBot ? ' 🤖' : ''}
-          {isCurrent ? ' ⏳' : ''}
-        </span>
-        <span className="seat-score">⭐{seat.score}</span>
-        <span className="seat-secrets">
+    <div
+      className={`seat ${isYou ? 'you' : ''} ${isCurrent ? 'current' : ''} ${seat.alive ? '' : 'dead'} ${shaking ? 'shaking' : ''}`}
+    >
+      <div className="seat-top">
+        <div className={`avatar av-${seat.id === 'you' ? 'you' : (seat.isBot ? 'bot' : 'human')}`}>
+          {seat.name.slice(0, 1)}
+        </div>
+        <div className="seat-info">
+          <div className="seat-name">
+            {seat.name}
+            {seat.isBot && <span className="bot-tag">🤖</span>}
+            {isPrev && <span className="rel-tag" title="你的上家">🌨️上家</span>}
+            {isNext && <span className="rel-tag" title="你的下家">🔥下家</span>}
+            {isCurrent && <span className="turn-tag">⏳施法中</span>}
+          </div>
+          <HpBar hp={seat.hp} shaking={shaking} />
+        </div>
+        <div className="seat-side">
+          <div className="seat-score">⭐ {seat.score}</div>
           <SecretBadge seat={seat} isYou={isYou} />
-        </span>
+        </div>
       </div>
-      <HpBar hp={seat.hp} />
-      <div className="hand">
-        {seat.hand.map((m, i) =>
-          m ? (
-            <MagicChip key={i} magic={m} />
-          ) : (
-            <span key={i} className="chip back" title="你的手牌（背对自己，看不到）">
-              🂠
-            </span>
-          ),
-        )}
+      <div className="hand-fan">
+        {seat.hand.map((m, i) => (
+          <MagicCard key={i} magic={m} hidden={isYou} />
+        ))}
         {seat.handCount === 0 && <span className="empty-hand">无手牌</span>}
       </div>
       {!seat.alive && <div className="dead-mark">💀 已倒下</div>}
+      {floats.map((f) => (
+        <span key={f.key} className={`float-fx ${f.kind}`}>
+          {f.text}
+        </span>
+      ))}
     </div>
   );
 }
@@ -92,63 +109,219 @@ function Seat({ seat, isYou, isCurrent }: { seat: SeatView; isYou: boolean; isCu
 export default function GameScreen({
   playerCount,
   myName,
+  settings,
   onExit,
   onRestart,
+  onToggleSound,
+  onToggleFx,
 }: {
   playerCount: number;
   myName: string;
+  settings: GameSettings;
   onExit: () => void;
   onRestart: () => void;
+  onToggleSound: () => void;
+  onToggleFx: () => void;
 }) {
   const game = useLocalGame(playerCount, myName);
+  const [floats, setFloats] = useState<FloatFx[]>([]);
+  const [shake, setShake] = useState<{ seatId: string; key: number } | null>(null);
+  const [banner, setBanner] = useState<{ magic: Magic; fail: boolean; key: number } | null>(null);
+  const [dice, setDice] = useState<{ amount: number; key: number } | null>(null);
+  const [confetti, setConfetti] = useState(false);
+  const prevSeq = useRef<number | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const fxOn = useRef(settings.fx);
+  fxOn.current = settings.fx;
+
+  useEffect(() => {
+    setSoundEnabled(settings.sound);
+  }, [settings.sound]);
 
   useEffect(() => {
     game.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const view = game.view;
+
+  // 事件增量 → 特效/音效
+  useEffect(() => {
+    if (!view) return;
+    const last = view.events.length ? view.events[view.events.length - 1].seq : 0;
+    if (prevSeq.current === null) {
+      prevSeq.current = last;
+      return;
+    }
+    const fresh = view.events.filter((e) => e.seq > prevSeq.current!);
+    prevSeq.current = last;
+    for (const e of fresh) handleFx(e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view?.turnNo]);
+
+  // 战报自动滚动
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [game.view?.turnNo, game.view?.events.length]);
+  }, [view?.events.length]);
 
-  const view = game.view;
+  function handleFx(e: EffectEvent) {
+    const fx = fxOn.current;
+    switch (e.type) {
+      case 'damage': {
+        if (!e.targetId) break;
+        playSfx('damage');
+        if (!fx) break;
+        const key = e.seq;
+        setFloats((f) => [...f, { key, seatId: e.targetId!, text: `-${e.amount ?? 1}`, kind: 'damage' }]);
+        setShake({ seatId: e.targetId!, key });
+        window.setTimeout(() => {
+          setFloats((f) => f.filter((x) => x.key !== key));
+          setShake((s) => (s?.key === key ? null : s));
+        }, 1400);
+        break;
+      }
+      case 'heal': {
+        if (!e.targetId || (e.amount ?? 0) <= 0) break;
+        playSfx('heal');
+        if (!fx) break;
+        const key = e.seq;
+        setFloats((f) => [...f, { key, seatId: e.targetId!, text: `+${e.amount}`, kind: 'heal' }]);
+        window.setTimeout(() => setFloats((f) => f.filter((x) => x.key !== key)), 1400);
+        break;
+      }
+      case 'cast': {
+        playSfx('cast');
+        if (fx && e.magic) {
+          const key = e.seq;
+          setBanner({ magic: e.magic, fail: false, key });
+          window.setTimeout(() => setBanner((b) => (b?.key === key ? null : b)), 1200);
+        }
+        break;
+      }
+      case 'fail': {
+        playSfx('fail');
+        if (fx && e.magic) {
+          const key = e.seq;
+          setBanner({ magic: e.magic, fail: true, key });
+          window.setTimeout(() => setBanner((b) => (b?.key === key ? null : b)), 1500);
+        }
+        break;
+      }
+      case 'dice': {
+        if (e.amount == null) break;
+        playSfx('dice');
+        if (fx) {
+          const key = e.seq;
+          setDice({ amount: e.amount, key });
+          window.setTimeout(() => setDice((d) => (d?.key === key ? null : d)), 1300);
+        }
+        break;
+      }
+      case 'turnStart':
+        if (e.playerId === view?.youId) playSfx('turn');
+        break;
+      case 'roundEnd':
+        playSfx('roundEnd');
+        break;
+      case 'gameOver':
+        playSfx('gameOver');
+        if (fx) setConfetti(true);
+        break;
+      default:
+        break;
+    }
+  }
+
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 80 }, (_, i) => ({
+        left: Math.random() * 100,
+        delay: Math.random() * 1.4,
+        dur: 2.2 + Math.random() * 2,
+        size: 6 + Math.random() * 8,
+        color: ['#ffb84d', '#7c5cff', '#43d17a', '#ff5d73', '#4dd8ff'][i % 5],
+        rot: Math.random() * 720,
+      })),
+    [],
+  );
+
   if (!view) return <div className="page">加载中……</div>;
 
   const you = view.seats.find((s) => s.id === view.youId)!;
   const others = view.seats.filter((s) => s.id !== view.youId);
   const youIdx = view.seats.findIndex((s) => s.id === view.youId);
   const n = view.seats.length;
-  const prevSeat = view.seats[(youIdx - 1 + n) % n];
-  const nextSeat = view.seats[(youIdx + 1) % n];
+  const prevId = view.seats[(youIdx - 1 + n) % n].id;
+  const nextId = view.seats[(youIdx + 1) % n].id;
 
   return (
     <div className="page game-page">
       <header className="topbar">
         <div className="topbar-title">🧙 出包魔法师</div>
         <div className="topbar-info">
-          <span>第 {view.round} 轮</span>
-          <span>🎴 牌堆 {view.deckCount}</span>
-          <span>🤫 秘密 {view.secretPileCount}</span>
-          <span>🗑️ 弃牌 {view.discard.length}</span>
+          <span className="chip-info">🏷️ 第 {view.round} 轮</span>
+          <span className="chip-info">🎴 牌堆 {view.deckCount}</span>
+          <span className="chip-info">🤫 秘密 {view.secretPileCount}</span>
+          <span className="chip-info">🗑️ 弃牌 {view.discard.length}</span>
         </div>
+        <button
+          className="ghost-btn"
+          title={settings.sound ? '关闭音效' : '开启音效'}
+          onClick={() => onToggleSound()}
+        >
+          {settings.sound ? '🔊' : '🔇'}
+        </button>
+        <button
+          className="ghost-btn"
+          title={settings.fx ? '关闭动画' : '开启动画'}
+          onClick={() => onToggleFx()}
+        >
+          {settings.fx ? '✨' : '💤'}
+        </button>
         <button className="ghost-btn" onClick={onExit}>
           退出
         </button>
       </header>
 
       <main className="board">
-        <div className="other-seats">
+        <div className="opponents">
           {others.map((s) => (
-            <Seat key={s.id} seat={s} isYou={false} isCurrent={view.currentPlayerId === s.id} />
+            <Seat
+              key={s.id}
+              seat={s}
+              isYou={false}
+              isCurrent={view.currentPlayerId === s.id}
+              isPrev={s.id === prevId}
+              isNext={s.id === nextId}
+              shaking={shake?.seatId === s.id}
+              floats={floats.filter((f) => f.seatId === s.id)}
+            />
           ))}
         </div>
 
-        <div className="your-area">
-          <Seat seat={you} isYou isCurrent={view.currentPlayerId === you.id} />
-          <div className="you-hint">
-            你的上家：{prevSeat.name}（🌨️ 暴风雪目标）｜你的下家：{nextSeat.name}（🔥 火球目标）
+        <div className="your-zone">
+          <div className="turn-status">
+            {view.isYourTurn ? (
+              <span className="your-turn">✨ 轮到你施法了！大声喊出魔法名！</span>
+            ) : (
+              <span className="wait-turn">
+                ⏳ 等待{' '}
+                {view.currentPlayerId
+                  ? view.seats.find((s) => s.id === view.currentPlayerId)?.name
+                  : '……'}
+                {' '}施法中
+              </span>
+            )}
           </div>
+          <Seat
+            seat={you}
+            isYou
+            isCurrent={view.currentPlayerId === you.id}
+            isPrev={you.id === prevId}
+            isNext={you.id === nextId}
+            shaking={shake?.seatId === you.id}
+            floats={floats.filter((f) => f.seatId === you.id)}
+          />
           <div className="action-bar">
             {MAGIC_LIST.map((m) => {
               const legal = view.legalMagics.includes(m.key);
@@ -156,28 +329,26 @@ export default function GameScreen({
               return (
                 <button
                   key={m.key}
-                  className={`magic-btn ${legal ? '' : 'illegal'} ${isLast ? 'last' : ''}`}
+                  className={`magic-btn card-btn-${m.key} ${legal ? '' : 'illegal'} ${isLast ? 'last' : ''}`}
                   disabled={!view.isYourTurn || !legal}
                   onClick={() => game.declare(m.key)}
                   title={m.desc}
                 >
-                  <span className="magic-btn-emoji">{m.emoji}</span>
-                  <span className="magic-btn-name">{m.name}</span>
-                  <span className="magic-btn-count">×{m.count}</span>
+                  <span className="mb-emoji">{m.emoji}</span>
+                  <span className="mb-name">{m.name}</span>
+                  <span className="mb-count">×{m.count}</span>
+                  {view.isYourTurn && !legal && <span className="mb-lock">🔒</span>}
                 </button>
               );
             })}
-            <button
-              className="end-btn"
-              disabled={!view.isYourTurn}
-              onClick={game.endTurn}
-            >
+            <button className="end-btn" disabled={!view.isYourTurn} onClick={game.endTurn}>
               ⏭️ 结束回合
             </button>
           </div>
           {view.isYourTurn && view.lastMagic && (
             <div className="restrict-hint">
-              你刚施放了 {MAGIC_DEFS[view.lastMagic].emoji}「{MAGIC_DEFS[view.lastMagic].name}」，下一张不能比它更稀有（总张数不能更少）。
+              {MAGIC_DEFS[view.lastMagic].emoji} 已施放「{MAGIC_DEFS[view.lastMagic].name}」：
+              下一张魔法不能比它更稀有（总张数不能更少）。
             </div>
           )}
         </div>
@@ -195,6 +366,44 @@ export default function GameScreen({
         </div>
       </aside>
 
+      {/* 特效层 */}
+      {banner && (
+        <div className={`spell-banner ${banner.fail ? 'fail' : ''}`} key={banner.key}>
+          {banner.fail ? (
+            <span>
+              {MAGIC_DEFS[banner.magic].emoji} 出包了！「{MAGIC_DEFS[banner.magic].name}」施放失败！
+            </span>
+          ) : (
+            <span>
+              {MAGIC_DEFS[banner.magic].emoji}「{MAGIC_DEFS[banner.magic].name}」！
+            </span>
+          )}
+        </div>
+      )}
+      {dice && (
+        <div className="dice-overlay" key={dice.key}>
+          <span className="dice-cube">🎲</span>
+          <span className="dice-num">{dice.amount}</span>
+        </div>
+      )}
+      {confetti &&
+        confettiPieces.map((p, i) => (
+          <span
+            key={i}
+            className="confetti"
+            style={{
+              left: `${p.left}%`,
+              width: p.size,
+              height: p.size * 1.6,
+              background: p.color,
+              animationDelay: `${p.delay}s`,
+              animationDuration: `${p.dur}s`,
+              transform: `rotate(${p.rot}deg)`,
+            }}
+          />
+        ))}
+
+      {/* 轮末 / 终局弹层 */}
       {view.phase === 'roundEnd' && view.roundResult && (
         <div className="overlay">
           <div className="panel overlay-panel">
@@ -203,7 +412,11 @@ export default function GameScreen({
             <ul className="score-list">
               {view.seats.map((s) => (
                 <li key={s.id}>
-                  {s.name}：{view.roundResult!.points[s.id] ?? 0} 分（累计 ⭐{s.score}）
+                  {s.name}：
+                  <b className={view.roundResult!.points[s.id] > 0 ? 'gain' : ''}>
+                    +{view.roundResult!.points[s.id] ?? 0}
+                  </b>
+                  {' '}（累计 ⭐{s.score}）
                 </li>
               ))}
             </ul>
@@ -221,15 +434,17 @@ export default function GameScreen({
             <h2>🏆 游戏结束</h2>
             <p className="winner">
               {view.winnerId
-                ? `${view.seats.find((s) => s.id === view.winnerId)!.name} 获胜！`
-                : '平局？'}
+                ? `${view.seats.find((s) => s.id === view.winnerId)!.name} 获得最终胜利！`
+                : '平局！'}
             </p>
             <ul className="score-list">
-              {view.seats.map((s) => (
-                <li key={s.id}>
-                  {s.name}：⭐{s.score}
-                </li>
-              ))}
+              {[...view.seats]
+                .sort((a, b) => b.score - a.score)
+                .map((s, i) => (
+                  <li key={s.id}>
+                    {['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i] ?? ''} {s.name}：⭐{s.score}
+                  </li>
+                ))}
             </ul>
             <div className="overlay-btns">
               <button className="primary-btn" onClick={onRestart}>
