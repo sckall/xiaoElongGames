@@ -2,19 +2,24 @@ import { useState } from 'react';
 import { MAGIC_LIST, MAX_PLAYERS, MIN_PLAYERS } from '@tm/rules';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
-import type { GameSettings } from './GameSettings';
+import { AI_SPEED_PRESETS, DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
 
 function loadSettings(): GameSettings {
   try {
     const raw = localStorage.getItem('tm-settings');
     if (raw) {
       const s = JSON.parse(raw) as Partial<GameSettings>;
-      return { fx: s.fx !== false, sound: s.sound !== false };
+      return {
+        fx: s.fx !== false,
+        sound: s.sound !== false,
+        aiSpeed: typeof s.aiSpeed === 'number' ? s.aiSpeed : DEFAULT_SETTINGS.aiSpeed,
+        serverUrl: typeof s.serverUrl === 'string' ? s.serverUrl : '',
+      };
     }
   } catch {
     /* ignore */
   }
-  return { fx: true, sound: true };
+  return { ...DEFAULT_SETTINGS };
 }
 
 type Screen = 'setup' | 'local' | 'online';
@@ -63,6 +68,7 @@ export default function App() {
         onExit={() => setScreen('setup')}
         onToggleSound={() => updateSettings({ sound: !settings.sound })}
         onToggleFx={() => updateSettings({ fx: !settings.fx })}
+        onServerUrlChange={(url) => updateSettings({ serverUrl: url.trim() })}
       />
     );
   }
@@ -113,6 +119,20 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="field">
+              <span>AI 行动节奏</span>
+              <select
+                className="bot-select"
+                value={settings.aiSpeed}
+                onChange={(e) => updateSettings({ aiSpeed: Number(e.target.value) })}
+              >
+                {AI_SPEED_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}（{p.value}ms）
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               className="primary-btn big"

@@ -1,6 +1,12 @@
 /**
  * 房间：封装大厅 → 对局 → 结算的完整生命周期。
- * 断线/离开的座位由服务端 AI 自动托管，游戏不中断。
+ *
+ * 断线/退出管理方案：
+ * - 身份 = (房间码, playerId)。playerId 保存在玩家本机 localStorage，凭它重连恢复座位。
+ * - 断线后按房间设置「托管策略」等待一段时间再交给 AI 托管；
+ *   等待期内真人重连 → 恢复真人控制（AI 只是临时代理，真人回来即接管）。
+ * - 房主断线 → 房主身份转移给其他在线真人（大厅/对局均可）。
+ * - 所有真人离开/断开 → 房间自动关闭。
  */
 import { randomUUID } from 'node:crypto';
 import {
@@ -9,17 +15,22 @@ import {
   MIN_PLAYERS,
   chooseAiAction,
   type Magic,
-  type PlayerView,
 } from '@tm/rules';
-import type { LobbyInfo } from '@tm/rules';
+import {
+  AUTOPILOT_DELAYS,
+  DEFAULT_ROOM_SETTINGS,
+  type LobbyInfo,
+  type RoomSettings,
+} from '@tm/rules';
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
 
 const BOT_NAMES = ['阿呆', '梅林', '小圆', '老巴'];
 const BOT_RISKS = [0.15, 0.28, 0.42, 0.55];
 
-const AI_DELAY_MS = 900;
 const ROUND_DELAY_MS = 3500;
+const AI_SPEED_MIN = 300;
+const AI_SPEED_MAX = 4000;
 
 export type RoomSocket = Socket<ClientToServerEvents, ServerToClientEvents, object, RoomSocketData>;
 
@@ -33,7 +44,8 @@ interface Seat {
   name: string;
   isBot: boolean;
   connected: boolean;
-  autoPlay: boolean; // 断线/离开后由服务端托管
+  autoPlay: boolean; // AI 托管中（断线/离开触发，真人回来即取消）
+  disconnectedAt: number | null; // 断线时刻，用于托管等待计时
   socketId: string | null;
 }
 
@@ -58,6 +70,7 @@ export class Room {
   status: 'lobby' | 'playing' = 'lobby';
   seats: Seat[] = [];
   game: Game | null = null;
+  settings: RoomSettings = { ...DEFAULT_ROOM_SETTINGS };
 
   private io: Server<ClientToServerEvents, ServerToClientEvents>;
   private onEmpty: (code: string) => void;
@@ -68,6 +81,7 @@ export class Room {
     code: string,
     hostId: string,
     hostName: string,
+    settings: Partial<RoomSettings> | undefined,
     io: Server<ClientToServerEvents, ServerToClientEvents>,
     onEmpty: (code: string) => void,
   ) {
@@ -75,7 +89,16 @@ export class Room {
     this.hostId = hostId;
     this.io = io;
     this.onEmpty = onEmpty;
-    this.seats.push({ id: hostId, name: hostName, isBot: false, connected: true, autoPlay: false, socketId: null });
+    this.settings = { ...DEFAULT_ROOM_SETTINGS, ...settings };
+    this.seats.push({
+      id: hostId,
+      name: hostName,
+      isBot: false,
+      connected: true,
+      autoPlay: false,
+      disconnectedAt: null,
+      socketId: null,
+    });
   }
 
   private seat(id: string): Seat | undefined {
@@ -98,9 +121,11 @@ export class Room {
         isBot: s.isBot,
         isHost: s.id === this.hostId,
         connected: s.connected,
+        autopilot: s.autoPlay,
       })),
       botCount: this.seats.filter((s) => s.isBot).length,
       humanCount: this.seats.filter((s) => !s.isBot).length,
+      settings: { ...this.settings },
     };
   }
 
@@ -126,7 +151,7 @@ export class Room {
     if (socketId) this.io.to(socketId).emit('error', message);
   }
 
-  /** 加入房间（支持断线重连 token） */
+  /** 加入房间（新玩家不带 token；重连带 token 恢复座位） */
   join(nameRaw: string, token: string | undefined, socketId: string):
     | { ok: true; playerId: string; rejoin: boolean }
     | { ok: false; error: string } {
@@ -134,19 +159,36 @@ export class Room {
     if (token) {
       const existing = this.seat(token);
       if (existing) {
+        if (existing.connected && existing.socketId !== socketId) {
+          return { ok: false, error: '该座位已在线（如确认本人，请先关闭旧窗口）' };
+        }
         existing.connected = true;
         existing.autoPlay = false;
-        existing.name = existing.isBot ? existing.name : name;
+        existing.disconnectedAt = null;
+        if (!existing.isBot) existing.name = name;
         existing.socketId = socketId;
+        if (this.game) this.game.log(`${existing.name} 重新上线，恢复操作 ✅`);
+        this.broadcastViews();
+        this.broadcastLobby();
+        this.schedule();
         return { ok: true, playerId: token, rejoin: true };
       }
+      return { ok: false, error: '重连凭据无效（座位不存在），请直接加入' };
     }
     if (this.status === 'playing') return { ok: false, error: '对局已开始，无法加入新玩家' };
     if (this.seats.filter((s) => !s.isBot).length >= MAX_PLAYERS) {
       return { ok: false, error: '房间已满' };
     }
     const id = randomUUID();
-    this.seats.push({ id, name, isBot: false, connected: true, autoPlay: false, socketId });
+    this.seats.push({
+      id,
+      name,
+      isBot: false,
+      connected: true,
+      autoPlay: false,
+      disconnectedAt: null,
+      socketId,
+    });
     return { ok: true, playerId: id, rejoin: false };
   }
 
@@ -158,7 +200,6 @@ export class Room {
     const bots = this.seats.filter((s) => s.isBot);
     const maxBots = MAX_PLAYERS - humans.length;
     const c = Math.max(0, Math.min(maxBots, Math.floor(count)));
-    // 移除多余的 bot
     this.seats = this.seats.filter((s) => !s.isBot || bots.indexOf(s) < c);
     const have = this.seats.filter((s) => s.isBot).length;
     for (let i = have; i < c; i++) {
@@ -168,10 +209,21 @@ export class Room {
         isBot: true,
         connected: true,
         autoPlay: true,
+        disconnectedAt: null,
         socketId: null,
       });
     }
     this.broadcastLobby();
+  }
+
+  /** 房间设置（仅房主；大厅/对局均可改） */
+  updateSettings(actorId: string, patch: Partial<RoomSettings>, actorSocketId: string): void {
+    if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以修改房间设置');
+    const next: RoomSettings = { ...this.settings, ...patch };
+    next.aiSpeed = Math.max(AI_SPEED_MIN, Math.min(AI_SPEED_MAX, Math.floor(next.aiSpeed)));
+    this.settings = next;
+    this.broadcastLobby();
+    this.schedule();
   }
 
   /** 开始对局（仅房主，总人数 2~5） */
@@ -214,7 +266,19 @@ export class Room {
     this.schedule();
   }
 
-  /** 调度：AI 回合 / 托管回合 / 轮末自动下一轮 */
+  /** 当前玩家是否需要服务端代打（AI / 断线到期托管） */
+  private needsAutoPlay(seat: Seat): boolean {
+    if (seat.isBot || seat.autoPlay) return true;
+    if (!seat.connected) {
+      const wait = AUTOPILOT_DELAYS[this.settings.autopilot];
+      if (wait <= 0) return true;
+      if (seat.disconnectedAt == null) return true;
+      return Date.now() - seat.disconnectedAt >= wait;
+    }
+    return false;
+  }
+
+  /** 调度：AI 回合 / 托管回合 / 断线等待重连 / 轮末自动下一轮 */
   private schedule(): void {
     this.clearTimers();
     const game = this.game;
@@ -230,16 +294,31 @@ export class Room {
     }
     const cur = game.current;
     const seat = this.seat(cur.id);
-    if (seat && (seat.isBot || seat.autoPlay || !seat.connected)) {
+    if (!seat) return;
+    if (this.needsAutoPlay(seat)) {
+      // 断线但还没到托管时间 → 到点再检查（期间真人可能重连）
+      if (!seat.isBot && !seat.autoPlay && !seat.connected) {
+        const wait = AUTOPILOT_DELAYS[this.settings.autopilot];
+        const elapsed = seat.disconnectedAt ? Date.now() - seat.disconnectedAt : Infinity;
+        if (elapsed < wait) {
+          this.botTimer = setTimeout(() => this.schedule(), wait - elapsed + 50);
+          return;
+        }
+        // 到期：正式转托管
+        seat.autoPlay = true;
+        game.log(`${seat.name} 断线超时，由 AI 托管 🤖`);
+        this.broadcastLobby();
+      }
       const idx = this.seats.indexOf(seat);
       const risk = BOT_RISKS[Math.max(0, idx) % BOT_RISKS.length];
+      const delay = Math.max(300, this.settings.aiSpeed);
       this.botTimer = setTimeout(() => {
         const a = chooseAiAction(game.getView(cur.id), { risk });
         if (a.type === 'declare') game.declareSpell(cur.id, a.magic);
         else game.endTurn(cur.id);
         this.broadcastViews();
         this.schedule();
-      }, AI_DELAY_MS);
+      }, delay);
     }
   }
 
@@ -250,17 +329,25 @@ export class Room {
     this.roundTimer = null;
   }
 
-  /** 断线：座位保留，游戏由服务端托管 */
+  /** 断线：座位保留，按托管策略等待后由 AI 代理 */
   onDisconnect(playerId: string): void {
     const s = this.seat(playerId);
     if (!s) return;
     s.connected = false;
     s.socketId = null;
     if (this.status === 'playing') {
-      this.game?.log(`${s.name} 断线，由服务端托管 ⚠️`);
+      s.disconnectedAt = Date.now();
+      const wait = AUTOPILOT_DELAYS[this.settings.autopilot];
+      this.game?.log(
+        wait > 0
+          ? `${s.name} 断线，${Math.round(wait / 1000)} 秒内重连可恢复 ⏳`
+          : `${s.name} 断线，由 AI 托管 🤖`,
+      );
       this.broadcastViews();
+      this.broadcastLobby();
       this.schedule();
     } else {
+      this.transferHostIfNeeded(playerId);
       this.broadcastLobby();
     }
     this.maybeClose();
@@ -276,10 +363,7 @@ export class Room {
         this.close();
         return;
       }
-      if (this.hostId === playerId) {
-        const next = this.seats.find((x) => !x.isBot);
-        this.hostId = next ? next.id : this.seats[0].id;
-      }
+      this.transferHostIfNeeded(playerId);
       this.broadcastLobby();
       return;
     }
@@ -287,10 +371,18 @@ export class Room {
     s.connected = false;
     s.socketId = null;
     s.autoPlay = true;
-    this.game?.log(`${s.name} 离开对局，由服务端托管 🤖`);
+    this.game?.log(`${s.name} 离开对局，由 AI 托管 🤖`);
     this.broadcastViews();
+    this.broadcastLobby();
     this.schedule();
     this.maybeClose();
+  }
+
+  /** 房主离场时把房主身份交给其他在线真人 */
+  private transferHostIfNeeded(leavingId: string): void {
+    if (this.hostId !== leavingId) return;
+    const next = this.seats.find((s) => !s.isBot && s.connected && s.id !== leavingId);
+    if (next) this.hostId = next.id;
   }
 
   private maybeClose(): void {
@@ -301,10 +393,5 @@ export class Room {
   private close(): void {
     this.clearTimers();
     this.onEmpty(this.code);
-  }
-
-  /** 供注册表在解散前清理 */
-  destroy(): void {
-    this.clearTimers();
   }
 }

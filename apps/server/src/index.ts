@@ -45,7 +45,7 @@ io.on('connection', (socket: RoomSocket) => {
       const name = sanitizeName(payload?.name);
       const playerId = randomUUID();
       const code = uniqueCode();
-      const room = new Room(code, playerId, name, io, (c) => rooms.delete(c));
+      const room = new Room(code, playerId, name, payload?.settings, io, (c) => rooms.delete(c));
       rooms.set(code, room);
       socket.join(code);
       socket.data = { roomCode: code, playerId };
@@ -90,6 +90,12 @@ io.on('connection', (socket: RoomSocket) => {
     const d = socket.data;
     if (!d.roomCode || !d.playerId) return;
     rooms.get(d.roomCode)?.setBots(d.playerId, payload?.count ?? 0, socket.id);
+  });
+
+  socket.on('updateSettings', (payload) => {
+    const d = socket.data;
+    if (!d.roomCode || !d.playerId) return;
+    rooms.get(d.roomCode)?.updateSettings(d.playerId, payload?.settings ?? {}, socket.id);
   });
 
   socket.on('startGame', () => {

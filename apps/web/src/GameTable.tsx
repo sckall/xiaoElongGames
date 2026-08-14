@@ -3,6 +3,7 @@ import {
   MAGIC_DEFS,
   MAGIC_LIST,
   type EffectEvent,
+  type LobbyInfo,
   type Magic,
   type PlayerView,
   type SeatView,
@@ -65,6 +66,7 @@ function Seat({
   isNext,
   shaking,
   floats,
+  connInfo,
 }: {
   seat: SeatView;
   isYou: boolean;
@@ -73,6 +75,8 @@ function Seat({
   isNext: boolean;
   shaking: boolean;
   floats: FloatFx[];
+  /** 联机模式下的连接/托管状态 */
+  connInfo?: { connected: boolean; autopilot: boolean };
 }) {
   return (
     <div
@@ -84,6 +88,12 @@ function Seat({
           <div className="seat-name">
             {seat.name}
             {seat.isBot && <span className="bot-tag">🤖</span>}
+            {connInfo && !connInfo.connected && !connInfo.autopilot && (
+              <span className="conn-tag waiting">⏳ 断线等待重连</span>
+            )}
+            {connInfo && !connInfo.connected && connInfo.autopilot && (
+              <span className="conn-tag pilot">🤖 AI 托管中</span>
+            )}
             {isPrev && (
               <span className="rel-tag" title="你的上家">
                 🌨️上家
@@ -126,6 +136,7 @@ export default function GameTable({
   onRematch,
   onToggleSound,
   onToggleFx,
+  roomInfo,
 }: {
   api: GameApi;
   settings: GameSettings;
@@ -133,10 +144,12 @@ export default function GameTable({
   onRematch?: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
+  /** 联机模式：大厅信息（用于显示断线/托管状态） */
+  roomInfo?: LobbyInfo | null;
 }) {
   const [floats, setFloats] = useState<FloatFx[]>([]);
   const [shake, setShake] = useState<{ seatId: string; key: number } | null>(null);
-  const [banner, setBanner] = useState<{ magic: Magic; fail: boolean; key: number } | null>(null);
+  const [fullFx, setFullFx] = useState<{ magic: Magic; fail: boolean; key: number } | null>(null);
   const [dice, setDice] = useState<{ amount: number; key: number } | null>(null);
   const [confetti, setConfetti] = useState(false);
   const prevSeq = useRef<number | null>(null);
@@ -203,8 +216,8 @@ export default function GameTable({
         playSfx('cast');
         if (fx && e.magic) {
           const key = e.seq;
-          setBanner({ magic: e.magic, fail: false, key });
-          window.setTimeout(() => setBanner((b) => (b?.key === key ? null : b)), 1200);
+          setFullFx({ magic: e.magic, fail: false, key });
+          window.setTimeout(() => setFullFx((b) => (b?.key === key ? null : b)), 1300);
         }
         break;
       }
@@ -212,8 +225,8 @@ export default function GameTable({
         playSfx('fail');
         if (fx && e.magic) {
           const key = e.seq;
-          setBanner({ magic: e.magic, fail: true, key });
-          window.setTimeout(() => setBanner((b) => (b?.key === key ? null : b)), 1500);
+          setFullFx({ magic: e.magic, fail: true, key });
+          window.setTimeout(() => setFullFx((b) => (b?.key === key ? null : b)), 1600);
         }
         break;
       }
@@ -288,18 +301,22 @@ export default function GameTable({
 
       <main className="board">
         <div className="opponents">
-          {others.map((s) => (
-            <Seat
-              key={s.id}
-              seat={s}
-              isYou={false}
-              isCurrent={view.currentPlayerId === s.id}
-              isPrev={s.id === prevId}
-              isNext={s.id === nextId}
-              shaking={shake?.seatId === s.id}
-              floats={floats.filter((f) => f.seatId === s.id)}
-            />
-          ))}
+          {others.map((s) => {
+            const cp = roomInfo?.players.find((p) => p.id === s.id);
+            return (
+              <Seat
+                key={s.id}
+                seat={s}
+                isYou={false}
+                isCurrent={view.currentPlayerId === s.id}
+                isPrev={s.id === prevId}
+                isNext={s.id === nextId}
+                shaking={shake?.seatId === s.id}
+                floats={floats.filter((f) => f.seatId === s.id)}
+                connInfo={cp ? { connected: cp.connected, autopilot: cp.autopilot } : undefined}
+              />
+            );
+          })}
         </div>
 
         <div className="your-zone">
@@ -320,6 +337,10 @@ export default function GameTable({
             isNext={you.id === nextId}
             shaking={shake?.seatId === you.id}
             floats={floats.filter((f) => f.seatId === you.id)}
+            connInfo={(() => {
+              const cp = roomInfo?.players.find((p) => p.id === you.id);
+              return cp ? { connected: cp.connected, autopilot: cp.autopilot } : undefined;
+            })()}
           />
           <div className="action-bar">
             {MAGIC_LIST.map((m) => {
@@ -365,18 +386,21 @@ export default function GameTable({
         </div>
       </aside>
 
-      {/* 特效层 */}
-      {banner && (
-        <div className={`spell-banner ${banner.fail ? 'fail' : ''}`} key={banner.key}>
-          {banner.fail ? (
-            <span>
-              {MAGIC_DEFS[banner.magic].emoji} 出包了！「{MAGIC_DEFS[banner.magic].name}」施放失败！
-            </span>
-          ) : (
-            <span>
-              {MAGIC_DEFS[banner.magic].emoji}「{MAGIC_DEFS[banner.magic].name}」！
-            </span>
-          )}
+      {/* 全屏施法特效（成功/失败两版） */}
+      {fullFx && (
+        <div
+          className={`full-fx ${fullFx.fail ? 'fail' : 'success'}`}
+          key={fullFx.key}
+          role="status"
+        >
+          <div className="fx-burst" />
+          <div className="fx-emoji">{fullFx.fail ? '😱' : MAGIC_DEFS[fullFx.magic].emoji}</div>
+          <div className="fx-text">
+            {fullFx.fail
+              ? `「${MAGIC_DEFS[fullFx.magic].name}」施放失败！`
+              : `「${MAGIC_DEFS[fullFx.magic].name}」施放成功！`}
+          </div>
+          <div className="fx-sub">{fullFx.fail ? '出包了！' : MAGIC_DEFS[fullFx.magic].desc}</div>
         </div>
       )}
       {dice && (

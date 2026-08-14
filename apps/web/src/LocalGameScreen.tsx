@@ -19,7 +19,7 @@ export default function LocalGameScreen({
   onToggleSound: () => void;
   onToggleFx: () => void;
 }) {
-  const api = useLocalGame(playerCount, myName);
+  const api = useLocalGame(playerCount, myName, settings.aiSpeed);
   return (
     <GameTable
       api={{ ...api, autoRound: false }}

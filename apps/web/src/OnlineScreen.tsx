@@ -9,14 +9,16 @@ export default function OnlineScreen({
   onExit,
   onToggleSound,
   onToggleFx,
+  onServerUrlChange,
 }: {
   settings: GameSettings;
   defaultName: string;
   onExit: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
+  onServerUrlChange: (url: string) => void;
 }) {
-  const remote = useRemoteGame();
+  const remote = useRemoteGame(settings.serverUrl);
 
   if (remote.stage === 'playing' && remote.view) {
     return (
@@ -33,9 +35,18 @@ export default function OnlineScreen({
         onExit={remote.leave}
         onToggleSound={onToggleSound}
         onToggleFx={onToggleFx}
+        roomInfo={remote.lobby}
       />
     );
   }
 
-  return <LobbyScreen remote={remote} defaultName={defaultName} onExit={onExit} />;
+  return (
+    <LobbyScreen
+      remote={remote}
+      defaultName={defaultName}
+      serverUrl={settings.serverUrl}
+      onServerUrlChange={onServerUrlChange}
+      onExit={onExit}
+    />
+  );
 }

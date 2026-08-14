@@ -14,5 +14,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "preview": "pnpm --filter @tm/web preview"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
   }
 }

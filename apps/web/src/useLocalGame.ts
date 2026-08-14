@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Game,
-  chooseAiAction,
-  type Magic,
-  type PlayerView,
-} from '@tm/rules';
+import { Game, chooseAiAction, type Magic, type PlayerView } from '@tm/rules';
 
 const BOT_NAMES = ['阿呆', '梅林', '小圆', '老巴'];
 /** 每个 AI 座位的性格参数（风险门槛） */
@@ -18,10 +13,12 @@ export interface LocalGameApi {
   advanceRound: () => void;
 }
 
-export function useLocalGame(playerCount: number, myName: string): LocalGameApi {
+export function useLocalGame(playerCount: number, myName: string, aiSpeed: number): LocalGameApi {
   const gameRef = useRef<Game | null>(null);
   const [view, setView] = useState<PlayerView | null>(null);
   const [, setVersion] = useState(0);
+  const aiSpeedRef = useRef(aiSpeed);
+  aiSpeedRef.current = aiSpeed;
 
   const refresh = useCallback(() => {
     const g = gameRef.current;
@@ -69,7 +66,7 @@ export function useLocalGame(playerCount: number, myName: string): LocalGameApi 
     refresh();
   }, [refresh]);
 
-  // 调度：AI 回合 / 本轮结束后的自动下一轮
+  // 调度：AI 回合 / 本轮结束后的自动下一轮（节奏由设置决定）
   useEffect(() => {
     const g = gameRef.current;
     if (!g || !view) return;
@@ -85,12 +82,15 @@ export function useLocalGame(playerCount: number, myName: string): LocalGameApi 
       const botId = g.current.id;
       const idx = g.players.findIndex((p) => p.id === botId);
       const risk = BOT_RISKS[Math.max(0, idx - 1)] ?? 0.3;
-      const t = setTimeout(() => {
-        const a = chooseAiAction(g.getView(botId), { risk });
-        if (a.type === 'declare') g.declareSpell(botId, a.magic);
-        else g.endTurn(botId);
-        refresh();
-      }, 900);
+      const t = setTimeout(
+        () => {
+          const a = chooseAiAction(g.getView(botId), { risk });
+          if (a.type === 'declare') g.declareSpell(botId, a.magic);
+          else g.endTurn(botId);
+          refresh();
+        },
+        Math.max(300, aiSpeedRef.current),
+      );
       return () => clearTimeout(t);
     }
   }, [view, refresh]);
