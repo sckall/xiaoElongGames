@@ -22,12 +22,13 @@ export default function LocalGameScreen({
   const api = useLocalGame(playerCount, myName, settings.aiSpeed);
   return (
     <GameTable
-      api={{ ...api, autoRound: false }}
+      api={api}
       settings={settings}
       onExit={onExit}
       onRematch={onRestart}
       onToggleSound={onToggleSound}
       onToggleFx={onToggleFx}
+      canAdvanceRound
     />
   );
 }

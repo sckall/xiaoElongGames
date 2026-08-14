@@ -1287,6 +1287,117 @@ button {
   margin-top: 8px;
 }
 
+/* ---------- 牌堆剩余部件 ---------- */
+.deck-widget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+
+.deck-widget-icon {
+  font-size: 18px;
+}
+
+.deck-widget-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.deck-widget-count {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.deck-widget-unit {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- 轮末结算侧边面板（不遮挡手牌） ---------- */
+.round-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(360px, 92vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 25;
+  text-align: center;
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.round-panel h2 {
+  margin: 0 0 6px;
+}
+
+.round-result-text {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.round-panel .score-list {
+  line-height: 1.8;
+  margin: 4px 0 10px;
+}
+
+.round-panel .primary-btn {
+  width: 100%;
+}
+
+/* ---------- 手牌复盘 ---------- */
+.reveal-hands {
+  margin-top: 10px;
+  text-align: left;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reveal-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.reveal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reveal-name {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 88px;
+  flex: none;
+}
+
+.reveal-cards {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.reveal-secret {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.overlay-panel .reveal-hands {
+  text-align: left;
+}
+
 /* ---------- 弹层 ---------- */
 .overlay {
   position: fixed;

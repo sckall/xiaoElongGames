@@ -28,14 +28,15 @@ export default function OnlineScreen({
           start: () => {},
           declare: remote.declare,
           endTurn: remote.endTurn,
-          advanceRound: () => {},
-          autoRound: true,
+          advanceRound: remote.advanceRound,
         }}
         settings={settings}
         onExit={remote.leave}
         onToggleSound={onToggleSound}
         onToggleFx={onToggleFx}
         roomInfo={remote.lobby}
+        canAdvanceRound={remote.lobby?.hostId === remote.view.youId}
+        online
       />
     );
   }

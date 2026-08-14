@@ -75,6 +75,8 @@ export interface RemoteApi {
   setBots: (count: number) => void;
   updateSettings: (patch: Partial<RoomSettings>) => void;
   start: () => void;
+  /** 房主开始下一轮 */
+  advanceRound: () => void;
   declare: (magic: Magic) => void;
   endTurn: () => void;
   leave: () => void;
@@ -94,7 +96,8 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     const s = io(serverUrl.trim() || undefined, { transports: ['websocket', 'polling'] });
     s.on('lobby', (info) => {
       setLobby(info);
-      setStage('lobby');
+      // 对局进行中的 lobby 广播（断线/托管状态同步）不能把界面拉回大厅
+      setStage((prev) => (prev === 'playing' ? 'playing' : 'lobby'));
     });
     s.on('state', (v) => {
       setView(v);
@@ -172,6 +175,11 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     socketRef.current?.emit('startGame');
   }, []);
 
+  /** 房主开始下一轮 */
+  const advanceRound = useCallback(() => {
+    socketRef.current?.emit('nextRound');
+  }, []);
+
   const declare = useCallback((magic: Magic) => {
     socketRef.current?.emit('declareSpell', { magic });
   }, []);
@@ -205,6 +213,7 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     setBots,
     updateSettings,
     start,
+    advanceRound,
     declare,
     endTurn,
     leave,

@@ -458,6 +458,8 @@ export class Game {
     const you = this.player(playerId);
     const seats: SeatView[] = this.players.map((p) => {
       const isYou = p.id === playerId;
+      // 轮末/终局复盘时向本人揭晓自己的手牌
+      const revealOwnHand = this.phase !== 'playing';
       return {
         id: p.id,
         name: p.name,
@@ -466,7 +468,7 @@ export class Game {
         score: p.score,
         alive: p.alive,
         handCount: p.hand.length,
-        hand: isYou ? p.hand.map(() => null) : p.hand.map((c) => c.magic),
+        hand: isYou && !revealOwnHand ? p.hand.map(() => null) : p.hand.map((c) => c.magic),
         secretCount: p.secrets.length,
         secrets: isYou ? p.secrets.map((c) => c.magic) : p.secrets.map(() => null),
       };

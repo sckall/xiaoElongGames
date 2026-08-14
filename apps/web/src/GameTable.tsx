@@ -18,9 +18,8 @@ export interface GameApi {
   start: () => void;
   declare: (magic: Magic) => void;
   endTurn: () => void;
+  /** 开始下一轮（本地直接执行；联机仅房主可发） */
   advanceRound: () => void;
-  /** true = 轮末由服务端自动推进（联机） */
-  autoRound: boolean;
 }
 
 interface FloatFx {
@@ -58,6 +57,31 @@ function SecretBadge({ seat, isYou }: { seat: SeatView; isYou: boolean }) {
   return <div className="secret-badge">🤫 ×{seat.secretCount}</div>;
 }
 
+/** 轮末/终局复盘：展示所有玩家的手牌 */
+function RevealHands({ seats }: { seats: SeatView[] }) {
+  return (
+    <div className="reveal-hands">
+      <div className="reveal-title">🃏 手牌复盘</div>
+      {seats.map((s) => (
+        <div key={s.id} className="reveal-row">
+          <span className="reveal-name">
+            {s.name}
+            {s.isBot ? ' 🤖' : ''}
+            {!s.alive && ' 💀'}
+          </span>
+          <span className="reveal-cards">
+            {s.hand.map((m, i) => (
+              <MagicCard key={i} magic={m} small />
+            ))}
+            {s.handCount === 0 && <span className="empty-hand">无手牌</span>}
+            {s.secretCount > 0 && <span className="reveal-secret">🤫×{s.secretCount}</span>}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Seat({
   seat,
   isYou,
@@ -66,6 +90,7 @@ function Seat({
   isNext,
   shaking,
   floats,
+  hideOwnHand,
   connInfo,
 }: {
   seat: SeatView;
@@ -75,6 +100,8 @@ function Seat({
   isNext: boolean;
   shaking: boolean;
   floats: FloatFx[];
+  /** 对局中自己手牌背对自己；轮末/终局复盘时揭晓 */
+  hideOwnHand: boolean;
   /** 联机模式下的连接/托管状态 */
   connInfo?: { connected: boolean; autopilot: boolean };
 }) {
@@ -115,7 +142,7 @@ function Seat({
       </div>
       <div className="hand-fan">
         {seat.hand.map((m, i) => (
-          <MagicCard key={i} magic={m} hidden={isYou} />
+          <MagicCard key={i} magic={m} hidden={isYou && hideOwnHand} />
         ))}
         {seat.handCount === 0 && <span className="empty-hand">无手牌</span>}
       </div>
@@ -137,6 +164,8 @@ export default function GameTable({
   onToggleSound,
   onToggleFx,
   roomInfo,
+  canAdvanceRound,
+  online,
 }: {
   api: GameApi;
   settings: GameSettings;
@@ -144,8 +173,11 @@ export default function GameTable({
   onRematch?: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
-  /** 联机模式：大厅信息（用于显示断线/托管状态） */
+  /** 联机模式：大厅信息（用于显示断线/托管状态与房主判断） */
   roomInfo?: LobbyInfo | null;
+  /** 当前玩家是否可以开始下一轮（本地恒为 true；联机仅房主） */
+  canAdvanceRound: boolean;
+  online?: boolean;
 }) {
   const [floats, setFloats] = useState<FloatFx[]>([]);
   const [shake, setShake] = useState<{ seatId: string; key: number } | null>(null);
@@ -276,6 +308,8 @@ export default function GameTable({
   const n = view.seats.length;
   const prevId = view.seats[(youIdx - 1 + n) % n].id;
   const nextId = view.seats[(youIdx + 1) % n].id;
+  // 对局中自己手牌隐藏；轮末/终局复盘揭晓
+  const hideOwnHand = view.phase === 'playing';
 
   return (
     <div className="page game-page">
@@ -283,10 +317,10 @@ export default function GameTable({
         <div className="topbar-title">🧙 出包魔法师</div>
         <div className="topbar-info">
           <span className="chip-info">🏷️ 第 {view.round} 轮</span>
-          <span className="chip-info">🎴 牌堆 {view.deckCount}</span>
+          <span className="chip-info">🎴 剩余牌堆 {view.deckCount}</span>
           <span className="chip-info">🤫 秘密 {view.secretPileCount}</span>
           <span className="chip-info">🗑️ 弃牌 {view.discard.length}</span>
-          {api.autoRound && <span className="chip-info online">🌐 联机</span>}
+          {online && <span className="chip-info online">🌐 联机</span>}
         </div>
         <button className="ghost-btn" title={settings.sound ? '关闭音效' : '开启音效'} onClick={onToggleSound}>
           {settings.sound ? '🔊' : '🔇'}
@@ -313,6 +347,7 @@ export default function GameTable({
                 isNext={s.id === nextId}
                 shaking={shake?.seatId === s.id}
                 floats={floats.filter((f) => f.seatId === s.id)}
+                hideOwnHand={hideOwnHand}
                 connInfo={cp ? { connected: cp.connected, autopilot: cp.autopilot } : undefined}
               />
             );
@@ -337,6 +372,7 @@ export default function GameTable({
             isNext={you.id === nextId}
             shaking={shake?.seatId === you.id}
             floats={floats.filter((f) => f.seatId === you.id)}
+            hideOwnHand={hideOwnHand}
             connInfo={(() => {
               const cp = roomInfo?.players.find((p) => p.id === you.id);
               return cp ? { connected: cp.connected, autopilot: cp.autopilot } : undefined;
@@ -371,6 +407,12 @@ export default function GameTable({
               下一张魔法不能比它更稀有（总张数不能更少）。
             </div>
           )}
+          <div className="deck-widget" title="牌堆剩余数量">
+            <span className="deck-widget-icon">🎴</span>
+            <span className="deck-widget-label">牌堆剩余</span>
+            <span className="deck-widget-count">{view.deckCount}</span>
+            <span className="deck-widget-unit">张</span>
+          </div>
         </div>
       </main>
 
@@ -426,35 +468,31 @@ export default function GameTable({
           />
         ))}
 
-      {/* 轮末 / 终局弹层 */}
+      {/* 轮末结算：右侧浮动面板，不遮挡手牌，可复盘 */}
       {view.phase === 'roundEnd' && view.roundResult && (
-        <div className="overlay">
-          <div className="panel overlay-panel">
-            <h2>🏁 本轮结束</h2>
-            <p>{view.roundResult.text}</p>
-            <ul className="score-list">
-              {view.seats.map((s) => (
-                <li key={s.id}>
-                  {s.name}：
-                  <b className={view.roundResult!.points[s.id] > 0 ? 'gain' : ''}>
-                    +{view.roundResult!.points[s.id] ?? 0}
-                  </b>{' '}
-                  （累计 ⭐{s.score}）
-                </li>
-              ))}
-            </ul>
-            {api.autoRound ? (
-              <p className="muted">等待服务器自动开始下一轮……</p>
-            ) : (
-              <>
-                <p className="muted">3 秒后自动开始下一轮……</p>
-                <button className="primary-btn" onClick={api.advanceRound}>
-                  ▶️ 立即开始下一轮
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        <aside className="round-panel panel">
+          <h2>🏁 本轮结束</h2>
+          <p className="round-result-text">{view.roundResult.text}</p>
+          <ul className="score-list">
+            {view.seats.map((s) => (
+              <li key={s.id}>
+                {s.name}：
+                <b className={view.roundResult!.points[s.id] > 0 ? 'gain' : ''}>
+                  +{view.roundResult!.points[s.id] ?? 0}
+                </b>{' '}
+                （累计 ⭐{s.score}）
+              </li>
+            ))}
+          </ul>
+          <RevealHands seats={view.seats} />
+          {canAdvanceRound ? (
+            <button className="primary-btn" onClick={api.advanceRound}>
+              ▶️ 开始下一轮
+            </button>
+          ) : (
+            <p className="muted">等待房主开始下一轮……</p>
+          )}
+        </aside>
       )}
 
       {view.phase === 'gameOver' && (
@@ -475,6 +513,7 @@ export default function GameTable({
                   </li>
                 ))}
             </ul>
+            <RevealHands seats={view.seats} />
             <div className="overlay-btns">
               {onRematch && (
                 <button className="primary-btn" onClick={onRematch}>
@@ -482,7 +521,7 @@ export default function GameTable({
                 </button>
               )}
               <button className="ghost-btn" onClick={onExit}>
-                {api.autoRound ? '离开房间' : '返回设置'}
+                {online ? '离开房间' : '返回设置'}
               </button>
             </div>
           </div>

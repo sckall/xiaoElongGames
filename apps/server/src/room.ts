@@ -28,7 +28,6 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
 const BOT_NAMES = ['阿呆', '梅林', '小圆', '老巴'];
 const BOT_RISKS = [0.15, 0.28, 0.42, 0.55];
 
-const ROUND_DELAY_MS = 3500;
 const AI_SPEED_MIN = 300;
 const AI_SPEED_MAX = 4000;
 
@@ -266,6 +265,16 @@ export class Room {
     this.schedule();
   }
 
+  /** 本轮结算后由房主触发下一轮 */
+  nextRound(actorId: string, actorSocketId: string): void {
+    if (!this.game || this.status !== 'playing') return;
+    if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以开始下一轮');
+    if (this.game.phase !== 'roundEnd') return this.emitError(actorSocketId, '本轮尚未结束');
+    this.game.nextRound();
+    this.broadcastViews();
+    this.schedule();
+  }
+
   /** 当前玩家是否需要服务端代打（AI / 断线到期托管） */
   private needsAutoPlay(seat: Seat): boolean {
     if (seat.isBot || seat.autoPlay) return true;
@@ -278,20 +287,12 @@ export class Room {
     return false;
   }
 
-  /** 调度：AI 回合 / 托管回合 / 断线等待重连 / 轮末自动下一轮 */
+  /** 调度：AI 回合 / 托管回合 / 断线等待重连（轮末由房主手动开始下一轮） */
   private schedule(): void {
     this.clearTimers();
     const game = this.game;
     if (!game || this.status !== 'playing') return;
-    if (game.phase === 'gameOver') return;
-    if (game.phase === 'roundEnd') {
-      this.roundTimer = setTimeout(() => {
-        game.nextRound();
-        this.broadcastViews();
-        this.schedule();
-      }, ROUND_DELAY_MS);
-      return;
-    }
+    if (game.phase === 'gameOver' || game.phase === 'roundEnd') return;
     const cur = game.current;
     const seat = this.seat(cur.id);
     if (!seat) return;
@@ -335,6 +336,7 @@ export class Room {
     if (!s) return;
     s.connected = false;
     s.socketId = null;
+    this.transferHostIfNeeded(playerId);
     if (this.status === 'playing') {
       s.disconnectedAt = Date.now();
       const wait = AUTOPILOT_DELAYS[this.settings.autopilot];
@@ -347,7 +349,6 @@ export class Room {
       this.broadcastLobby();
       this.schedule();
     } else {
-      this.transferHostIfNeeded(playerId);
       this.broadcastLobby();
     }
     this.maybeClose();
@@ -371,6 +372,7 @@ export class Room {
     s.connected = false;
     s.socketId = null;
     s.autoPlay = true;
+    this.transferHostIfNeeded(playerId);
     this.game?.log(`${s.name} 离开对局，由 AI 托管 🤖`);
     this.broadcastViews();
     this.broadcastLobby();

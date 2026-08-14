@@ -66,18 +66,11 @@ export function useLocalGame(playerCount: number, myName: string, aiSpeed: numbe
     refresh();
   }, [refresh]);
 
-  // 调度：AI 回合 / 本轮结束后的自动下一轮（节奏由设置决定）
+  // 调度：AI 回合（节奏由设置决定；轮末由玩家手动开始下一轮）
   useEffect(() => {
     const g = gameRef.current;
     if (!g || !view) return;
-    if (g.phase === 'gameOver') return;
-    if (g.phase === 'roundEnd') {
-      const t = setTimeout(() => {
-        g.nextRound();
-        refresh();
-      }, 3200);
-      return () => clearTimeout(t);
-    }
+    if (g.phase === 'gameOver' || g.phase === 'roundEnd') return;
     if (g.current.isBot) {
       const botId = g.current.id;
       const idx = g.players.findIndex((p) => p.id === botId);

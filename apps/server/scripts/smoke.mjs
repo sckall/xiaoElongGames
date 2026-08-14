@@ -71,9 +71,14 @@ await sleep(600);
 if (!A.lastView || !B.lastView) fail('开局后未收到游戏状态');
 else console.log('✅ 对局开始，双方均收到状态');
 
-// 5. 随机行动直到游戏结束（或超时）
+// 5. 随机行动直到游戏结束（或超时）；轮末由房主 A 手动开始下一轮
 const deadline = Date.now() + 90_000;
 while (Date.now() < deadline && !(A.gameOver && B.gameOver)) {
+  if (A.lastView?.phase === 'roundEnd') {
+    A.s.emit('nextRound');
+    await sleep(500);
+    continue;
+  }
   autoPlay(A);
   autoPlay(B);
   await sleep(300);

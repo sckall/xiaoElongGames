@@ -104,6 +104,12 @@ io.on('connection', (socket: RoomSocket) => {
     rooms.get(d.roomCode)?.start(d.playerId, socket.id);
   });
 
+  socket.on('nextRound', () => {
+    const d = socket.data;
+    if (!d.roomCode || !d.playerId) return;
+    rooms.get(d.roomCode)?.nextRound(d.playerId, socket.id);
+  });
+
   socket.on('declareSpell', (payload) => {
     const d = socket.data;
     if (!d.roomCode || !d.playerId || !payload?.magic) return;

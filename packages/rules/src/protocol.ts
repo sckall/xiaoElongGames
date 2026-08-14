@@ -79,6 +79,8 @@ export interface ClientToServerEvents {
   setBots: (payload: { count: number }) => void;
   updateSettings: (payload: { settings: Partial<RoomSettings> }) => void;
   startGame: () => void;
+  /** 本轮结算后由房主触发开始下一轮 */
+  nextRound: () => void;
   declareSpell: (payload: { magic: Magic }) => void;
   endTurn: () => void;
 }
