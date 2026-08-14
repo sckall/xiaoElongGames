@@ -11,7 +11,6 @@
 import { randomUUID } from 'node:crypto';
 import {
   Game,
-  MAX_PLAYERS,
   MIN_PLAYERS,
   chooseAiAction,
   type Magic,
@@ -19,7 +18,11 @@ import {
 import {
   AUTOPILOT_DELAYS,
   DEFAULT_ROOM_SETTINGS,
+  GAME_ID,
+  MAX_PASSWORD_LEN,
+  MAX_PLAYERS,
   type LobbyInfo,
+  type RoomListItem,
   type RoomSettings,
 } from '@tm/rules';
 import type { Server, Socket } from 'socket.io';
@@ -53,6 +56,10 @@ export function sanitizeName(raw: unknown): string {
   return s || '无名法师';
 }
 
+export function sanitizePassword(raw: unknown): string {
+  return String(raw ?? '').trim().slice(0, MAX_PASSWORD_LEN);
+}
+
 export function genRoomCode(): string {
   // 去掉易混淆字符 0/O/1/I/L
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -70,6 +77,7 @@ export class Room {
   seats: Seat[] = [];
   game: Game | null = null;
   settings: RoomSettings = { ...DEFAULT_ROOM_SETTINGS };
+  password = '';
 
   private io: Server<ClientToServerEvents, ServerToClientEvents>;
   private onEmpty: (code: string) => void;
@@ -81,6 +89,8 @@ export class Room {
     hostId: string,
     hostName: string,
     settings: Partial<RoomSettings> | undefined,
+    password: string | undefined,
+    botCount: number | undefined,
     io: Server<ClientToServerEvents, ServerToClientEvents>,
     onEmpty: (code: string) => void,
   ) {
@@ -89,6 +99,7 @@ export class Room {
     this.io = io;
     this.onEmpty = onEmpty;
     this.settings = { ...DEFAULT_ROOM_SETTINGS, ...settings };
+    this.password = sanitizePassword(password);
     this.seats.push({
       id: hostId,
       name: hostName,
@@ -98,6 +109,22 @@ export class Room {
       disconnectedAt: null,
       socketId: null,
     });
+    this.addBots(Math.max(0, Math.min(MAX_PLAYERS - 1, Math.floor(botCount ?? 0))));
+  }
+
+  private addBots(count: number): void {
+    const have = this.seats.filter((s) => s.isBot).length;
+    for (let i = have; i < count; i++) {
+      this.seats.push({
+        id: `bot-${this.code}-${i + 1}`,
+        name: BOT_NAMES[i % BOT_NAMES.length],
+        isBot: true,
+        connected: true,
+        autoPlay: true,
+        disconnectedAt: null,
+        socketId: null,
+      });
+    }
   }
 
   private seat(id: string): Seat | undefined {
@@ -125,6 +152,19 @@ export class Room {
       botCount: this.seats.filter((s) => s.isBot).length,
       humanCount: this.seats.filter((s) => !s.isBot).length,
       settings: { ...this.settings },
+      hasPassword: this.password !== '',
+    };
+  }
+
+  /** 房间列表项（公开） */
+  listItem(): RoomListItem {
+    return {
+      code: this.code,
+      gameId: GAME_ID,
+      playerCount: this.seats.length,
+      maxPlayers: MAX_PLAYERS,
+      hasPassword: this.password !== '',
+      status: this.status,
     };
   }
 
@@ -150,8 +190,8 @@ export class Room {
     if (socketId) this.io.to(socketId).emit('error', message);
   }
 
-  /** 加入房间（新玩家不带 token；重连带 token 恢复座位） */
-  join(nameRaw: string, token: string | undefined, socketId: string):
+  /** 加入房间（新玩家不带 token；重连带 token 恢复座位；有锁房间校验密码） */
+  join(nameRaw: string, token: string | undefined, socketId: string, passwordRaw?: string):
     | { ok: true; playerId: string; rejoin: boolean }
     | { ok: false; error: string } {
     const name = sanitizeName(nameRaw);
@@ -173,6 +213,9 @@ export class Room {
         return { ok: true, playerId: token, rejoin: true };
       }
       return { ok: false, error: '重连凭据无效（座位不存在），请直接加入' };
+    }
+    if (this.password !== '' && sanitizePassword(passwordRaw) !== this.password) {
+      return { ok: false, error: '密码错误' };
     }
     if (this.status === 'playing') return { ok: false, error: '对局已开始，无法加入新玩家' };
     if (this.seats.filter((s) => !s.isBot).length >= MAX_PLAYERS) {
@@ -200,18 +243,7 @@ export class Room {
     const maxBots = MAX_PLAYERS - humans.length;
     const c = Math.max(0, Math.min(maxBots, Math.floor(count)));
     this.seats = this.seats.filter((s) => !s.isBot || bots.indexOf(s) < c);
-    const have = this.seats.filter((s) => s.isBot).length;
-    for (let i = have; i < c; i++) {
-      this.seats.push({
-        id: `bot-${this.code}-${i + 1}`,
-        name: BOT_NAMES[i % BOT_NAMES.length],
-        isBot: true,
-        connected: true,
-        autoPlay: true,
-        disconnectedAt: null,
-        socketId: null,
-      });
-    }
+    this.addBots(c);
     this.broadcastLobby();
   }
 
@@ -223,6 +255,13 @@ export class Room {
     this.settings = next;
     this.broadcastLobby();
     this.schedule();
+  }
+
+  /** 设置/清除房间密码（仅房主） */
+  setPassword(actorId: string, passwordRaw: string, actorSocketId: string): void {
+    if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以设置密码');
+    this.password = sanitizePassword(passwordRaw);
+    this.broadcastLobby();
   }
 
   /** 开始对局（仅房主，总人数 2~5） */

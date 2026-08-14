@@ -6,6 +6,7 @@ import type {
   LobbyInfo,
   Magic,
   PlayerView,
+  RoomListItem,
   RoomSettings,
   ServerToClientEvents,
 } from '@tm/rules';
@@ -69,11 +70,15 @@ export interface RemoteApi {
   view: PlayerView | null;
   error: string | null;
   myId: string | null;
-  create: (name: string, botCount: number) => void;
-  join: (code: string, name: string) => void;
+  /** 公开房间列表（主动拉取） */
+  roomList: RoomListItem[] | null;
+  create: (name: string, botCount: number, password?: string) => void;
+  join: (code: string, name: string, password?: string) => void;
   rejoin: () => void;
+  listRooms: () => void;
   setBots: (count: number) => void;
   updateSettings: (patch: Partial<RoomSettings>) => void;
+  setPassword: (password: string) => void;
   start: () => void;
   /** 房主开始下一轮 */
   advanceRound: () => void;
@@ -89,6 +94,7 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
   const [view, setView] = useState<PlayerView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
+  const [roomList, setRoomList] = useState<RoomListItem[] | null>(null);
 
   const ensure = useCallback(() => {
     if (socketRef.current) return socketRef.current;
@@ -111,10 +117,10 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
   }, [serverUrl]);
 
   const create = useCallback(
-    (name: string, botCount: number) => {
+    (name: string, botCount: number, password?: string) => {
       setError(null);
       const s = ensure();
-      s.emit('createRoom', { name, botCount }, (res: AckResult) => {
+      s.emit('createRoom', { name, botCount, password }, (res: AckResult) => {
         if (!res.ok) {
           setError(res.error);
           return;
@@ -126,12 +132,12 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     [ensure],
   );
 
-  /** 普通加入：不带 token（永远是新玩家） */
+  /** 普通加入：不带 token（永远是新玩家）；有锁房间需密码 */
   const join = useCallback(
-    (code: string, name: string) => {
+    (code: string, name: string, password?: string) => {
       setError(null);
       const s = ensure();
-      s.emit('joinRoom', { code: code.trim().toUpperCase(), name }, (res: AckResult) => {
+      s.emit('joinRoom', { code: code.trim().toUpperCase(), name, password }, (res: AckResult) => {
         if (!res.ok) {
           setError(res.error);
           return;
@@ -167,6 +173,17 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     socketRef.current?.emit('setBots', { count });
   }, []);
 
+  const listRooms = useCallback(() => {
+    const s = ensure();
+    s.emit('listRooms', (res) => {
+      setRoomList(res.rooms ?? []);
+    });
+  }, [ensure]);
+
+  const setPassword = useCallback((password: string) => {
+    socketRef.current?.emit('setPassword', { password });
+  }, []);
+
   const updateSettings = useCallback((patch: Partial<RoomSettings>) => {
     socketRef.current?.emit('updateSettings', { settings: patch });
   }, []);
@@ -199,6 +216,7 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     setView(null);
     setMyId(null);
     setError(null);
+    setRoomList(null);
   }, [lobby?.code]);
 
   return {
@@ -207,11 +225,14 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     view,
     error,
     myId,
+    roomList,
     create,
     join,
     rejoin,
+    listRooms,
     setBots,
     updateSettings,
+    setPassword,
     start,
     advanceRound,
     declare,

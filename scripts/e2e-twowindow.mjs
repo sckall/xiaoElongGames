@@ -18,17 +18,21 @@ const browser = await chromium.launch();
 try {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 
+  // 进入联机页面的公共路径：设置页（填昵称）→ 联机 → 游戏大厅 → 出包魔法师
+  async function enterOnline(page, name) {
+    await page.goto(BASE);
+    await page.waitForSelector('.setup-panel');
+    await page.fill('.setup-panel input:first-of-type', name);
+    await page.click('text=🌐 联机对战');
+    await page.click('button.primary-btn.big');
+    await page.waitForSelector('.hall-page');
+    await page.click('.hall-card.playable');
+    await page.waitForSelector('.lobby-panel');
+  }
+
   // ---- 窗口 A：创建房间 ----
   const A = await ctx.newPage();
-  await A.goto(BASE);
-  await A.waitForSelector('.setup-panel');
-  await A.fill('.setup-panel input[type=text], .setup-panel input:not([maxlength="4"])', '房主测试');
-  await A.click('text=🌐 联机对战');
-  await A.click('button.primary-btn.big');
-  await A.waitForSelector('.lobby-panel');
-  await A.fill('.lobby-panel input:first-of-type', '房主测试');
-  // AI 选 0，保证只能靠第二个真人开局
-  await A.selectOption('.lobby-panel select.bot-select', '0');
+  await enterOnline(A, '房主测试');
   await A.click('text=➕ 创建房间');
   await A.waitForSelector('.room-code');
   const code = (await A.textContent('.rc-code'))?.trim().slice(0, 4) ?? '';
@@ -36,12 +40,7 @@ try {
 
   // ---- 窗口 B（同上下文 = 同 localStorage）：加入 ----
   const B = await ctx.newPage();
-  await B.goto(BASE);
-  await B.waitForSelector('.setup-panel');
-  await B.click('text=🌐 联机对战');
-  await B.click('button.primary-btn.big');
-  await B.waitForSelector('.lobby-panel');
-  await B.fill('.lobby-panel input:first-of-type', '房客测试');
+  await enterOnline(B, '房客测试');
   await B.fill('.code-input', code);
   await B.locator('button.primary-btn', { hasText: '加入' }).click();
   await B.waitForSelector('.room-code', { timeout: 10000 }).catch(async () => {

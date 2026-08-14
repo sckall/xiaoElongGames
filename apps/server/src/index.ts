@@ -40,12 +40,29 @@ function uniqueCode(): string {
 io.on('connection', (socket: RoomSocket) => {
   socket.data = {};
 
+  socket.on('listRooms', (cb) => {
+    try {
+      cb({ rooms: [...rooms.values()].map((r) => r.listItem()) });
+    } catch (err) {
+      cb({ rooms: [] });
+    }
+  });
+
   socket.on('createRoom', (payload, cb) => {
     try {
       const name = sanitizeName(payload?.name);
       const playerId = randomUUID();
       const code = uniqueCode();
-      const room = new Room(code, playerId, name, payload?.settings, io, (c) => rooms.delete(c));
+      const room = new Room(
+        code,
+        playerId,
+        name,
+        payload?.settings,
+        payload?.password,
+        payload?.botCount,
+        io,
+        (c) => rooms.delete(c),
+      );
       rooms.set(code, room);
       socket.join(code);
       socket.data = { roomCode: code, playerId };
@@ -66,7 +83,7 @@ io.on('connection', (socket: RoomSocket) => {
         cb({ ok: false, error: '房间不存在，请检查房间码' });
         return;
       }
-      const res = room.join(name, payload?.token, socket.id);
+      const res = room.join(name, payload?.token, socket.id, payload?.password);
       if (!res.ok) {
         cb({ ok: false, error: res.error });
         return;
@@ -96,6 +113,12 @@ io.on('connection', (socket: RoomSocket) => {
     const d = socket.data;
     if (!d.roomCode || !d.playerId) return;
     rooms.get(d.roomCode)?.updateSettings(d.playerId, payload?.settings ?? {}, socket.id);
+  });
+
+  socket.on('setPassword', (payload) => {
+    const d = socket.data;
+    if (!d.roomCode || !d.playerId) return;
+    rooms.get(d.roomCode)?.setPassword(d.playerId, payload?.password ?? '', socket.id);
   });
 
   socket.on('startGame', () => {

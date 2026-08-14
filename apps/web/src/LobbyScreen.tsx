@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AUTOPILOT_LABELS, type AutopilotMode } from '@tm/rules';
+import { useEffect, useState } from 'react';
+import { AUTOPILOT_LABELS, type AutopilotMode, type RoomListItem } from '@tm/rules';
 import type { RemoteApi } from './useRemoteGame';
 import { lastSavedRoom } from './useRemoteGame';
 import { AI_SPEED_PRESETS } from './GameSettings';
@@ -17,10 +17,17 @@ export default function LobbyScreen({
   onServerUrlChange: (url: string) => void;
   onExit: () => void;
 }) {
-  const [name, setName] = useState(defaultName || '你');
-  const [botCount, setBotCount] = useState(2);
   const [code, setCode] = useState('');
+  const [joinPw, setJoinPw] = useState('');
+  const [createPw, setCreatePw] = useState('');
+  const [selected, setSelected] = useState<RoomListItem | null>(null);
   const saved = lastSavedRoom();
+
+  // 进入界面拉取一次房间列表
+  useEffect(() => {
+    remote.listRooms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const copyCode = async () => {
     if (!remote.lobby) return;
@@ -31,7 +38,7 @@ export default function LobbyScreen({
     }
   };
 
-  // ---- 大厅 ----
+  // ---- 房间内 ----
   if (remote.lobby) {
     const me = remote.lobby.players.find((p) => p.id === remote.myId);
     const isHost = me?.isHost ?? false;
@@ -42,7 +49,7 @@ export default function LobbyScreen({
         <div className="panel lobby-panel">
           <h1>🧙 联机大厅</h1>
           <div className="room-code" title="点击复制">
-            <span className="rc-label">房间码</span>
+            <span className="rc-label">房间码{remote.lobby.hasPassword ? ' 🔒（有密码）' : ''}</span>
             <button className="rc-code" onClick={copyCode}>
               {remote.lobby.code} <span className="rc-copy">📋</span>
             </button>
@@ -108,6 +115,28 @@ export default function LobbyScreen({
                 </select>
               </div>
 
+              <div className="field">
+                <span>房间密码（可选）</span>
+                <div className="create-row">
+                  <input
+                    className="code-input"
+                    value={createPw}
+                    maxLength={16}
+                    placeholder={remote.lobby.hasPassword ? '已设密码（输入新密码覆盖）' : '留空 = 无密码'}
+                    onChange={(e) => setCreatePw(e.target.value)}
+                  />
+                  <button
+                    className="ghost-btn"
+                    onClick={() => {
+                      remote.setPassword(createPw.trim());
+                      setCreatePw('');
+                    }}
+                  >
+                    {createPw.trim() ? '设置密码' : remote.lobby!.hasPassword ? '清除密码' : '设置'}
+                  </button>
+                </div>
+              </div>
+
               <button
                 className="primary-btn big"
                 disabled={total < 2}
@@ -148,41 +177,74 @@ export default function LobbyScreen({
     );
   }
 
-  // ---- 创建 / 加入 ----
+  // ---- 房间列表 + 创建/加入 ----
+  const rooms = remote.roomList ?? [];
   return (
     <div className="page lobby-page">
       <div className="panel lobby-panel">
-        <h1>🌐 联机对战</h1>
-        <p className="tagline">创建房间分享房间码，或加入朋友的房间</p>
+        <h1>🧙 出包魔法师 · 联机</h1>
+        <p className="tagline">加入公开房间，或创建自己的房间</p>
 
-        <label className="field">
-          <span>你的名字</span>
-          <input value={name} maxLength={12} onChange={(e) => setName(e.target.value)} />
-        </label>
+        <div className="room-list-block">
+          <div className="rl-head">
+            <span className="rl-title">🏠 房间列表</span>
+            <button className="ghost-btn" onClick={remote.listRooms}>
+              🔄 刷新
+            </button>
+          </div>
+          {rooms.length === 0 ? (
+            <p className="muted">暂无房间，创建一个吧～</p>
+          ) : (
+            <ul className="room-list">
+              {rooms.map((r) => (
+                <li
+                  key={r.code}
+                  className={selected?.code === r.code ? 'rl-row selected' : 'rl-row'}
+                  onClick={() => setSelected(r)}
+                >
+                  <span className="rl-lock">{r.hasPassword ? '🔒' : '🔓'}</span>
+                  <span className="rl-code">{r.code}</span>
+                  <span className="rl-count">
+                    👥 {r.playerCount}/{r.maxPlayers}
+                  </span>
+                  <span className={r.status === 'playing' ? 'rl-status playing' : 'rl-status'}>
+                    {r.status === 'playing' ? '⏳ 对局中' : '等待中'}
+                  </span>
+                  <span className="rl-join">加入 →</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selected && (
+            <div className="join-selected">
+              <span className="rl-code">{selected.code}</span>
+              {selected.hasPassword && (
+                <input
+                  className="code-input"
+                  value={joinPw}
+                  maxLength={16}
+                  placeholder="房间密码"
+                  onChange={(e) => setJoinPw(e.target.value)}
+                />
+              )}
+              <button
+                className="primary-btn"
+                disabled={selected.status === 'playing' || (selected.hasPassword && !joinPw)}
+                onClick={() => {
+                  remote.join(selected.code, defaultName, joinPw);
+                  setJoinPw('');
+                  setSelected(null);
+                }}
+              >
+                {selected.status === 'playing' ? '对局中不可加入' : '加入此房间'}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="join-block">
           <div className="field">
-            <span>创建房间（可加入 AI 补位）</span>
-            <div className="create-row">
-              <select
-                className="bot-select"
-                value={botCount}
-                onChange={(e) => setBotCount(Number(e.target.value))}
-              >
-                {[0, 1, 2, 3, 4].map((b) => (
-                  <option key={b} value={b}>
-                    AI ×{b}
-                  </option>
-                ))}
-              </select>
-              <button className="primary-btn" onClick={() => remote.create(name, botCount)}>
-                ➕ 创建房间
-              </button>
-            </div>
-          </div>
-
-          <div className="field">
-            <span>加入房间</span>
+            <span>按房间码加入</span>
             <div className="create-row">
               <input
                 className="code-input"
@@ -191,14 +253,47 @@ export default function LobbyScreen({
                 placeholder="4 位房间码"
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
               />
+              <input
+                className="code-input pw"
+                value={joinPw}
+                maxLength={16}
+                placeholder="密码（无锁留空）"
+                onChange={(e) => setJoinPw(e.target.value)}
+              />
               <button
                 className="primary-btn"
                 disabled={code.length !== 4}
-                onClick={() => remote.join(code, name)}
+                onClick={() => {
+                  remote.join(code, defaultName, joinPw);
+                  setJoinPw('');
+                }}
               >
                 加入
               </button>
             </div>
+          </div>
+
+          <div className="field">
+            <span>创建新房间</span>
+            <div className="create-row">
+              <input
+                className="code-input pw"
+                value={createPw}
+                maxLength={16}
+                placeholder="房间密码（可选）"
+                onChange={(e) => setCreatePw(e.target.value)}
+              />
+              <button
+                className="primary-btn"
+                onClick={() => {
+                  remote.create(defaultName, 0, createPw);
+                  setCreatePw('');
+                }}
+              >
+                ➕ 创建房间
+              </button>
+            </div>
+            <span className="muted">AI 补位在房间内添加</span>
           </div>
 
           {saved && (
@@ -224,7 +319,7 @@ export default function LobbyScreen({
         {remote.error && <div className="error-box">{remote.error}</div>}
 
         <button className="ghost-btn" onClick={onExit}>
-          ← 返回设置
+          ← 返回游戏大厅
         </button>
       </div>
     </div>

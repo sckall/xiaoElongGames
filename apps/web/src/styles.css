@@ -972,18 +972,42 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
   z-index: 25;
   pointer-events: none;
 }
 
+.dice-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: rgba(20, 12, 45, 0.85);
+  border: 1px solid rgba(138, 107, 255, 0.5);
+  border-radius: 16px;
+  padding: 16px 30px 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  animation: dicePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dice-label {
+  font-size: 14px;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+
+.dice-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .dice-cube {
-  font-size: 72px;
+  font-size: 56px;
   animation: diceRoll 0.7s ease-out;
 }
 
 .dice-num {
-  font-size: 84px;
+  font-size: 72px;
   font-weight: 900;
   color: var(--accent);
   text-shadow: 0 4px 18px rgba(255, 184, 77, 0.7);
@@ -1543,6 +1567,212 @@ input {
   text-align: left;
 }
 
+/* ---------- 游戏大厅 ---------- */
+.hall-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 5vh;
+}
+
+.hall-wrap {
+  width: min(880px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hall-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.hall-header h1 {
+  margin: 0;
+  font-size: 34px;
+  background: linear-gradient(120deg, #ffe9b0, #ffb84d 45%, #ff8a4d);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hall-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.hall-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.hall-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(138, 107, 255, 0.4);
+  background: linear-gradient(180deg, #342468, #241a48 60%, #20173f);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.hall-card.playable:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 184, 77, 0.25);
+}
+
+.hall-card.planned {
+  cursor: default;
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.hall-emoji {
+  font-size: 56px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.hall-name {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.hall-meta {
+  font-size: 13px;
+  color: #4dd8ff;
+}
+
+.hall-desc {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.hall-cta {
+  margin-top: 6px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ---------- 房间列表 ---------- */
+.room-list-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(30, 27, 75, 0.55);
+  border: 1px solid rgba(138, 107, 255, 0.35);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.rl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rl-title {
+  font-weight: 700;
+}
+
+.room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--input-bg);
+  border: 1px solid rgba(138, 107, 255, 0.3);
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.rl-row:hover,
+.rl-row.selected {
+  border-color: var(--accent2);
+  background: rgba(138, 107, 255, 0.18);
+}
+
+.rl-lock {
+  font-size: 15px;
+}
+
+.rl-code {
+  font-weight: 900;
+  letter-spacing: 3px;
+  font-size: 15px;
+  min-width: 64px;
+}
+
+.rl-count {
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1;
+}
+
+.rl-status {
+  font-size: 12px;
+  color: var(--ok);
+  background: rgba(67, 209, 122, 0.12);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.rl-status.playing {
+  color: var(--warn);
+  background: rgba(255, 210, 63, 0.12);
+}
+
+.rl-join {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.join-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px dashed rgba(138, 107, 255, 0.4);
+  padding-top: 10px;
+  flex-wrap: wrap;
+}
+
+.join-selected .code-input {
+  flex: 1;
+  min-width: 90px;
+}
+
+.code-input.pw {
+  flex: 1.4;
+  letter-spacing: 1px;
+  font-size: 14px;
+  text-align: left;
+}
+
 /* ---------- 弹层 ---------- */
 .overlay {
   position: fixed;
@@ -1630,8 +1860,24 @@ input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.001s !important;
-    transition-duration: 0.001s !important;
+  /* 只关闭装饰性循环动画；信息性特效保持可见（尤其全屏施法特效，不能闪现消失） */
+  .card-back-glyph,
+  .fx-rays,
+  .turn-tag,
+  .your-turn,
+  .seat.current,
+  .conn-tag.waiting,
+  body::before,
+  body::after {
+    animation: none !important;
+  }
+
+  .full-fx,
+  .full-fx * {
+    animation: none !important;
+  }
+
+  .full-fx {
+    opacity: 1 !important;
   }
 }

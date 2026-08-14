@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MAGIC_LIST, MAX_PLAYERS, MIN_PLAYERS } from '@tm/rules';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
+import HallScreen from './HallScreen';
 import { AI_SPEED_PRESETS, DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
 
 function loadSettings(): GameSettings {
@@ -23,7 +24,7 @@ function loadSettings(): GameSettings {
   return { ...DEFAULT_SETTINGS };
 }
 
-type Screen = 'setup' | 'local' | 'online';
+type Screen = 'setup' | 'hall' | 'local' | 'online';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('setup');
@@ -61,13 +62,17 @@ export default function App() {
     );
   }
 
+  if (screen === 'hall') {
+    return <HallScreen onEnter={() => setScreen('online')} onBack={() => setScreen('setup')} />;
+  }
+
   if (screen === 'online') {
     return (
       <OnlineScreen
         key={sessionKey}
         settings={settings}
         defaultName={myName}
-        onExit={() => setScreen('setup')}
+        onExit={() => setScreen('hall')}
         onToggleSound={() => updateSettings({ sound: !settings.sound })}
         onToggleFx={() => updateSettings({ fx: !settings.fx })}
         onToggleLog={() => updateSettings({ showLog: !settings.showLog })}
@@ -152,10 +157,10 @@ export default function App() {
             className="primary-btn big"
             onClick={() => {
               setSessionKey((k) => k + 1);
-              setScreen('online');
+              setScreen('hall');
             }}
           >
-            🌐 进入联机大厅
+            🌐 进入游戏大厅
           </button>
         )}
 

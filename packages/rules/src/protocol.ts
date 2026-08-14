@@ -5,6 +5,19 @@ import type { Magic, PlayerView } from './types';
 
 export const MAX_NAME_LEN = 12;
 export const ROOM_CODE_LEN = 4;
+export const MAX_PASSWORD_LEN = 16;
+/** 游戏 ID（未来多游戏时按游戏注册） */
+export const GAME_ID = 'trouble-magician';
+
+/** 房间列表项（公开信息） */
+export interface RoomListItem {
+  code: string;
+  gameId: string;
+  playerCount: number;
+  maxPlayers: number;
+  hasPassword: boolean;
+  status: 'lobby' | 'playing';
+}
 
 /** 断线托管策略 */
 export type AutopilotMode = 'instant' | 'wait15s' | 'wait60s';
@@ -51,6 +64,8 @@ export interface LobbyInfo {
   botCount: number;
   humanCount: number;
   settings: RoomSettings;
+  /** 房间是否设有密码 */
+  hasPassword: boolean;
 }
 
 export type Ack<T> = (res: T) => void;
@@ -59,13 +74,17 @@ export interface CreateRoomPayload {
   name: string;
   botCount: number;
   settings?: Partial<RoomSettings>;
+  /** 可选房间密码（空 = 无密码） */
+  password?: string;
 }
 
 export interface JoinRoomPayload {
   code: string;
   name: string;
-  /** 断线重连凭据（仅"重新加入上次房间"时携带） */
+  /** 仅「重新加入上次房间」时携带 */
   token?: string;
+  /** 房间密码（有锁房间必填） */
+  password?: string;
 }
 
 export type AckResult =
@@ -78,6 +97,10 @@ export interface ClientToServerEvents {
   leaveRoom: () => void;
   setBots: (payload: { count: number }) => void;
   updateSettings: (payload: { settings: Partial<RoomSettings> }) => void;
+  /** 房主设置/清除房间密码（空串清除） */
+  setPassword: (payload: { password: string }) => void;
+  /** 拉取公开房间列表 */
+  listRooms: (cb: Ack<{ rooms: RoomListItem[] }>) => void;
   startGame: () => void;
   /** 本轮结算后由房主触发开始下一轮 */
   nextRound: () => void;

@@ -43,21 +43,34 @@ function autoPlay(out) {
   }
 }
 
-// 1. 建房（带 1 个 AI）
+// 1. 建房（带 1 个 AI + 密码）
 const A = makeClient();
 await sleep(300);
-const created = await emitAck(A.s, 'createRoom', { name: '冒烟房主', botCount: 1 });
+const created = await emitAck(A.s, 'createRoom', { name: '冒烟房主', botCount: 1, password: 'pw123' });
 if (!created.ok) fail(`建房失败：${created.error}`);
-else console.log(`✅ 房间已创建：${created.code}`);
+else console.log(`✅ 房间已创建（带密码）：${created.code}`);
 
-// 2. 第二人普通加入（不带 token）
+// 2. 密码校验：无密码/错误密码被拒，正确密码可加入
 const B = makeClient();
 await sleep(300);
-const joined = await emitAck(B.s, 'joinRoom', { code: created.code, name: '冒烟房客' });
-if (!joined.ok) fail(`普通加入失败：${joined.error}`);
+const noPw = await emitAck(B.s, 'joinRoom', { code: created.code, name: '冒烟房客' });
+if (noPw.ok) fail('无密码加入带锁房间应当被拒绝');
+const wrongPw = await emitAck(B.s, 'joinRoom', { code: created.code, name: '冒烟房客', password: 'x' });
+if (wrongPw.ok) fail('错误密码应当被拒绝');
+const joined = await emitAck(B.s, 'joinRoom', { code: created.code, name: '冒烟房客', password: 'pw123' });
+if (!joined.ok) fail(`正确密码加入失败：${joined.error}`);
 await sleep(300);
 if (!A.lobby || A.lobby.humanCount !== 2) fail(`大厅应有 2 名真人，实际 ${A.lobby?.humanCount}`);
-else console.log('✅ 第二名真人普通加入成功（不依赖 token）');
+else console.log('✅ 密码校验生效（无密码/错误密码拒绝，正确密码加入）');
+
+// 2.5 房间列表应包含带锁房间
+const listRes = await new Promise((resolve) => A.s.emit('listRooms', resolve));
+const found = (listRes?.rooms ?? []).find((r) => r.code === created.code);
+if (!found || !found.hasPassword || found.playerCount !== 3) {
+  fail(`房间列表异常：${JSON.stringify(found)}`);
+} else {
+  console.log('✅ 房间列表返回带锁房间（人数 3/5）');
+}
 
 // 3. 房间设置：托管策略改为立即托管、AI 提速
 A.s.emit('updateSettings', { settings: { autopilot: 'instant', aiSpeed: 500 } });

@@ -59,13 +59,18 @@ try {
   }
   await page.close();
 
-  // ---- 联机大厅 ----
+  // ---- 游戏大厅 + 联机大厅 ----
   const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page2 = await ctx2.newPage();
   await page2.goto(BASE);
   await page2.waitForSelector('.setup-panel');
   await page2.click('text=🌐 联机对战');
   await page2.click('button.primary-btn.big');
+  await page2.waitForSelector('.hall-page');
+  await sleep(400);
+  await shot(page2, '05-hall');
+  console.log('✅ 05-hall');
+  await page2.click('.hall-card.playable');
   await page2.waitForSelector('.lobby-panel');
   await sleep(400);
   await shot(page2, '05-lobby');

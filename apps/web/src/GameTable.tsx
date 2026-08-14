@@ -446,8 +446,13 @@ export default function GameTable({
       )}
       {dice && (
         <div className="dice-overlay" key={dice.key}>
-          <span className="dice-cube">🎲</span>
-          <span className="dice-num">{dice.amount}</span>
+          <div className="dice-box">
+            <span className="dice-label">🎲 掷骰子</span>
+            <div className="dice-row">
+              <span className="dice-cube">🎲</span>
+              <span className="dice-num">{dice.amount}</span>
+            </div>
+          </div>
         </div>
       )}
       {confetti &&
