@@ -163,6 +163,7 @@ export default function GameTable({
   onRematch,
   onToggleSound,
   onToggleFx,
+  onToggleLog,
   roomInfo,
   canAdvanceRound,
   online,
@@ -173,6 +174,7 @@ export default function GameTable({
   onRematch?: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
+  onToggleLog: () => void;
   /** 联机模式：大厅信息（用于显示断线/托管状态与房主判断） */
   roomInfo?: LobbyInfo | null;
   /** 当前玩家是否可以开始下一轮（本地恒为 true；联机仅房主） */
@@ -249,7 +251,7 @@ export default function GameTable({
         if (fx && e.magic) {
           const key = e.seq;
           setFullFx({ magic: e.magic, fail: false, key });
-          window.setTimeout(() => setFullFx((b) => (b?.key === key ? null : b)), 1300);
+          window.setTimeout(() => setFullFx((b) => (b?.key === key ? null : b)), 1500);
         }
         break;
       }
@@ -258,7 +260,7 @@ export default function GameTable({
         if (fx && e.magic) {
           const key = e.seq;
           setFullFx({ magic: e.magic, fail: true, key });
-          window.setTimeout(() => setFullFx((b) => (b?.key === key ? null : b)), 1600);
+          window.setTimeout(() => setFullFx((b) => (b?.key === key ? null : b)), 1800);
         }
         break;
       }
@@ -312,7 +314,7 @@ export default function GameTable({
   const hideOwnHand = view.phase === 'playing';
 
   return (
-    <div className="page game-page">
+    <div className={`page game-page ${settings.showLog ? '' : 'no-log'}`}>
       <header className="topbar">
         <div className="topbar-title">🧙 出包魔法师</div>
         <div className="topbar-info">
@@ -322,6 +324,9 @@ export default function GameTable({
           <span className="chip-info">🗑️ 弃牌 {view.discard.length}</span>
           {online && <span className="chip-info online">🌐 联机</span>}
         </div>
+        <button className="ghost-btn" title={settings.showLog ? '隐藏战报（凭记忆推理）' : '显示战报'} onClick={onToggleLog}>
+          {settings.showLog ? '📜' : '📕'}
+        </button>
         <button className="ghost-btn" title={settings.sound ? '关闭音效' : '开启音效'} onClick={onToggleSound}>
           {settings.sound ? '🔊' : '🔇'}
         </button>
@@ -382,17 +387,18 @@ export default function GameTable({
             {MAGIC_LIST.map((m) => {
               const legal = view.legalMagics.includes(m.key);
               const isLast = view.lastMagic === m.key;
+              const remaining = view.magicRemaining[m.key];
               return (
                 <button
                   key={m.key}
                   className={`magic-btn card-btn-${m.key} ${legal ? '' : 'illegal'} ${isLast ? 'last' : ''}`}
                   disabled={!view.isYourTurn || !legal}
                   onClick={() => api.declare(m.key)}
-                  title={m.desc}
+                  title={`${m.desc}｜全副牌共 ${m.count} 张｜你的视角还有 ${remaining} 张未被看见`}
                 >
                   <span className="mb-emoji">{m.emoji}</span>
                   <span className="mb-name">{m.name}</span>
-                  <span className="mb-count">×{m.count}</span>
+                  <span className={`mb-count ${remaining > 0 ? '' : 'zero'}`}>剩 {remaining}</span>
                   {view.isYourTurn && !legal && <span className="mb-lock">🔒</span>}
                 </button>
               );
@@ -407,42 +413,35 @@ export default function GameTable({
               下一张魔法不能比它更稀有（总张数不能更少）。
             </div>
           )}
-          <div className="deck-widget" title="牌堆剩余数量">
-            <span className="deck-widget-icon">🎴</span>
-            <span className="deck-widget-label">牌堆剩余</span>
-            <span className="deck-widget-count">{view.deckCount}</span>
-            <span className="deck-widget-unit">张</span>
-          </div>
         </div>
       </main>
 
-      <aside className="log-panel">
-        <h3>📜 战报</h3>
-        <div className="log" ref={logRef}>
-          {view.events.map((e) => (
-            <div key={e.seq} className={`log-line ev-${e.type}`}>
-              <span className="log-icon">{EVENT_ICONS[e.type] ?? '•'}</span>
-              <span>{e.text}</span>
-            </div>
-          ))}
-        </div>
-      </aside>
+      {settings.showLog && (
+        <aside className="log-panel">
+          <h3>📜 战报</h3>
+          <div className="log" ref={logRef}>
+            {view.events.map((e) => (
+              <div key={e.seq} className={`log-line ev-${e.type}`}>
+                <span className="log-icon">{EVENT_ICONS[e.type] ?? '•'}</span>
+                <span>{e.text}</span>
+              </div>
+            ))}
+          </div>
+        </aside>
+      )}
 
       {/* 全屏施法特效（成功/失败两版） */}
       {fullFx && (
-        <div
-          className={`full-fx ${fullFx.fail ? 'fail' : 'success'}`}
-          key={fullFx.key}
-          role="status"
-        >
-          <div className="fx-burst" />
-          <div className="fx-emoji">{fullFx.fail ? '😱' : MAGIC_DEFS[fullFx.magic].emoji}</div>
-          <div className="fx-text">
-            {fullFx.fail
-              ? `「${MAGIC_DEFS[fullFx.magic].name}」施放失败！`
-              : `「${MAGIC_DEFS[fullFx.magic].name}」施放成功！`}
+        <div className={`full-fx ${fullFx.fail ? 'fail' : 'success'}`} key={fullFx.key} role="status">
+          <div className="fx-rays" />
+          <div className="fx-plate">
+            <span className="fx-badge">{fullFx.fail ? '❌ 出包' : '✅ 成功'}</span>
+            <span className="fx-emoji">{fullFx.fail ? '😱' : MAGIC_DEFS[fullFx.magic].emoji}</span>
+            <span className="fx-name">{MAGIC_DEFS[fullFx.magic].name}</span>
+            <span className="fx-text">
+              {fullFx.fail ? '施放失败！' : '施放成功！'}
+            </span>
           </div>
-          <div className="fx-sub">{fullFx.fail ? '出包了！' : MAGIC_DEFS[fullFx.magic].desc}</div>
         </div>
       )}
       {dice && (

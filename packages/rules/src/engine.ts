@@ -478,6 +478,19 @@ export class Game {
       const minCount = this.lastMagic ? MAGIC_DEFS[this.lastMagic].count : 0;
       legalMagics = MAGIC_LIST.filter((d) => d.count >= minCount).map((d) => d.key);
     }
+    // 本视角每个魔法的剩余张数：总数 - 可见明牌（他人手牌 + 弃牌堆 + 自己秘密牌）
+    const magicRemaining = {} as Record<Magic, number>;
+    for (const def of MAGIC_LIST) {
+      let visible = this.discard.filter((c) => c.magic === def.key).length;
+      for (const p of this.players) {
+        if (p.id === playerId) {
+          visible += p.secrets.filter((c) => c.magic === def.key).length;
+        } else {
+          visible += p.hand.filter((c) => c.magic === def.key).length;
+        }
+      }
+      magicRemaining[def.key] = def.count - visible;
+    }
     return {
       round: this.round,
       turnNo: this.turnNo,
@@ -494,6 +507,7 @@ export class Game {
       winnerId: this.winnerId,
       isYourTurn: this.phase === 'playing' && this.current.id === playerId,
       legalMagics,
+      magicRemaining,
     };
   }
 }

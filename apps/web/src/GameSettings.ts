@@ -5,6 +5,8 @@ export interface GameSettings {
   aiSpeed: number;
   /** 联机服务器地址（空 = 同源自动） */
   serverUrl: string;
+  /** 显示战报日志（默认隐藏，方便玩家凭记忆推理） */
+  showLog: boolean;
 }
 
 export const AI_SPEED_PRESETS = [
@@ -19,4 +21,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   sound: true,
   aiSpeed: 1000,
   serverUrl: '',
+  showLog: false,
 };

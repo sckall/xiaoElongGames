@@ -325,6 +325,30 @@ describe('胜负判定', () => {
     const v2 = g.getView('p0');
     expect(v2.seats.find((s) => s.id === 'p2')!.secrets).toEqual([null]);
   });
+
+  it('视角剩余数：看不到自己手牌，因此每个玩家的剩余数不同', () => {
+    const g = makeGame(2, 7);
+    // 唯一的龙在 p0 手中
+    forceHand(g, 'p0', ['dragon', 'potion', 'potion', 'potion', 'potion']);
+    g.deck = g.deck.filter((c) => c.magic !== 'dragon');
+    g.secretPile = g.secretPile.filter((c) => c.magic !== 'dragon');
+    // p1 视角：龙在 p0 明牌里 → 剩余 0
+    const v1 = g.getView('p1');
+    expect(v1.magicRemaining.dragon).toBe(0);
+    // p0 视角：看不到自己的手牌 → 龙仍可能在未知区域 → 剩余 1
+    const v0 = g.getView('p0');
+    expect(v0.magicRemaining.dragon).toBe(1);
+    // 药水：p0 手中有 4 张，其他 4 张分布未知区域
+    // p1 视角可见 4 张（在 p0 手中）→ 剩余 8 - 4 - 弃牌0 = 4
+    expect(v1.magicRemaining.potion).toBe(4);
+    expect(v0.magicRemaining.potion).toBe(8);
+    // 施放药水后（进弃牌堆）：双方剩余都减 1
+    g.declareSpell('p0', 'potion');
+    const v1b = g.getView('p1');
+    const v0b = g.getView('p0');
+    expect(v1b.magicRemaining.potion).toBe(4); // 8 - 3(明牌) - 1(弃牌)
+    expect(v0b.magicRemaining.potion).toBe(7); // 8 - 0(看不到自己的牌) - 1(弃牌)
+  });
 });
 
 describe('AI 决策', () => {

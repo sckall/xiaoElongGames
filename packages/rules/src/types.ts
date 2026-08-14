@@ -182,4 +182,11 @@ export interface PlayerView {
   isYourTurn: boolean;
   /** 当前回合玩家可合法施放的魔法（下一张总张数不能小于上一张） */
   legalMagics: Magic[];
+  /**
+   * 每个魔法在本玩家视角的「剩余」张数：
+   * 总张数 - 本视角可见明牌（他人手牌 + 弃牌堆 + 自己的秘密牌）。
+   * 因看不到自己的手牌，不同玩家的数值不同；
+   * 等价于该魔法仍在【自己手牌 ∪ 牌堆 ∪ 秘密牌堆 ∪ 他人秘密牌】中的张数。
+   */
+  magicRemaining: Record<Magic, number>;
 }

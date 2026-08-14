@@ -9,6 +9,7 @@ export default function OnlineScreen({
   onExit,
   onToggleSound,
   onToggleFx,
+  onToggleLog,
   onServerUrlChange,
 }: {
   settings: GameSettings;
@@ -16,6 +17,7 @@ export default function OnlineScreen({
   onExit: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
+  onToggleLog: () => void;
   onServerUrlChange: (url: string) => void;
 }) {
   const remote = useRemoteGame(settings.serverUrl);
@@ -34,6 +36,7 @@ export default function OnlineScreen({
         onExit={remote.leave}
         onToggleSound={onToggleSound}
         onToggleFx={onToggleFx}
+        onToggleLog={onToggleLog}
         roomInfo={remote.lobby}
         canAdvanceRound={remote.lobby?.hostId === remote.view.youId}
         online

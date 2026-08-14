@@ -10,6 +10,7 @@ export default function LocalGameScreen({
   onRestart,
   onToggleSound,
   onToggleFx,
+  onToggleLog,
 }: {
   playerCount: number;
   myName: string;
@@ -18,6 +19,7 @@ export default function LocalGameScreen({
   onRestart: () => void;
   onToggleSound: () => void;
   onToggleFx: () => void;
+  onToggleLog: () => void;
 }) {
   const api = useLocalGame(playerCount, myName, settings.aiSpeed);
   return (
@@ -28,6 +30,7 @@ export default function LocalGameScreen({
       onRematch={onRestart}
       onToggleSound={onToggleSound}
       onToggleFx={onToggleFx}
+      onToggleLog={onToggleLog}
       canAdvanceRound
     />
   );

@@ -14,6 +14,7 @@ function loadSettings(): GameSettings {
         sound: s.sound !== false,
         aiSpeed: typeof s.aiSpeed === 'number' ? s.aiSpeed : DEFAULT_SETTINGS.aiSpeed,
         serverUrl: typeof s.serverUrl === 'string' ? s.serverUrl : '',
+        showLog: s.showLog === true,
       };
     }
   } catch {
@@ -55,6 +56,7 @@ export default function App() {
         onRestart={() => setSessionKey((k) => k + 1)}
         onToggleSound={() => updateSettings({ sound: !settings.sound })}
         onToggleFx={() => updateSettings({ fx: !settings.fx })}
+        onToggleLog={() => updateSettings({ showLog: !settings.showLog })}
       />
     );
   }
@@ -68,6 +70,7 @@ export default function App() {
         onExit={() => setScreen('setup')}
         onToggleSound={() => updateSettings({ sound: !settings.sound })}
         onToggleFx={() => updateSettings({ fx: !settings.fx })}
+        onToggleLog={() => updateSettings({ showLog: !settings.showLog })}
         onServerUrlChange={(url) => updateSettings({ serverUrl: url.trim() })}
       />
     );
@@ -170,6 +173,13 @@ export default function App() {
               onClick={() => updateSettings({ fx: !settings.fx })}
             >
               {settings.fx ? '✨ 动画开' : '💤 动画关'}
+            </button>
+            <button
+              className={`pref-btn ${settings.showLog ? 'active' : ''}`}
+              title="战报日志默认隐藏：有些信息（出过的牌）需要玩家自己记忆"
+              onClick={() => updateSettings({ showLog: !settings.showLog })}
+            >
+              {settings.showLog ? '📜 战报开' : '📕 战报关'}
             </button>
           </div>
         </div>
