@@ -28,7 +28,8 @@
 node scripts/pack-local.mjs
 # 产物：release/gator-hall-local-<版本>.tar.gz（约 0.1MB）
 # 解压后双击「启动.command」(macOS) 或「启动.bat」(Windows) 即玩，
-# 无需 Node/pnpm——仅用系统 Python 托管静态文件（127.0.0.1:8123）。
+# 无需 Node/pnpm——仅用系统 Python 托管静态文件（127.0.0.1:8123，仅本机可访问）。
+# 服务自动关闭：关掉启动窗口立即停；即使忘关，闲置 10 分钟也自动退出，不留后台进程。
 # 该包内联机模式仍可用：游戏内填已部署公网服务器的地址即可。
 ```
 
