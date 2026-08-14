@@ -1475,6 +1475,13 @@ button {
   .action-bar {
     grid-template-columns: repeat(5, 1fr);
   }
+
+  .round-panel {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+    max-height: 55vh;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

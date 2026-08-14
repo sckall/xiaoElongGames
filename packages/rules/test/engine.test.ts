@@ -305,6 +305,26 @@ describe('胜负判定', () => {
       expect(p.secrets.length).toBe(0);
     }
   });
+
+  it('轮末复盘：向本人揭晓自己的手牌，对局中仍隐藏', () => {
+    // 对局中：自己手牌为 null（背对自己）
+    const g = makeGame(3, 7);
+    forceHand(g, 'p0', ['fire', 'dragon', 'potion', 'potion', 'potion']);
+    const v0 = g.getView('p0');
+    expect(v0.seats.find((s) => s.id === 'p0')!.hand.every((m) => m === null)).toBe(true);
+    // 击杀结束本轮后：自己手牌揭晓，可复盘
+    g.player('p1').hp = 1;
+    g.declareSpell('p0', 'fire');
+    expect(g.phase).toBe('roundEnd');
+    const v1 = g.getView('p0');
+    const me = v1.seats.find((s) => s.id === 'p0')!;
+    expect(me.hand.every((m) => m !== null)).toBe(true);
+    expect(me.hand.filter((m) => m === 'potion').length).toBe(3);
+    // 他人秘密牌身份仍保密
+    g.player('p2').secrets.push({ id: 's1', magic: 'dragon' });
+    const v2 = g.getView('p0');
+    expect(v2.seats.find((s) => s.id === 'p2')!.secrets).toEqual([null]);
+  });
 });
 
 describe('AI 决策', () => {
