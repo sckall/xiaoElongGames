@@ -9,11 +9,11 @@ export default function HallScreen({
     <div className="page hall-page">
       <div className="hall-wrap">
         <header className="hall-header">
-          <h1>🎮 游戏大厅</h1>
+          <h1>🐊 小鳄龙之家</h1>
           <p className="tagline">选择游戏开始游玩</p>
           <div className="hall-actions">
             <button className="ghost-btn" onClick={onBack}>
-              ← 返回设置
+              ← 返回首页
             </button>
           </div>
         </header>

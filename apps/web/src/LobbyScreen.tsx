@@ -308,7 +308,7 @@ export default function LobbyScreen({
           <input
             className="server-input"
             value={serverUrl}
-            placeholder="例如 http://192.168.1.10:8787 或 https://tm.example.com"
+            placeholder="例如 http://192.168.x.x:8787 或 https://你的域名"
             onChange={(e) => onServerUrlChange(e.target.value)}
           />
           <p className="muted">

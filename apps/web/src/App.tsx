@@ -56,6 +56,8 @@ export default function App() {
         onPlayerCountChange={setPlayerCount}
         aiSpeed={settings.aiSpeed}
         onAiSpeedChange={(ms) => updateSettings({ aiSpeed: ms })}
+        settings={settings}
+        onUpdateSettings={updateSettings}
         onPlayLocal={() => {
           setSessionKey((k) => k + 1);
           setScreen('local');
@@ -100,44 +102,19 @@ export default function App() {
     );
   }
 
-  // ---- 设置页（昵称 + 偏好 → 游戏大厅） ----
+  // ---- 首页（昵称 → 游戏大厅） ----
   return (
     <div className="page setup-page">
       <div className="panel setup-panel">
         <h1>
-          🧙 出包魔法师 <span className="subtitle">Trouble Magician</span>
+          🐊 小鳄龙之家 <span className="subtitle">Game Hall · 游戏大厅</span>
         </h1>
-        <p className="tagline">连自己会什么魔法都不知道的见习魔法师们，开始瞎放魔法吧！</p>
+        <p className="tagline">选择游戏，和朋友一起玩</p>
 
         <label className="field">
           <span>你的名字</span>
           <input value={myName} maxLength={8} onChange={(e) => setMyName(e.target.value)} />
         </label>
-
-        <div className="field">
-          <span>偏好</span>
-          <div className="pref-row">
-            <button
-              className={`pref-btn ${settings.sound ? 'active' : ''}`}
-              onClick={() => updateSettings({ sound: !settings.sound })}
-            >
-              {settings.sound ? '🔊 音效开' : '🔇 音效关'}
-            </button>
-            <button
-              className={`pref-btn ${settings.fx ? 'active' : ''}`}
-              onClick={() => updateSettings({ fx: !settings.fx })}
-            >
-              {settings.fx ? '✨ 动画开' : '💤 动画关'}
-            </button>
-            <button
-              className={`pref-btn ${settings.showLog ? 'active' : ''}`}
-              title="战报日志默认隐藏：有些信息（出过的牌）需要玩家自己记忆"
-              onClick={() => updateSettings({ showLog: !settings.showLog })}
-            >
-              {settings.showLog ? '📜 战报开' : '📕 战报关'}
-            </button>
-          </div>
-        </div>
 
         <button className="primary-btn big" onClick={() => setScreen('hall')}>
           🎮 进入游戏大厅

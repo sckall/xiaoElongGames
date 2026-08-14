@@ -525,7 +525,7 @@ export default function GameTable({
                 </button>
               )}
               <button className="ghost-btn" onClick={onExit}>
-                {online ? '离开房间' : '返回设置'}
+                {online ? '离开房间' : '返回游戏'}
               </button>
             </div>
           </div>

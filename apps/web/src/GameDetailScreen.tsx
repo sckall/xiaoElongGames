@@ -1,12 +1,14 @@
 import { MAGIC_LIST, MAX_PLAYERS, MIN_PLAYERS } from '@tm/rules';
-import { AI_SPEED_PRESETS } from './GameSettings';
+import { AI_SPEED_PRESETS, type GameSettings } from './GameSettings';
 
-/** 游戏详情页：出包魔法师 → 单人 vs AI / 联机对战 */
+/** 游戏详情页：出包魔法师 → 单人 vs AI / 联机对战 + 游戏偏好 */
 export default function GameDetailScreen({
   playerCount,
   onPlayerCountChange,
   aiSpeed,
   onAiSpeedChange,
+  settings,
+  onUpdateSettings,
   onPlayLocal,
   onPlayOnline,
   onBack,
@@ -15,6 +17,8 @@ export default function GameDetailScreen({
   onPlayerCountChange: (n: number) => void;
   aiSpeed: number;
   onAiSpeedChange: (ms: number) => void;
+  settings: GameSettings;
+  onUpdateSettings: (patch: Partial<GameSettings>) => void;
   onPlayLocal: () => void;
   onPlayOnline: () => void;
   onBack: () => void;
@@ -81,6 +85,31 @@ export default function GameDetailScreen({
             <button className="primary-btn big" onClick={onPlayOnline}>
               🌐 进入联机大厅
             </button>
+          </section>
+
+          <section className="detail-mode">
+            <h2>⚙️ 游戏偏好</h2>
+            <div className="pref-row">
+              <button
+                className={`pref-btn ${settings.sound ? 'active' : ''}`}
+                onClick={() => onUpdateSettings({ sound: !settings.sound })}
+              >
+                {settings.sound ? '🔊 音效开' : '🔇 音效关'}
+              </button>
+              <button
+                className={`pref-btn ${settings.fx ? 'active' : ''}`}
+                onClick={() => onUpdateSettings({ fx: !settings.fx })}
+              >
+                {settings.fx ? '✨ 动画开' : '💤 动画关'}
+              </button>
+              <button
+                className={`pref-btn ${settings.showLog ? 'active' : ''}`}
+                title="战报日志默认隐藏：有些信息（出过的牌）需要玩家自己记忆"
+                onClick={() => onUpdateSettings({ showLog: !settings.showLog })}
+              >
+                {settings.showLog ? '📜 战报开' : '📕 战报关'}
+              </button>
+            </div>
           </section>
         </div>
 

@@ -8,3 +8,12 @@ tools/
 .env
 .env.*
 !.env.example
+
+# 发布打包产物
+release/
+*.tgz
+*.tar.gz
+
+# 构建/工具缓存
+*.tsbuildinfo
+.vite/
