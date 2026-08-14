@@ -142,7 +142,7 @@ function Seat({
       </div>
       <div className="hand-fan">
         {seat.hand.map((m, i) => (
-          <MagicCard key={i} magic={m} hidden={isYou && hideOwnHand} />
+          <MagicCard key={i} magic={m} hidden={isYou && hideOwnHand} small={!isYou} />
         ))}
         {seat.handCount === 0 && <span className="empty-hand">无手牌</span>}
       </div>

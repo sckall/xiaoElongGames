@@ -509,8 +509,24 @@ button {
 
 .opponents {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 10px;
+}
+
+/* 对手座位紧凑化：小卡牌、小头像，缓解 4-5 人拥挤 */
+.opponents .seat {
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.opponents .avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 17px;
+}
+
+.opponents .hand-fan .card + .card {
+  margin-left: -6px;
 }
 
 /* ---------- 座位 ---------- */
@@ -761,7 +777,7 @@ button {
 
 .action-bar {
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 8px;
 }
 
@@ -1845,10 +1861,6 @@ input {
   .log-panel {
     max-height: 260px;
     position: static;
-  }
-
-  .action-bar {
-    grid-template-columns: repeat(5, 1fr);
   }
 
   .round-panel {
