@@ -2,8 +2,9 @@
  * 《鳄龙咆哮》bot 决策：只用 getSnapshot(botId) 的玩家视角信息。
  * 返回一组可交给 applyInput 的白名单动作；非法/不可用的动作由引擎安全拒绝。
  */
-import { HERO_IDS, segmentBlocked, wrapAngle } from './defs';
+import { HERO_IDS, SPAWN_POINTS, segmentBlocked, wrapAngle } from './defs';
 import type {
+  AIStyle,
   HeroId,
   RealtimeInputAction,
   Snapshot,
@@ -12,6 +13,8 @@ import type {
 
 export interface AIOptions {
   rng?: () => number;
+  /** combat=实战；movement=只走位不攻击（手感/碰撞测试用） */
+  style?: AIStyle;
 }
 
 function hash(s: string): number {
@@ -34,6 +37,27 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
   }
   if (view.phase === 'gameOver') return [];
   if (!me.alive) return [{ type: 'move', x: 0, z: 0 }];
+
+  // 移动测试 AI：每隔 4 秒选一个路点走过去；不瞄准、不开火、不放技能
+  if (options.style === 'movement') {
+    const waypoints = [...SPAWN_POINTS, { x: 0, y: 0, z: 0 }];
+    const windowIdx = Math.floor(view.t / 4000);
+    const wp = waypoints[(windowIdx + hash(me.id)) % waypoints.length];
+    const dx = wp.x - me.pos.x;
+    const dz = wp.z - me.pos.z;
+    const dist = Math.hypot(dx, dz);
+    const actions: RealtimeInputAction[] = [];
+    if (dist < 1.2) {
+      actions.push({ type: 'move', x: 0, z: 0 });
+    } else {
+      actions.push({ type: 'move', x: dx / dist, z: dz / dist });
+    }
+    actions.push({ type: 'look', yaw: Math.atan2(dx, dz), pitch: 0 });
+    if (view.t % 2400 < 200 && hash(me.id + String(Math.floor(view.t / 2400))) % 4 === 0) {
+      actions.push({ type: 'jump', pressed: true });
+    }
+    return actions;
+  }
 
   const enemies = view.players.filter((p) => p.id !== view.youId && p.alive && p.visible);
   const actions: RealtimeInputAction[] = [];

@@ -35,6 +35,16 @@ Socket.IO + 服务端 tick（20Hz）广播快照；正式期如需状态补丁/�
 - `getSnapshot(playerId)`：按玩家视角投影，隐身敌人不下发、私有伤害事件只给
   双方、事件增量下发。
 
+引擎选项（`createEngine(players, options)`）：
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `mode` | `ffa` | `ffa` 自由混战 / `tdm` 团队死斗 |
+| `scoreLimit` | 15 | 击杀线（1-200，越界回默认） |
+| `matchTimeMs` | 600000 | 时长上限，到时按分数判定 |
+| `heroSelectMs` | 30000 | 英雄选择倒计时，到时自动补选 |
+| `aiStyle` | `combat` | `combat` 实战 AI；`movement` **移动测试 AI（只走位不攻击）** |
+
 | 输入动作 | 字段 | 校验 |
 |----------|------|------|
 | `selectHero` | `hero` | `HERO_IDS` 白名单；仅 heroSelect 阶段 |

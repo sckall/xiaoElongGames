@@ -29,9 +29,14 @@ try {
   await page.waitForSelector('.hall-page');
   await page.locator('.hall-card').filter({ hasText: '鳄龙咆哮' }).click();
   await page.waitForSelector('.ccf-detail-panel');
+  const aiStyle = process.env.TM_AI_STYLE === 'movement' ? 'movement' : 'combat';
+  if (aiStyle === 'movement') {
+    await page.locator('.bot-select').last().selectOption('movement');
+    await sleep(200);
+  }
   await sleep(300);
-  await shot(page, '2026-08-15-detail');
-  console.log('✅ detail');
+  await shot(page, `2026-08-15-detail${aiStyle === 'movement' ? '-movement' : ''}`);
+  console.log(`✅ detail（AI=${aiStyle}）`);
 
   await page.click('button:has-text("开始（本地 vs AI）")');
   await page.waitForSelector('.ccf-hero-grid');
@@ -53,6 +58,14 @@ try {
   // 等待 bot 对局推进，观察击杀信息/计分变化
   await sleep(12_000);
   await shot(page, '2026-08-15-battle-late');
+  if (aiStyle === 'movement') {
+    const kills = await page.locator('.ccf-kill-item').count();
+    if (kills > 0) {
+      console.log(`❌ 移动测试 AI 出现 ${kills} 条击杀信息`);
+      process.exit(1);
+    }
+    console.log('✅ 移动测试 AI：12 秒内无射击/击杀');
+  }
   console.log('✅ battle-late');
 
   // 计分板（Tab 在未锁鼠标时也应可用）

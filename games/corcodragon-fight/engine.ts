@@ -39,6 +39,7 @@ import {
 } from './defs';
 import type {
   AABB,
+  AIStyle,
   EffectKind,
   EngineOptions,
   EventKind,
@@ -265,6 +266,7 @@ export class CorcodragonFightEngine {
   readonly scoreLimit: number;
   readonly matchTimeMs: number;
   readonly heroSelectMs: number;
+  readonly aiStyle: AIStyle;
   phase: 'heroSelect' | 'playing' | 'gameOver' = 'heroSelect';
   t = 0;
   timeLeft: number;
@@ -278,7 +280,8 @@ export class CorcodragonFightEngine {
   private acc = 0;
   private effectSeq = 1;
   private eventSeq = 0;
-  private events: EngineEvent[] = [];
+  /** 全部事件环（供测试/回放检查；平台只消费 getSnapshot 的增量投影） */
+  readonly events: EngineEvent[] = [];
   private lastSentSeq = new Map<string, number>();
   private botNextThink = new Map<string, number>();
   private effects: EngineEffect[] = [];
@@ -291,12 +294,14 @@ export class CorcodragonFightEngine {
     const scoreLimit = optNum(options.scoreLimit, 1, 200, DEFAULT_OPTIONS.scoreLimit);
     const matchTimeMs = optNum(options.matchTimeMs, 30_000, 3_600_000, DEFAULT_OPTIONS.matchTimeMs);
     const heroSelectMs = optNum(options.heroSelectMs, 5_000, 120_000, DEFAULT_OPTIONS.heroSelectMs);
+    const aiStyle: AIStyle = options.aiStyle === 'movement' ? 'movement' : 'combat';
     const rng = typeof options.rng === 'function' ? options.rng : Math.random;
 
     this.mode = mode;
     this.scoreLimit = scoreLimit;
     this.matchTimeMs = matchTimeMs;
     this.heroSelectMs = heroSelectMs;
+    this.aiStyle = aiStyle;
     this.timeLeft = matchTimeMs;
     this.heroSelectLeft = heroSelectMs;
     this.rng = rng;
@@ -626,7 +631,7 @@ export class CorcodragonFightEngine {
       if (this.t >= next) {
         this.botNextThink.set(p.id, this.t + BOT_THINK_MS + Math.floor(this.rng() * 120));
         const view = this.getSnapshot(p.id);
-        const actions = chooseAIInputs(view, { rng: this.rng });
+        const actions = chooseAIInputs(view, { rng: this.rng, style: this.aiStyle });
         for (const a of actions) this.applyInput(p.id, a);
       }
     }
@@ -1404,6 +1409,7 @@ export function createEngine(
         scoreLimit: typeof options.scoreLimit === 'number' ? options.scoreLimit : undefined,
         matchTimeMs: typeof options.matchTimeMs === 'number' ? options.matchTimeMs : undefined,
         heroSelectMs: typeof options.heroSelectMs === 'number' ? options.heroSelectMs : undefined,
+        aiStyle: options.aiStyle === 'movement' ? 'movement' : options.aiStyle === 'combat' ? 'combat' : undefined,
       }
     : {};
   return new CorcodragonFightEngine(players, { ...opts, rng });

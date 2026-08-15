@@ -61,7 +61,10 @@ export default function RealtimeLobbyScreen({
   const effectiveMode = roomConfig?.mode === 'tdm' ? 'tdm' : config.mode;
   const effectiveLimit =
     typeof roomConfig?.scoreLimit === 'number' ? roomConfig.scoreLimit : config.scoreLimit;
-  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀`;
+  const effectiveAiStyle = roomConfig?.aiStyle ?? config.aiStyle;
+  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀 · ${
+    effectiveAiStyle === 'movement' ? '🧪 移动测试 AI' : '⚔️ 实战 AI'
+  }`;
 
   if (remote.lobby) {
     const me = remote.lobby.players.find((p) => p.id === remote.myId);
@@ -249,7 +252,11 @@ export default function RealtimeLobbyScreen({
               <button
                 className="primary-btn"
                 onClick={() => {
-                  remote.create(defaultName, 0, createPw, { mode: config.mode, scoreLimit: config.scoreLimit });
+                  remote.create(defaultName, 0, createPw, {
+                    mode: config.mode,
+                    scoreLimit: config.scoreLimit,
+                    aiStyle: config.aiStyle ?? 'combat',
+                  });
                   setCreatePw('');
                 }}
               >

@@ -59,7 +59,11 @@ export default function App() {
   const [sessionKey, setSessionKey] = useState(0);
   const [selectedGameId, setSelectedGameId] = useState('trouble-magician');
   const [settings, setSettings] = useState<GameSettings>(loadSettings);
-  const [fightConfig, setFightConfig] = useState<FightConfig>({ mode: 'ffa', scoreLimit: 15 });
+  const [fightConfig, setFightConfig] = useState<FightConfig>({
+    mode: 'ffa',
+    scoreLimit: 15,
+    aiStyle: 'combat',
+  });
 
   const updateSettings = (patch: Partial<GameSettings>) => {
     setSettings((s) => {

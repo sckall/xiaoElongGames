@@ -19,8 +19,10 @@ import {
   WEAPON_DEFS,
   WEAPON_IDS,
   WALL_HEIGHT,
+  viewRelativeMove,
 } from './defs';
 import type {
+  AIStyle,
   GameModeKind,
   HeroId,
   RealtimeInputAction,
@@ -78,6 +80,8 @@ export interface FpsDriver {
 export interface FightConfig {
   mode: GameModeKind;
   scoreLimit: number;
+  /** bot 行为：combat=实战 AI；movement=移动测试 AI（只走位不攻击） */
+  aiStyle: AIStyle;
 }
 
 // ---------------- 3D 视图 + HUD ----------------
@@ -223,16 +227,11 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         if (me.ads) speed *= 0.5;
         if (me.stealthT > 0) speed *= 1.25;
         const k = keysRef.current;
-        const yaw = viewRef.current.yaw;
-        const fw = { x: Math.sin(yaw), z: Math.cos(yaw) };
-        const right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
         const mz = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
         const mx = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
-        const len = Math.hypot(mx, mz) || 1;
-        const dx = (fw.x * mz + right.x * mx) / len;
-        const dz = (fw.z * mz + right.z * mx) / len;
-        localPosRef.current.x += dx * speed * dt;
-        localPosRef.current.z += dz * speed * dt;
+        const dir = viewRelativeMove(viewRef.current.yaw, mx, mz);
+        localPosRef.current.x += dir.x * speed * dt;
+        localPosRef.current.z += dir.z * speed * dt;
       }
       if (me) {
         const target = new THREE.Vector3(me.pos.x, me.pos.y, me.pos.z);
@@ -476,18 +475,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const send = (input: RealtimeInputAction) => driverRef.current.send(input);
     const syncMove = () => {
       const k = keysRef.current;
-      const yaw = viewRef.current.yaw;
-      const fw = { x: Math.sin(yaw), z: Math.cos(yaw) };
-      const right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
       const mz = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
       const mx = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
-      const len = Math.hypot(mx, mz);
-      const nx = len > 0 ? (fw.x * mz + right.x * mx) / len : 0;
-      const nz = len > 0 ? (fw.z * mz + right.z * mx) / len : 0;
+      const dir = viewRelativeMove(viewRef.current.yaw, mx, mz);
       const last = lastMoveRef.current;
-      if (Math.abs(nx - last.x) > 1e-4 || Math.abs(nz - last.z) > 1e-4) {
-        lastMoveRef.current = { x: nx, z: nz };
-        send({ type: 'move', x: nx, z: nz });
+      if (Math.abs(dir.x - last.x) > 1e-4 || Math.abs(dir.z - last.z) > 1e-4) {
+        lastMoveRef.current = { x: dir.x, z: dir.z };
+        send({ type: 'move', x: dir.x, z: dir.z });
       }
     };
 
@@ -938,6 +932,7 @@ export function CorcodragonFightLocalScreen({
     const engine = new CorcodragonFightEngine(players, {
       mode: config.mode,
       scoreLimit: config.scoreLimit,
+      aiStyle: config.aiStyle ?? 'combat',
       matchTimeMs: config.mode === 'ffa' ? 10 * 60_000 : 8 * 60_000,
     });
     engineRef.current = engine;
@@ -959,7 +954,7 @@ export function CorcodragonFightLocalScreen({
       cancelAnimationFrame(raf);
       engineRef.current = null;
     };
-  }, [round, playerCount, myName, config.mode, config.scoreLimit]);
+  }, [round, playerCount, myName, config.mode, config.scoreLimit, config.aiStyle]);
 
   const send = useCallback((input: RealtimeInputAction) => {
     engineRef.current?.applyInput('you', input);
@@ -999,7 +994,8 @@ export function CorcodragonFightDetailScreen({
 }) {
   const [mode, setMode] = useState<GameModeKind>('ffa');
   const [scoreLimit, setScoreLimit] = useState(15);
-  const config = { mode, scoreLimit };
+  const [aiStyle, setAiStyle] = useState<AIStyle>('combat');
+  const config = { mode, scoreLimit, aiStyle };
   return (
     <div className="page detail-page">
       <div className="panel detail-panel ccf-detail-panel">
@@ -1035,6 +1031,13 @@ export function CorcodragonFightDetailScreen({
                 {[10, 15, 25].map((n) => (
                   <option key={n} value={n}>{n} 杀</option>
                 ))}
+              </select>
+            </div>
+            <div className="field">
+              <span>AI 行为</span>
+              <select className="bot-select" value={aiStyle} onChange={(e) => setAiStyle(e.target.value as AIStyle)}>
+                <option value="combat">⚔️ 实战 AI（索敌/射击/技能）</option>
+                <option value="movement">🧪 移动测试 AI（只走位不攻击）</option>
               </select>
             </div>
           </section>

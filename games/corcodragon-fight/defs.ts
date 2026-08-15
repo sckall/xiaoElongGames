@@ -267,6 +267,9 @@ export interface PlayerConfig {
   isBot?: boolean;
 }
 
+export const AI_STYLES = ['combat', 'movement'] as const;
+export type AIStyle = (typeof AI_STYLES)[number];
+
 export interface EngineOptions {
   mode?: GameModeKind;
   /** 自由混战=个人击杀线；团队死斗=队伍击杀线 */
@@ -275,6 +278,12 @@ export interface EngineOptions {
   matchTimeMs?: number;
   /** 英雄选择阶段最长时长（毫秒），到时自动补选 */
   heroSelectMs?: number;
+  /**
+   * bot 行为风格：
+   * - combat：实战 AI（索敌/射击/技能）
+   * - movement：移动测试 AI（只走位不攻击，用于验证手感/碰撞）
+   */
+  aiStyle?: AIStyle;
   /** 可注入随机数（测试/回放用） */
   rng?: () => number;
 }
@@ -518,4 +527,28 @@ export function wrapAngle(a: number): number {
   while (x >= Math.PI) x -= Math.PI * 2;
   while (x < -Math.PI) x += Math.PI * 2;
   return x;
+}
+
+/**
+ * 把「视角相对移动」换算为世界系移动向量。
+ *
+ * 引擎/渲染的视角约定：yaw=0 时朝 +z；Three.js 相机经 yaw+π 补偿后，
+ * 其右向量为 (-cos yaw, 0, sin yaw)。本函数是客户端唯一的方向换算出口，
+ * 保证 W=画面前方、D=画面右方（与相机渲染完全一致）。
+ */
+export function viewRelativeMove(
+  yaw: number,
+  mx: number,
+  mz: number,
+): { x: number; z: number } {
+  const fw = { x: Math.sin(yaw), z: Math.cos(yaw) };
+  const right = { x: -Math.cos(yaw), z: Math.sin(yaw) };
+  let x = fw.x * mz + right.x * mx;
+  let z = fw.z * mz + right.z * mx;
+  const len = Math.hypot(x, z);
+  if (len > 1) {
+    x /= len;
+    z /= len;
+  }
+  return { x, z };
 }

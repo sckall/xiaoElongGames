@@ -13,6 +13,10 @@
   - 文档：`docs/REALTIME.md`（实时通道设计）与 `games/corcodragon-fight/README.md`
     （新框架引入说明）；截图留档 `docs/screenshots/corcodragon-fight/`
   - 测试：30 个引擎单测、realtime 端到端冒烟、双窗口联机回归、三档布局 QA 全部通过
+- 🐛 修复《鳄龙咆哮》A/D 横移与视角不一致（客户端右向量换算错误，改为 `viewRelativeMove`
+  单一方向出口并加单测；W/S 前后方向经核验本就一致）
+- 🧪 《鳄龙咆哮》新增「移动测试 AI」设置：`aiStyle: movement`（本地详情页与联机房间配置均可选），
+  bot 只按路点走位、不攻击，用于手感/碰撞/同步测试
 - 🐛 修复出包魔法师模糊测试 Math.random 偶发超时（改为可复现种子）
 - 大厅品牌化：「小鳄龙之家-游戏大厅」，游戏偏好移入出包魔法师详情页
 - 开发者文档体系：ARCHITECTURE / AGENTS / CHANGELOG / README 索引 / DEPLOY 扩充

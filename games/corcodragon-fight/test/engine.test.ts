@@ -3,6 +3,7 @@ import { CorcodragonFightEngine } from '../engine';
 import {
   HERO_IDS,
   PLAYER_RADIUS,
+  viewRelativeMove,
   type EngineOptions,
   type RealtimeInputAction,
 } from '../defs';
@@ -421,6 +422,53 @@ describe('快照投影', () => {
     const view = e.getSnapshot(e.players[0].id);
     expect(view.arena.half).toBe(20);
     expect(view.arena.obstacles.length).toBeGreaterThan(0);
+  });
+});
+
+describe('视角相对移动换算（客户端方向唯一出口）', () => {
+  it('W=画面正前方；D=画面右方（与 Three.js 相机右向量一致）', () => {
+    // yaw=0 朝 +z：W 前进 +z；D 应为画面右方 -x
+    expect(viewRelativeMove(0, 0, 1)).toEqual({ x: 0, z: 1 });
+    expect(viewRelativeMove(0, 1, 0)).toEqual({ x: -1, z: 0 });
+    // 转身 180°（朝 -z）：W 后退视觉 → -z，D 视觉右方为 +x
+    expect(viewRelativeMove(Math.PI, 0, 1).z).toBeCloseTo(-1);
+    expect(viewRelativeMove(Math.PI, 1, 0).x).toBeCloseTo(1);
+    // 朝 +x（yaw=π/2）：D 视觉右方为 +z
+    expect(viewRelativeMove(Math.PI / 2, 1, 0).z).toBeCloseTo(1);
+  });
+
+  it('斜向输入归一化，避免加速', () => {
+    const r = viewRelativeMove(0, 1, 1);
+    expect(Math.hypot(r.x, r.z)).toBeCloseTo(1);
+  });
+});
+
+describe('移动测试 AI（只走位不攻击）', () => {
+  it('aiStyle 白名单钳制', () => {
+    const e = new CorcodragonFightEngine(mkPlayers(2), {
+      aiStyle: 'nuke' as never,
+      rng: mulberry32(1),
+    });
+    expect(e.aiStyle).toBe('combat');
+  });
+
+  it('移动 AI 会走动，但 20 秒内不产生任何射击/命中/击杀', () => {
+    const e = new CorcodragonFightEngine(mkPlayers(4, true), {
+      mode: 'ffa',
+      scoreLimit: 5,
+      matchTimeMs: 60_000,
+      aiStyle: 'movement',
+      rng: mulberry32(77),
+    });
+    const starts = e.players.map((p) => ({ ...p.pos }));
+    for (let i = 0; i < 400; i++) tick(e, 50); // 20s
+    expect(e.phase).toBe('playing');
+    expect(e.players.every((p) => p.alive && p.hp === p.maxHp)).toBe(true);
+    expect(e.players.some((p, i) => Math.hypot(p.pos.x - starts[i].x, p.pos.z - starts[i].z) > 2)).toBe(true);
+    const kinds = e.events.map((ev) => ev.kind);
+    expect(kinds).not.toContain('shot');
+    expect(kinds).not.toContain('hit');
+    expect(kinds).not.toContain('kill');
   });
 });
 
