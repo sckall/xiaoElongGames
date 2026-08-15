@@ -647,10 +647,11 @@ export class CorcodragonFightEngine {
     }
     if (p.ads) speed *= BALANCE.movement.adsSpeedMult;
     if (p.slowT > 0) speed *= p.slowMult;
-    const forward = { x: Math.sin(p.yaw), z: Math.cos(p.yaw) };
-    const right = { x: Math.cos(p.yaw), z: -Math.sin(p.yaw) };
-    let mx = forward.x * p.moveZ + right.x * p.moveX;
-    let mz = forward.z * p.moveZ + right.z * p.moveX;
+    // 契约：applyInput 的 move.x/z 是【世界系】方向向量。
+    // 视角相对换算在客户端唯一出口 viewRelativeMove() 完成（AI 同样发世界系），
+    // 服务端不重复乘 yaw，避免“按键方向随视角二次旋转”的绝对方向 bug。
+    let mx = p.moveX;
+    let mz = p.moveZ;
     const len = Math.hypot(mx, mz);
     if (len > 1) {
       mx /= len;

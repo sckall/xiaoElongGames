@@ -108,6 +108,8 @@ export interface WeaponBalance {
   reserve: number;
   reloadMs: number;
   range: number;
+  /** 开镜视角 FOV（度） */
+  adsFov: number;
   spread: number;
   adsSpread: number;
   headshot: number;
@@ -337,6 +339,7 @@ export function validateBalance(data: unknown): BalanceData {
       reserve: numOrSentinel(w.reserve, `weapons.${key}.reserve`),
       reloadMs: num(w.reloadMs, `weapons.${key}.reloadMs`, 0, 30_000),
       range: num(w.range, `weapons.${key}.range`, 0.1, 300),
+      adsFov: num(w.adsFov, `weapons.${key}.adsFov`, 10, 120),
       spread: num(w.spread, `weapons.${key}.spread`, 0, 0.5),
       adsSpread: num(w.adsSpread, `weapons.${key}.adsSpread`, 0, 0.5),
       headshot: num(w.headshot, `weapons.${key}.headshot`, 0.1, 10),

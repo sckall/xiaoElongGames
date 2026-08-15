@@ -68,6 +68,8 @@ export interface WeaponDef {
   reserve: number;
   reloadMs: number;
   range: number;
+  /** 开镜 FOV（度） */
+  adsFov: number;
   /** 腰射散布（弧度，±） */
   spread: number;
   /** 开镜散布（弧度，±） */
@@ -112,6 +114,7 @@ function weaponDefOf(key: WeaponId): WeaponDef {
     reserve: w.reserve === -1 ? Infinity : w.reserve,
     reloadMs: w.reloadMs,
     range: w.range,
+    adsFov: w.adsFov,
     spread: w.spread,
     adsSpread: w.adsSpread,
     headshot: w.headshot,

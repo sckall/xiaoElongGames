@@ -462,6 +462,38 @@ describe('视角相对移动换算（客户端方向唯一出口）', () => {
     const r = viewRelativeMove(0, 1, 1);
     expect(Math.hypot(r.x, r.z)).toBeCloseTo(1);
   });
+
+  it('集成：引擎按世界系应用 move，W 与视角前方一致（不二次旋转）', () => {
+    const e = mkEngine();
+    start(e);
+    const a = e.players[0].id;
+    const p = e.players[0];
+    // 沿 z=-16 空旷通道；视角朝 +x（yaw=π/2），W 应往 +x 走
+    e.debug.place(a, { x: -11, y: 0, z: -16 }, Math.PI / 2, 0);
+    const dir = viewRelativeMove(Math.PI / 2, 0, 1);
+    e.applyInput(a, { type: 'move', x: dir.x, z: dir.z });
+    for (let i = 0; i < 40; i++) tick(e, 50);
+    expect(p.pos.x).toBeGreaterThan(-8);
+    expect(p.pos.z).toBeCloseTo(-16, 2);
+  });
+
+  it('开镜减速生效（adsSpeedMult）', () => {
+    const e = mkEngine();
+    start(e);
+    const a = e.players[0].id;
+    const p = e.players[0];
+    const startZ = -16;
+    e.debug.place(a, { x: -11, y: 0, z: startZ }, 0, 0);
+    e.applyInput(a, { type: 'move', x: 0, z: 1 });
+    for (let i = 0; i < 20; i++) tick(e, 50);
+    const normalDist = p.pos.z - startZ;
+    e.debug.place(a, { x: -11, y: 0, z: startZ }, 0, 0);
+    e.applyInput(a, { type: 'ads', pressed: true });
+    for (let i = 0; i < 20; i++) tick(e, 50);
+    const adsDist = p.pos.z - startZ;
+    expect(adsDist).toBeGreaterThan(0);
+    expect(adsDist).toBeLessThan(normalDist * 0.8);
+  });
 });
 
 describe('移动测试 AI（只走位不攻击）', () => {

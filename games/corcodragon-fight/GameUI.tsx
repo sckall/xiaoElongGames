@@ -264,6 +264,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         // Three.js 相机默认朝 -z；引擎视角约定 yaw=0 朝 +z，因此补偿 π
         cam.rotation.y = viewRef.current.yaw + Math.PI;
         cam.rotation.x = viewRef.current.pitch;
+        // 开镜真实生效：FOV 向武器 adsFov 平滑过渡（狙击枪进入镜内视野）
+        const wdef = me ? WEAPON_DEFS[me.weapon] : null;
+        const targetFov = me?.ads && wdef && !wdef.melee ? wdef.adsFov : 75;
+        if (Math.abs(cam.fov - targetFov) > 0.05) {
+          cam.fov += (targetFov - cam.fov) * Math.min(1, 14 * dt);
+          cam.updateProjectionMatrix();
+        }
       }
 
       // 其他玩家平滑插值
@@ -455,7 +462,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         cameraRef.current.add(gun);
       }
       if (gunRef.current && muzzleRef.current) {
-        gunRef.current.visible = me.alive;
+        const scoped = me.ads && me.weapon === 'sniper';
+        gunRef.current.visible = me.alive && !scoped;
         muzzleRef.current.visible = false;
       }
     }
@@ -635,6 +643,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       {me && me.alive && snap?.phase === 'playing' && (
         <>
           <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`} />
+          {me.ads && me.weapon === 'sniper' && <div className="ccf-scope" />}
           <div className={`ccf-damage-vignette ${performance.now() - hitAt < 180 ? 'on' : ''}`} />
           <Hud snap={snap} me={me} killFeed={killFeed} />
         </>

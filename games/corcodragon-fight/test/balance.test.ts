@@ -29,6 +29,7 @@ describe('gameplay.json 配置层', () => {
   it('defs 代理对象随 BALANCE 热更新', () => {
     expect(HERO_DEFS.yanren.speed).toBe(5.4);
     expect(WEAPON_DEFS.pistol.reserve).toBe(Infinity);
+    expect(WEAPON_DEFS.sniper.adsFov).toBe(24);
     expect(applyBalancePatch({ heroes: { yanren: { speed: 6.6 } } })).toEqual({ ok: true });
     expect(HERO_DEFS.yanren.speed).toBe(6.6);
     expect(WEAPON_DEFS.rifle.damage).toBe(20);
