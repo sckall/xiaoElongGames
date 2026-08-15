@@ -703,9 +703,10 @@ export class CorcodragonEngine {
   }
 
   private tickDelayedEffects(current: InternalPlayer): void {
-    // 音障领域：己方回合开始时回复并加速
+    // 音障领域：己方回合开始时回复并加速（仅存活者）
     for (const z of this.zones) {
       if (z.kind !== 'sound') continue;
+      if (!this.alive(current)) continue;
       if (chebyshev(current.position, z.center) > z.radius) continue;
       const friendly = this.mode === 'ffa' ? current.id === z.casterId : current.team === z.team;
       if (!friendly) continue;
@@ -720,9 +721,10 @@ export class CorcodragonEngine {
       current.speedTurns = Math.max(current.speedTurns, 1);
     }
 
-    // 雷暴云：敌方回合开始时伤害并减速
+    // 雷暴云：敌方回合开始时伤害并减速（仅存活者）
     for (const z of this.zones) {
       if (z.kind !== 'storm') continue;
+      if (!this.alive(current)) continue;
       if (chebyshev(current.position, z.center) > z.radius) continue;
       const enemy = this.mode === 'ffa' ? current.id !== z.casterId : current.team !== z.team;
       if (!enemy) continue;
@@ -796,6 +798,7 @@ export class CorcodragonEngine {
     rawDamage: number,
     source: string,
   ): number {
+    if (!this.alive(target)) return 0;
     let amount = Math.max(1, Math.floor(rawDamage));
     // 堡垒模式减伤
     if (target.fortressTurns > 0) {
