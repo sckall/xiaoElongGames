@@ -4,6 +4,10 @@ import OnlineScreen from './OnlineScreen';
 import HallScreen from './HallScreen';
 import GameDetailScreen from './GameDetailScreen';
 import { DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
+import {
+  CorcodragonDetailScreen,
+  CorcodragonLocalScreen,
+} from '@tm/game-corcodragon-fire/GameUI';
 
 function loadSettings(): GameSettings {
   try {
@@ -31,6 +35,7 @@ export default function App() {
   const [playerCount, setPlayerCount] = useState(4);
   const [myName, setMyName] = useState('你');
   const [sessionKey, setSessionKey] = useState(0);
+  const [selectedGameId, setSelectedGameId] = useState('trouble-magician');
   const [settings, setSettings] = useState<GameSettings>(loadSettings);
 
   const updateSettings = (patch: Partial<GameSettings>) => {
@@ -46,10 +51,33 @@ export default function App() {
   };
 
   if (screen === 'hall') {
-    return <HallScreen onEnter={() => setScreen('game')} onBack={() => setScreen('setup')} />;
+    return (
+      <HallScreen
+        onEnter={(gameId) => {
+          setSelectedGameId(gameId);
+          setScreen('game');
+        }}
+        onBack={() => setScreen('setup')}
+      />
+    );
   }
 
   if (screen === 'game') {
+    if (selectedGameId === 'corcodragon-fire') {
+      return (
+        <CorcodragonDetailScreen
+          playerCount={playerCount}
+          onPlayerCountChange={setPlayerCount}
+          aiSpeed={settings.aiSpeed}
+          onAiSpeedChange={(ms) => updateSettings({ aiSpeed: ms })}
+          onPlayLocal={() => {
+            setSessionKey((k) => k + 1);
+            setScreen('local');
+          }}
+          onBack={() => setScreen('hall')}
+        />
+      );
+    }
     return (
       <GameDetailScreen
         playerCount={playerCount}
@@ -72,6 +100,19 @@ export default function App() {
   }
 
   if (screen === 'local') {
+    if (selectedGameId === 'corcodragon-fire') {
+      return (
+        <CorcodragonLocalScreen
+          key={sessionKey}
+          playerCount={playerCount}
+          myName={myName}
+          aiSpeed={settings.aiSpeed}
+          settings={settings}
+          onExit={() => setScreen('game')}
+          onRestart={() => setSessionKey((k) => k + 1)}
+        />
+      );
+    }
     return (
       <LocalGameScreen
         key={sessionKey}
