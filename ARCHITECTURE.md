@@ -135,13 +135,23 @@ games/
    第二个游戏接入时抽象为按注册表分发）。
 6. 验收：引擎单测 + `pnpm test/typecheck/build` + 冒烟 + 双窗口回归 + 布局 QA。
 
-### 三种模式的平台差异（规划）
+### 三种模式的平台差异（含 FPS/动作类适配方案）
 
-| 模式 | 引擎要求 | 平台补充 |
-|------|----------|----------|
-| turn-based | 状态+动作+投影（现状） | 无 |
-| async | 同上 + 状态可序列化落库 | 房间持久化 + 通知（需引入数据库） |
-| realtime | 高频状态/快照 | 插值/预测（或换 Colyseus 类引擎） |
+| 模式 | 数据模式 | 引擎契约 | 平台补充 |
+|------|----------|----------|----------|
+| turn-based | 事件驱动：动作 → 状态变更 → 广播全量视图 | `apply(playerId, action)` + `getView(playerId)`（现状） | 无 |
+| async | 事件驱动 + 状态落库 | 同 turn-based，要求状态可序列化 | 房间持久化 + 通知（需数据库） |
+| realtime（FPS/动作） | 时间驱动：服务端 tick 模拟，高频输入、差量快照 | `tick(dtMs)` + `applyInput(playerId, input)` + `getSnapshot()` + `getDelta(lastSeq)` | 20-60Hz tick 循环、差量广播、断线托管改为「站桩/移除」 |
+
+**realtime 接入路线（FPS 立项时执行）**：
+
+1. 原型期：Socket.IO + 服务端 tick（每房间 setInterval 20Hz）广播差量快照；
+   客户端只发输入流，本地客户端预测 + 他人插值渲染。2-8 人网页 FPS 足够。
+2. 正式期：评估引入 Colyseus（状态补丁同步/插值/重连房间开箱即用），
+   大厅与房间管理可保留现有平台，FPS 房间挂 Colyseus。
+3. 不建议起步用 WebRTC P2P（作弊面大、主机掉线迁移复杂）。
+4. 平台改造点：Room 调度按 mode 分支（事件 vs tick）；GameModule 契约按 mode
+   提供 TurnEngine 或 RealtimeEngine；协议新增输入/快照通道；托管策略按模式语义化。
 
 ### 给 AI 的上下文模板（开发新游戏时直接粘贴）
 
