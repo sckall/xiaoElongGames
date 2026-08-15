@@ -15,7 +15,8 @@
 | 依赖 | 用途 | 引入位置 |
 |------|------|----------|
 | `three` / `@types/three` | 浏览器 3D 场景渲染（第一人称、英雄胶囊、特效） | 仅 `games/corcodragon-fight` |
-| Socket.IO 现有依赖 | 复用平台连接层，新增 `rtInput`/`rtSnapshot` 两个实时事件 | 平台协议层 |
+| `tweakpane` | `?debug=1` 手感调试面板（按需动态加载，不进线上主包） | 仅 `games/corcodragon-fight` |
+| Socket.IO 现有依赖 | 复用平台连接层，新增 `rtInput`/`rtSnapshot`/`rtPing` 事件 | 平台协议层 |
 
 引擎（`engine.ts`/`ai.ts`/`defs.ts`）保持**纯 TS 零依赖、rng 可注入**，
 可独立单测；Three.js 只在 `GameUI.tsx`（子路径 `./GameUI`）中使用，服务端
@@ -63,11 +64,18 @@ Socket.IO + 服务端 tick（20Hz）广播快照；正式期如需状态补丁/�
 - 武器：步枪/狙击枪/手枪/匕首；命中为服务端射线（掩体遮挡 + 胶囊判定），
   支持爆头、伤害衰减、开镜、换弹与近战锥形判定。
 
+## 手感调参
+
+全部玩法数值在 `gameplay.json`（schema 校验见 `balance.ts`）。本地对局 URL 加
+`?debug=1` 打开 tweakpane 面板实时拖动，导出 `gameplay.tuned.json` 回写即可。
+完整流程见 [docs/GAMEPLAY-TUNING.md](../../docs/GAMEPLAY-TUNING.md)。
+
 ## 开发
 
 ```bash
-pnpm --filter @tm/game-corcodragon-fight test      # 引擎单测
+pnpm --filter @tm/game-corcodragon-fight test      # 引擎/配置层单测
 pnpm --filter @tm/game-corcodragon-fight typecheck
 ```
 
-相关文档：`docs/REALTIME.md`（平台 realtime 通道设计）。
+相关文档：`docs/REALTIME.md`（平台 realtime 通道设计）、
+`docs/GAMEPLAY-TUNING.md`（手感调参指南）。

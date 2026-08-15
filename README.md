@@ -16,6 +16,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 开发者 / Agent | 项目架构、前后端职责、数据流、文件与接口说明 |
 | [CHANGELOG.md](CHANGELOG.md) | 所有人 | 版本更新日志（v1 ~ 最新） |
 | [docs/REALTIME.md](docs/REALTIME.md) | 开发者 / Agent | 实时 FPS 通道设计（tick/快照协议/断线语义/演进路线） |
+| [docs/GAMEPLAY-TUNING.md](docs/GAMEPLAY-TUNING.md) | 策划 / 开发者 | 《鳄龙咆哮》手感调参（gameplay.json + `?debug=1` 面板） |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端详细部署（系统要求/依赖/命令/测试/发布包） |
 
 ## 🎮 客户端形态（重要）
@@ -72,6 +73,7 @@ node apps/server/scripts/smoke-realtime.mjs        # realtime 端到端冒烟（
 node scripts/smoke-corcodragon-fight.mjs           # 3D 本地冒烟 + 截图（需前端）
 node scripts/e2e-twowindow-corcodragon.mjs         # 双窗口联机回归 + 截图（需前端+服务端）
 node scripts/qa-layout-corcodragon-fight.mjs       # 桌面/平板/手机三档布局 QA（需前端）
+node scripts/smoke-tuning.mjs                      # 手感调试面板冒烟（需前端，?debug=1）
 # 界面截图（存 docs/screenshots/ 与 tools/vision-results/shots/）
 node scripts/shots.mjs && node scripts/shots-5p.mjs
 ```

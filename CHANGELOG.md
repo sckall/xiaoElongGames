@@ -17,6 +17,14 @@
   单一方向出口并加单测；W/S 前后方向经核验本就一致）
 - 🧪 《鳄龙咆哮》新增「移动测试 AI」设置：`aiStyle: movement`（本地详情页与联机房间配置均可选），
   bot 只按路点走位、不攻击，用于手感/碰撞/同步测试
+- 🎛️ 《鳄龙咆哮》手感调参体系：
+  - 全部玩法数值抽到 `gameplay.json`（tick/arena/movement/combat/heroes/weapons/ai/client），
+    `balance.ts` 全量 schema 校验 + 深合并热更新 + 恢复出厂；引擎运行时实时读配置
+  - `?debug=1` tweakpane 面板：本地实时拖动调参、导出 `gameplay.tuned.json`、一键重置；
+    tweakpane 按需分包（gzip 31.5KB，不进线上主包）
+  - 联机同步调试：输入 `seq` + 快照 `lastInputSeq` 回执、`rtPing` 延迟探测、
+    预测漂移统计与 `softCorrectionThreshold` 硬回滚软校正
+  - 调试文档：`docs/GAMEPLAY-TUNING.md`；面板冒烟 `scripts/smoke-tuning.mjs`
 - 🐛 修复出包魔法师模糊测试 Math.random 偶发超时（改为可复现种子）
 - 大厅品牌化：「小鳄龙之家-游戏大厅」，游戏偏好移入出包魔法师详情页
 - 开发者文档体系：ARCHITECTURE / AGENTS / CHANGELOG / README 索引 / DEPLOY 扩充

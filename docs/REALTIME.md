@@ -38,9 +38,13 @@
 
 ## 5. 客户端策略
 
-- **输入**：键鼠边沿事件（move/look/jump/fire/ads/reload/switchWeapon/skill/ult）即时发送；
+- **输入**：键鼠边沿事件（move/look/jump/fire/ads/reload/switchWeapon/skill/ult）即时发送，
+  每条带单调 `seq`；
 - **本人渲染**：轻量客户端预测——本地按输入推进视觉位置，同时向最近服务端快照软校正
-  （指数收敛），保证局域网手感（<100ms）；
+  （指数收敛）；快照回带 `lastInputSeq` 用于丢弃已确认输入，漂移超过
+  `client.softCorrectionThreshold` 时硬吸附服务端位置；
+- **网络观测**：客户端 2s 一次 `rtPing` 估算单程延迟，`?debug=1` 显示
+  ping / 漂移 / 待确认输入数；
 - **他人渲染**：快照插值 + 平滑（约 100ms 缓冲）；
 - **投影**：隐身敌人快照中 `visible=false` 且位置置空，客户端直接不渲染；
   私有伤害事件只发给双方；弹道/击杀等公开事件按可见性过滤。
@@ -61,7 +65,9 @@
 - [x] 契约：`games/types.ts` `RealtimeGameEngine` + `createRealtimeEngine`
 - [x] 协议：`rtInput` / `rtSnapshot` / `createRoom.gameId+config`（旧事件全保留）
 - [x] 服务端：`apps/server/src/realtime-room.ts`（50ms tick、视角快照、断线 AI 接管/重连）
-- [x] 引擎：移动/碰撞/弹道/爆头/技能/效果/重生/胜负，全动作白名单校验（30 单测）
+- [x] 引擎：移动/碰撞/弹道/爆头/技能/效果/重生/胜负，全动作白名单校验（34 单测）
+- [x] 数据化：gameplay.json + balance.ts 校验/热更新；`?debug=1` tweakpane 调参面板
+- [x] 同步调试：输入 seq/回执、rtPing、漂移统计与软校正
 - [x] 客户端：Three.js 第一人称（本地 60fps tick / 联机软校正），HUD/选英雄/计分板
 - [x] 验证：`apps/server/scripts/smoke-realtime.mjs`、`scripts/e2e-twowindow-corcodragon.mjs`、
   `scripts/qa-layout-corcodragon-fight.mjs`、截图留档 `docs/screenshots/corcodragon-fight/`
