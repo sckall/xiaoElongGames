@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { chooseAIInputs } from './ai';
 import { CorcodragonFightEngine } from './engine';
+import { BALANCE } from './balance';
 import {
   ARENA_HALF,
   EYE_Y,
@@ -214,7 +215,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     let raf = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
-      const dt = Math.min(0.05, clockRef.current.getDelta());
+      const dt = Math.min(BALANCE.client.maxDeltaMs / 1000, clockRef.current.getDelta());
       const snap = snapRef.current;
       const me = snap?.players.find((p) => p.id === driverRef.current.myId) ?? null;
       const cam = cameraRef.current;
@@ -235,7 +236,9 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
       if (me) {
         const target = new THREE.Vector3(me.pos.x, me.pos.y, me.pos.z);
-        const k2 = driverRef.current.online ? 8 : 12;
+        const k2 = driverRef.current.online
+          ? BALANCE.client.correctionRate
+          : BALANCE.client.interpolationRate;
         localPosRef.current.lerp(target, Math.min(1, k2 * dt));
       }
       if (cam) {
@@ -258,7 +261,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         if (id === driverRef.current.myId) continue;
         pr.group.visible = pr.visible && pr.alive;
         if (!pr.visible || !pr.alive) continue;
-        pr.group.position.lerp(pr.target, Math.min(1, 12 * dt));
+        pr.group.position.lerp(pr.target, Math.min(1, BALANCE.client.interpolationRate * dt));
         pr.group.rotation.y += (pr.yaw - pr.group.rotation.y) * Math.min(1, 10 * dt);
         pr.shield.visible = pr.shieldVal > 0;
         if (pr.shield.visible) {
@@ -537,9 +540,9 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;
       const v = viewRef.current;
-      v.yaw -= e.movementX * 0.0022;
-      v.pitch -= e.movementY * 0.0022;
-      v.pitch = Math.max(-1.4, Math.min(1.4, v.pitch));
+      v.yaw -= e.movementX * BALANCE.client.mouseSensitivity;
+      v.pitch -= e.movementY * BALANCE.client.mouseSensitivity;
+      v.pitch = Math.max(-BALANCE.arena.pitchClamp, Math.min(BALANCE.arena.pitchClamp, v.pitch));
       send({ type: 'look', yaw: v.yaw, pitch: v.pitch });
     };
     const onMouseDown = (e: MouseEvent) => {
@@ -941,7 +944,7 @@ export function CorcodragonFightLocalScreen({
     let lastSnap = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const dt = Math.min(60, Math.max(0, now - last));
+      const dt = Math.min(BALANCE.client.maxDeltaMs, Math.max(0, now - last));
       last = now;
       engine.tick(dt);
       if (now - lastSnap >= 45) {

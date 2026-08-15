@@ -1,0 +1,224 @@
+{
+  "tick": {
+    "stepMs": 50,
+    "maxAccumulatedMs": 250,
+    "botThinkMs": 200,
+    "effectChunkMs": 250
+  },
+  "arena": {
+    "half": 20,
+    "wallHeight": 3.2,
+    "playerRadius": 0.55,
+    "eyeY": 1.62,
+    "chestY": 1.15,
+    "capsuleBottomY": 0.15,
+    "capsuleTopY": 1.85,
+    "headshotMinY": 1.72,
+    "pitchClamp": 1.4
+  },
+  "movement": {
+    "gravity": 24,
+    "jumpVelocity": 8.2,
+    "adsSpeedMult": 0.5
+  },
+  "combat": {
+    "ultChargeMax": 100,
+    "ultPerDamage": 0.05,
+    "ultPerKill": 40,
+    "ultPerSecond": 2,
+    "respawnMs": 3000,
+    "explosionFalloff": 0.5,
+    "scoreLimitDefault": 15,
+    "matchTimeMsDefault": 600000,
+    "heroSelectMsDefault": 30000
+  },
+  "heroes": {
+    "yanren": {
+      "name": "炎刃",
+      "emoji": "🔥",
+      "role": "突击",
+      "hp": 150,
+      "speed": 5.4,
+      "skillName": "烈焰冲刺",
+      "skillDesc": "向前突进 10 米并留下火焰路径，灼烧敌人（25/秒）",
+      "skillCd": 8,
+      "ultName": "焚天烈焰",
+      "ultDesc": "以自身为中心半径 9 米爆炸，造成 80 伤害",
+      "ability": {
+        "dashDistance": 10,
+        "trailRadius": 1.1,
+        "trailDuration": 2.5,
+        "trailDps": 25,
+        "ultRadius": 9,
+        "ultDamage": 80
+      }
+    },
+    "yingxiao": {
+      "name": "影枭",
+      "emoji": "🦉",
+      "role": "刺客",
+      "hp": 120,
+      "speed": 5.9,
+      "skillName": "暗影潜行",
+      "skillDesc": "隐身 4 秒并提速；隐身中首次命中伤害翻倍并显形",
+      "skillCd": 10,
+      "ultName": "死亡标记",
+      "ultDesc": "标记 20 米内一名可见敌人，2.5 秒后造成 90 伤害",
+      "ability": {
+        "stealthDuration": 4,
+        "stealthSpeedMult": 1.25,
+        "stealthDamageMult": 2,
+        "markRange": 20,
+        "markDelay": 2.5,
+        "markDamage": 90
+      }
+    },
+    "tiebi": {
+      "name": "铁壁",
+      "emoji": "🛡️",
+      "role": "坦克",
+      "hp": 250,
+      "speed": 4.5,
+      "skillName": "能量护盾",
+      "skillDesc": "获得 80 点临时护盾，持续 5 秒",
+      "skillCd": 12,
+      "ultName": "堡垒模式",
+      "ultDesc": "6 秒内受伤 -50%，射速 +40%",
+      "ability": {
+        "shieldValue": 80,
+        "shieldDuration": 5,
+        "fortifyDuration": 6,
+        "fortifyDamageMult": 0.5,
+        "fortifyFireRateMult": 0.6
+      }
+    },
+    "lingyin": {
+      "name": "灵音",
+      "emoji": "🎵",
+      "role": "支援",
+      "hp": 175,
+      "speed": 5.0,
+      "skillName": "治愈波",
+      "skillDesc": "治疗自己 45（团队模式同时治疗 8 米内队友 30）",
+      "skillCd": 8,
+      "ultName": "音障领域",
+      "ultDesc": "脚下创造持续 5 秒治疗领域（半径 7，25/秒）",
+      "ability": {
+        "selfHeal": 45,
+        "allyHeal": 30,
+        "allyRadius": 8,
+        "zoneRadius": 7,
+        "zoneDuration": 5,
+        "zoneHealPerSec": 25
+      }
+    },
+    "guilei": {
+      "name": "诡雷",
+      "emoji": "💣",
+      "role": "控场",
+      "hp": 150,
+      "speed": 5.1,
+      "skillName": "粘性炸弹",
+      "skillDesc": "投掷粘性炸弹，1.2 秒后爆炸（半径 5，35 伤害）",
+      "skillCd": 6,
+      "ultName": "雷暴云",
+      "ultDesc": "目标区域召唤雷暴 4 秒（半径 7，25/秒并减速 50%）",
+      "ability": {
+        "bombThrowRange": 30,
+        "bombFuse": 1.2,
+        "bombRadius": 5,
+        "bombDamage": 35,
+        "stormRange": 25,
+        "stormRadius": 7,
+        "stormDuration": 4,
+        "stormDps": 25,
+        "slowDuration": 0.4,
+        "slowMult": 0.5
+      }
+    }
+  },
+  "weapons": {
+    "rifle": {
+      "name": "步枪",
+      "emoji": "🔫",
+      "damage": 20,
+      "interval": 100,
+      "magSize": 30,
+      "reserve": 90,
+      "reloadMs": 1500,
+      "range": 45,
+      "spread": 0.012,
+      "adsSpread": 0.003,
+      "headshot": 2,
+      "falloffStart": 18,
+      "falloffEnd": 45,
+      "minDmgMult": 0.55,
+      "desc": "均衡的自动步枪，右键开镜"
+    },
+    "sniper": {
+      "name": "狙击枪",
+      "emoji": "🎯",
+      "damage": 100,
+      "interval": 1100,
+      "magSize": 5,
+      "reserve": 15,
+      "reloadMs": 2500,
+      "range": 90,
+      "spread": 0.003,
+      "adsSpread": 0.0005,
+      "headshot": 2.5,
+      "falloffStart": 60,
+      "falloffEnd": 90,
+      "minDmgMult": 0.8,
+      "desc": "高伤害、慢射速，爆头 250"
+    },
+    "pistol": {
+      "name": "手枪",
+      "emoji": "🔫",
+      "damage": 15,
+      "interval": 160,
+      "magSize": 12,
+      "reserve": -1,
+      "reloadMs": 1000,
+      "range": 30,
+      "spread": 0.009,
+      "adsSpread": 0.0025,
+      "headshot": 1.5,
+      "falloffStart": 12,
+      "falloffEnd": 30,
+      "minDmgMult": 0.5,
+      "desc": "无限备弹的可靠副武器"
+    },
+    "dagger": {
+      "name": "匕首",
+      "emoji": "🔪",
+      "damage": 40,
+      "interval": 500,
+      "magSize": -1,
+      "reserve": -1,
+      "reloadMs": 0,
+      "range": 2.9,
+      "spread": 0,
+      "adsSpread": 0,
+      "headshot": 1,
+      "falloffStart": 2.9,
+      "falloffEnd": 2.9,
+      "minDmgMult": 1,
+      "melee": true,
+      "desc": "近战挥砍，不消耗弹药"
+    }
+  },
+  "ai": {
+    "preferredRange": 9,
+    "meleeRange": 3.4,
+    "aimTolerance": 0.12,
+    "meleeAimTolerance": 0.5
+  },
+  "client": {
+    "mouseSensitivity": 0.0022,
+    "interpolationRate": 12,
+    "correctionRate": 8,
+    "softCorrectionThreshold": 0.5,
+    "maxDeltaMs": 60
+  }
+}

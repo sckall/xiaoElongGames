@@ -9,26 +9,12 @@
  * - 内置 bot：通过 chooseAIInputs(getSnapshot(botId)) 决策，只使用玩家视角信息。
  */
 import {
-  ARENA_HALF,
-  CAPSULE_BOTTOM_Y,
-  CAPSULE_TOP_Y,
-  CHEST_Y,
-  DEFAULT_OPTIONS,
-  EYE_Y,
   GAME_ID,
   HERO_DEFS,
   HERO_IDS,
-  HEADSHOT_MIN_Y,
   INPUT_TYPES,
   OBSTACLES,
-  PLAYER_RADIUS,
-  RESPAWN_MS,
   SPAWN_POINTS,
-  TICK_MS,
-  ULT_CHARGE_MAX,
-  ULT_CHARGE_PER_DAMAGE,
-  ULT_CHARGE_PER_KILL,
-  ULT_CHARGE_PER_SECOND,
   WEAPON_DEFS,
   WEAPON_IDS,
   clampNum,
@@ -37,6 +23,7 @@ import {
   segmentBlocked,
   wrapAngle,
 } from './defs';
+import { BALANCE, abilityNum } from './balance';
 import type {
   AABB,
   AIStyle,
@@ -57,13 +44,7 @@ import type {
 } from './defs';
 import { chooseAIInputs } from './ai';
 
-const GRAVITY = 24; // m/s²
-const JUMP_VELOCITY = 8.2; // m/s
-const MAX_PITCH = 1.45; // rad（约 83°）
-const PITCH_CLAMP = 1.4;
 const MAX_EVENTS = 500;
-const BOT_THINK_MS = 200;
-const EFFECT_DAMAGE_CHUNK_MS = 250; // 持续伤害/治疗按 250ms 结算一次，避免事件风暴
 
 export interface EnginePlayerState {
   id: string;
@@ -93,6 +74,7 @@ export interface EnginePlayerState {
   stealthT: number;
   fortifyT: number;
   slowT: number;
+  slowMult: number;
   respawnAt: number;
   kills: number;
   deaths: number;
@@ -182,10 +164,10 @@ function rayWorld(ox: number, oy: number, oz: number, dir: Vec3, maxT: number): 
   let best: WorldRayHit = { t: maxT, x: ox, y: oy, z: oz, kind: 'none' };
   const boxes: AABB[] = [
     ...OBSTACLES.map((b) => ({ ...b })),
-    { minX: ARENA_HALF, maxX: ARENA_HALF + 4, minZ: -ARENA_HALF - 4, maxZ: ARENA_HALF + 4, height: 4 },
-    { minX: -ARENA_HALF - 4, maxX: -ARENA_HALF, minZ: -ARENA_HALF - 4, maxZ: ARENA_HALF + 4, height: 4 },
-    { minX: -ARENA_HALF - 4, maxX: ARENA_HALF + 4, minZ: ARENA_HALF, maxZ: ARENA_HALF + 4, height: 4 },
-    { minX: -ARENA_HALF - 4, maxX: ARENA_HALF + 4, minZ: -ARENA_HALF - 4, maxZ: -ARENA_HALF, height: 4 },
+    { minX: BALANCE.arena.half, maxX: BALANCE.arena.half + 4, minZ: -BALANCE.arena.half - 4, maxZ: BALANCE.arena.half + 4, height: 4 },
+    { minX: -BALANCE.arena.half - 4, maxX: -BALANCE.arena.half, minZ: -BALANCE.arena.half - 4, maxZ: BALANCE.arena.half + 4, height: 4 },
+    { minX: -BALANCE.arena.half - 4, maxX: BALANCE.arena.half + 4, minZ: BALANCE.arena.half, maxZ: BALANCE.arena.half + 4, height: 4 },
+    { minX: -BALANCE.arena.half - 4, maxX: BALANCE.arena.half + 4, minZ: -BALANCE.arena.half - 4, maxZ: -BALANCE.arena.half, height: 4 },
   ];
   for (const b of boxes) {
     const t = rayAabbXZ(ox, oz, dir.x, dir.z, b);
@@ -291,9 +273,9 @@ export class CorcodragonFightEngine {
       throw new Error(`玩家数量需在 1-8 之间（实际 ${Array.isArray(players) ? players.length : '非数组'}）`);
     }
     const mode = options.mode === 'tdm' ? 'tdm' : 'ffa';
-    const scoreLimit = optNum(options.scoreLimit, 1, 200, DEFAULT_OPTIONS.scoreLimit);
-    const matchTimeMs = optNum(options.matchTimeMs, 30_000, 3_600_000, DEFAULT_OPTIONS.matchTimeMs);
-    const heroSelectMs = optNum(options.heroSelectMs, 5_000, 120_000, DEFAULT_OPTIONS.heroSelectMs);
+    const scoreLimit = optNum(options.scoreLimit, 1, 200, BALANCE.combat.scoreLimitDefault);
+    const matchTimeMs = optNum(options.matchTimeMs, 30_000, 3_600_000, BALANCE.combat.matchTimeMsDefault);
+    const heroSelectMs = optNum(options.heroSelectMs, 5_000, 120_000, BALANCE.combat.heroSelectMsDefault);
     const aiStyle: AIStyle = options.aiStyle === 'movement' ? 'movement' : 'combat';
     const rng = typeof options.rng === 'function' ? options.rng : Math.random;
 
@@ -342,6 +324,7 @@ export class CorcodragonFightEngine {
         stealthT: 0,
         fortifyT: 0,
         slowT: 0,
+        slowMult: 0.5,
         respawnAt: 0,
         kills: 0,
         deaths: 0,
@@ -372,13 +355,13 @@ export class CorcodragonFightEngine {
     return this.mode === 'tdm' && a.id !== b.id && a.team === b.team;
   }
 
-  private hasLOS(a: Vec3, b: Vec3, targetY = CHEST_Y): boolean {
+  private hasLOS(a: Vec3, b: Vec3, targetY = BALANCE.arena.chestY): boolean {
     if (segmentBlocked(a.x, a.z, b.x, b.z)) return false;
     const dx = b.x - a.x;
     const dz = b.z - a.z;
     const dist = Math.hypot(dx, dz) || 1;
-    const dir = { x: dx / dist, y: (targetY - EYE_Y) / dist, z: dz / dist };
-    const hit = rayWorld(a.x, EYE_Y, a.z, dir, dist);
+    const dir = { x: dx / dist, y: (targetY - BALANCE.arena.eyeY) / dist, z: dz / dist };
+    const hit = rayWorld(a.x, BALANCE.arena.eyeY, a.z, dir, dist);
     return hit.kind === 'none' || hit.t >= dist - 0.05;
   }
 
@@ -458,7 +441,7 @@ export class CorcodragonFightEngine {
           return { ok: false, error: 'look.pitch 超出允许范围' };
         }
         p.yaw = wrapAngle(raw.yaw);
-        p.pitch = Math.max(-PITCH_CLAMP, Math.min(PITCH_CLAMP, raw.pitch));
+        p.pitch = Math.max(-BALANCE.arena.pitchClamp, Math.min(BALANCE.arena.pitchClamp, raw.pitch));
         return { ok: true };
       }
       case 'jump': {
@@ -530,18 +513,18 @@ export class CorcodragonFightEngine {
   tick(dtMs: number): void {
     if (typeof dtMs !== 'number' || !Number.isFinite(dtMs) || dtMs < 0) return;
     this.acc += Math.min(dtMs, 250);
-    while (this.acc >= TICK_MS) {
-      this.acc -= TICK_MS;
+    while (this.acc >= BALANCE.tick.stepMs) {
+      this.acc -= BALANCE.tick.stepMs;
       this.step();
     }
   }
 
   private step(): void {
-    this.t += TICK_MS;
-    const dt = TICK_MS / 1000;
+    this.t += BALANCE.tick.stepMs;
+    const dt = BALANCE.tick.stepMs / 1000;
 
     if (this.phase === 'heroSelect') {
-      this.heroSelectLeft = Math.max(0, this.heroSelectLeft - TICK_MS);
+      this.heroSelectLeft = Math.max(0, this.heroSelectLeft - BALANCE.tick.stepMs);
       for (const p of this.players) {
         if (!p.hero) {
           if (p.isBot) {
@@ -573,7 +556,7 @@ export class CorcodragonFightEngine {
 
     if (this.phase === 'gameOver') return;
 
-    this.timeLeft = Math.max(0, this.timeLeft - TICK_MS);
+    this.timeLeft = Math.max(0, this.timeLeft - BALANCE.tick.stepMs);
 
     // 1. 冷却与状态推进
     for (const p of this.players) {
@@ -589,11 +572,11 @@ export class CorcodragonFightEngine {
       p.fortifyT = Math.max(0, p.fortifyT - dt);
       p.slowT = Math.max(0, p.slowT - dt);
       p.ultCharge = Math.min(
-        ULT_CHARGE_MAX,
-        p.ultCharge + ULT_CHARGE_PER_SECOND * dt,
+        BALANCE.combat.ultChargeMax,
+        p.ultCharge + BALANCE.combat.ultPerSecond * dt,
       );
       if (p.reloading) {
-        p.reloadT = Math.max(0, p.reloadT - TICK_MS);
+        p.reloadT = Math.max(0, p.reloadT - BALANCE.tick.stepMs);
         if (p.reloadT <= 0) {
           p.reloading = false;
           const def = WEAPON_DEFS[p.weapon];
@@ -629,7 +612,10 @@ export class CorcodragonFightEngine {
       if (!p.isBot) continue;
       const next = this.botNextThink.get(p.id) ?? 0;
       if (this.t >= next) {
-        this.botNextThink.set(p.id, this.t + BOT_THINK_MS + Math.floor(this.rng() * 120));
+        this.botNextThink.set(
+          p.id,
+          this.t + BALANCE.tick.botThinkMs + Math.floor(this.rng() * 120),
+        );
         const view = this.getSnapshot(p.id);
         const actions = chooseAIInputs(view, { rng: this.rng, style: this.aiStyle });
         for (const a of actions) this.applyInput(p.id, a);
@@ -645,9 +631,11 @@ export class CorcodragonFightEngine {
   private movePlayer(p: EnginePlayerState, dt: number): void {
     const def = p.hero ? HERO_DEFS[p.hero] : HERO_DEFS.yanren;
     let speed = def.speed;
-    if (p.stealthT > 0) speed *= 1.25;
-    if (p.ads) speed *= 0.5;
-    if (p.slowT > 0) speed *= 0.5;
+    if (p.stealthT > 0) {
+      speed *= p.hero ? abilityNum(p.hero, 'stealthSpeedMult', 1.25) : 1.25;
+    }
+    if (p.ads) speed *= BALANCE.movement.adsSpeedMult;
+    if (p.slowT > 0) speed *= p.slowMult;
     const forward = { x: Math.sin(p.yaw), z: Math.cos(p.yaw) };
     const right = { x: Math.cos(p.yaw), z: -Math.sin(p.yaw) };
     let mx = forward.x * p.moveZ + right.x * p.moveX;
@@ -661,7 +649,7 @@ export class CorcodragonFightEngine {
     p.pos.z += mz * speed * dt;
 
     // 重力与跳跃
-    p.velY -= GRAVITY * dt;
+    p.velY -= BALANCE.movement.gravity * dt;
     p.pos.y += p.velY * dt;
     if (p.pos.y <= 0) {
       p.pos.y = 0;
@@ -671,7 +659,7 @@ export class CorcodragonFightEngine {
       p.onGround = false;
     }
     if (p.jumpRequested && p.onGround) {
-      p.velY = JUMP_VELOCITY;
+      p.velY = BALANCE.movement.jumpVelocity;
       p.pos.y += p.velY * dt;
       p.onGround = false;
       p.jumpRequested = false;
@@ -684,7 +672,7 @@ export class CorcodragonFightEngine {
 
   /** 圆形（玩家 XZ 截面）对 AABB 掩体/围墙的碰撞解算 */
   private resolveCollision(p: EnginePlayerState): void {
-    const r = PLAYER_RADIUS;
+    const r = BALANCE.arena.playerRadius;
     for (const b of OBSTACLES) {
       const nx = Math.max(b.minX, Math.min(p.pos.x, b.maxX));
       const nz = Math.max(b.minZ, Math.min(p.pos.z, b.maxZ));
@@ -712,18 +700,26 @@ export class CorcodragonFightEngine {
         }
       }
     }
-    p.pos.x = Math.max(-ARENA_HALF + r, Math.min(ARENA_HALF - r, p.pos.x));
-    p.pos.z = Math.max(-ARENA_HALF + r, Math.min(ARENA_HALF - r, p.pos.z));
+    p.pos.x = Math.max(-BALANCE.arena.half + r, Math.min(BALANCE.arena.half - r, p.pos.x));
+    p.pos.z = Math.max(-BALANCE.arena.half + r, Math.min(BALANCE.arena.half - r, p.pos.z));
   }
 
   private fire(p: EnginePlayerState): void {
     const def = WEAPON_DEFS[p.weapon];
-    const eye: Vec3 = { x: p.pos.x, y: p.pos.y + EYE_Y, z: p.pos.z };
+    const eye: Vec3 = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
     const spread = p.ads ? def.adsSpread : def.spread;
     const yaw = p.yaw + (this.rng() * 2 - 1) * spread;
-    const pitch = Math.max(-PITCH_CLAMP, Math.min(PITCH_CLAMP, p.pitch + (this.rng() * 2 - 1) * spread));
+    const pitch = Math.max(
+      -BALANCE.arena.pitchClamp,
+      Math.min(BALANCE.arena.pitchClamp, p.pitch + (this.rng() * 2 - 1) * spread),
+    );
     const dir = dirFromYawPitch(yaw, pitch);
-    const fortifyMul = p.fortifyT > 0 ? 0.6 : 1;
+    const fortifyMul =
+      p.fortifyT > 0
+        ? p.hero
+          ? abilityNum(p.hero, 'fortifyFireRateMult', 0.6)
+          : 0.6
+        : 1;
     p.fireCd = (def.interval * fortifyMul) / 1000;
     if (def.melee) {
       this.meleeStrike(p, eye, dir);
@@ -746,12 +742,12 @@ export class CorcodragonFightEngine {
         eye.z,
         dir,
         q.pos.x,
-        q.pos.y + CAPSULE_BOTTOM_Y,
+        q.pos.y + BALANCE.arena.capsuleBottomY,
         q.pos.z,
         q.pos.x,
-        q.pos.y + CAPSULE_TOP_Y,
+        q.pos.y + BALANCE.arena.capsuleTopY,
         q.pos.z,
-        PLAYER_RADIUS,
+        BALANCE.arena.playerRadius,
       );
       if (t < bestT) {
         bestT = t;
@@ -769,10 +765,10 @@ export class CorcodragonFightEngine {
             : 1 -
               ((dist - def.falloffStart) / Math.max(1e-6, def.falloffEnd - def.falloffStart)) *
                 (1 - def.minDmgMult);
-      const headshot = hitY >= HEADSHOT_MIN_Y && !def.melee;
+      const headshot = hitY >= BALANCE.arena.headshotMinY && !def.melee;
       let dmg = def.damage * falloff * (headshot ? def.headshot : 1);
       if (p.stealthT > 0) {
-        dmg *= 2;
+        dmg *= p.hero ? abilityNum(p.hero, 'stealthDamageMult', 2) : 2;
         p.stealthT = 0;
         this.pushEvent('info', `${p.name} 破隐一击！`, undefined, true, []);
       }
@@ -813,10 +809,10 @@ export class CorcodragonFightEngine {
       }
     }
     if (best) {
-      const hitPoint = { x: best.pos.x, y: best.pos.y + CHEST_Y, z: best.pos.z };
+      const hitPoint = { x: best.pos.x, y: best.pos.y + BALANCE.arena.chestY, z: best.pos.z };
       let dmg = WEAPON_DEFS.dagger.damage;
       if (p.stealthT > 0) {
-        dmg *= 2;
+        dmg *= p.hero ? abilityNum(p.hero, 'stealthDamageMult', 2) : 2;
         p.stealthT = 0;
       }
       this.pushEvent('shot', '', hitPoint, true, [], p.id, best.id);
@@ -836,7 +832,9 @@ export class CorcodragonFightEngine {
   ): void {
     if (!target.alive || this.phase !== 'playing') return;
     let amount = rawAmount;
-    if (target.fortifyT > 0) amount *= 0.5;
+    if (target.fortifyT > 0) {
+      amount *= target.hero ? abilityNum(target.hero, 'fortifyDamageMult', 0.5) : 0.5;
+    }
     amount = Math.max(1, Math.round(amount));
     let absorbed = 0;
     if (target.shield > 0) {
@@ -849,8 +847,8 @@ export class CorcodragonFightEngine {
     }
     if (attacker) {
       attacker.ultCharge = Math.min(
-        ULT_CHARGE_MAX,
-        attacker.ultCharge + rawAmount * ULT_CHARGE_PER_DAMAGE,
+        BALANCE.combat.ultChargeMax,
+        attacker.ultCharge + rawAmount * BALANCE.combat.ultPerDamage,
       );
     }
     this.pushEvent(
@@ -879,11 +877,14 @@ export class CorcodragonFightEngine {
     victim.fireHeld = false;
     victim.moveX = 0;
     victim.moveZ = 0;
-    victim.respawnAt = this.t + RESPAWN_MS;
+    victim.respawnAt = this.t + BALANCE.combat.respawnMs;
     if (killer) {
       killer.kills += 1;
       killer.score += 1;
-      killer.ultCharge = Math.min(ULT_CHARGE_MAX, killer.ultCharge + ULT_CHARGE_PER_KILL);
+      killer.ultCharge = Math.min(
+        BALANCE.combat.ultChargeMax,
+        killer.ultCharge + BALANCE.combat.ultPerKill,
+      );
       if (this.mode === 'tdm') this.teamScores[killer.team] += 1;
       this.pushEvent(
         'kill',
@@ -923,6 +924,7 @@ export class CorcodragonFightEngine {
     p.stealthT = 0;
     p.fortifyT = 0;
     p.slowT = 0;
+    p.slowMult = 0.5;
     p.velY = 0;
     p.pos = pickSpawn(
       this.rng,
@@ -963,7 +965,11 @@ export class CorcodragonFightEngine {
       case 'yanren': {
         const dir = dirFromYawPitch(p.yaw, 0);
         const start = { ...p.pos };
-        for (let d = 0.5; d <= 10; d += 0.5) {
+        const dashDistance = abilityNum(p.hero, 'dashDistance', 10);
+        const trailRadius = abilityNum(p.hero, 'trailRadius', 1.1);
+        const trailDuration = abilityNum(p.hero, 'trailDuration', 2.5);
+        const trailDps = abilityNum(p.hero, 'trailDps', 25);
+        for (let d = 0.5; d <= dashDistance; d += 0.5) {
           const x = start.x + dir.x * d;
           const z = start.z + dir.z * d;
           const clamped = { x, y: 0, z };
@@ -972,7 +978,17 @@ export class CorcodragonFightEngine {
           p.pos.x = probe.pos.x;
           p.pos.z = probe.pos.z;
           if (Math.floor(d * 2) % 2 === 0) {
-            this.addEffect('fireTrail', { x: p.pos.x, y: 0, z: p.pos.z }, 1.1, 2.5, p.id, 25, 0, 0, 0);
+            this.addEffect(
+              'fireTrail',
+              { x: p.pos.x, y: 0, z: p.pos.z },
+              trailRadius,
+              trailDuration,
+              p.id,
+              trailDps,
+              0,
+              0,
+              0,
+            );
           }
         }
         p.skillCd = def.skillCd;
@@ -980,23 +996,25 @@ export class CorcodragonFightEngine {
         return { ok: true };
       }
       case 'yingxiao': {
-        p.stealthT = 4;
+        p.stealthT = abilityNum(p.hero, 'stealthDuration', 4);
         p.skillCd = def.skillCd;
         this.pushEvent('skill', `${p.name} 进入暗影潜行 🦉`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'tiebi': {
-        p.shield = 80;
-        p.shieldT = 5;
+        p.shield = abilityNum(p.hero, 'shieldValue', 80);
+        p.shieldT = abilityNum(p.hero, 'shieldDuration', 5);
         p.skillCd = def.skillCd;
         this.pushEvent('skill', `${p.name} 展开能量护盾 🛡️`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'lingyin': {
-        this.healPlayer(p, 45, p);
+        this.healPlayer(p, abilityNum(p.hero, 'selfHeal', 45), p);
+        const allyRadius = abilityNum(p.hero, 'allyRadius', 8);
+        const allyHeal = abilityNum(p.hero, 'allyHeal', 30);
         for (const q of this.players) {
-          if (this.isAlly(p, q) && Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z) <= 8) {
-            this.healPlayer(q, 30, p);
+          if (this.isAlly(p, q) && Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z) <= allyRadius) {
+            this.healPlayer(q, allyHeal, p);
           }
         }
         p.skillCd = def.skillCd;
@@ -1005,14 +1023,17 @@ export class CorcodragonFightEngine {
       }
       case 'guilei': {
         const dir = dirFromYawPitch(p.yaw, p.pitch);
-        const eye = { x: p.pos.x, y: p.pos.y + EYE_Y, z: p.pos.z };
-        const hit = rayWorld(eye.x, eye.y, eye.z, dir, 30);
+        const eye = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
+        const throwRange = abilityNum(p.hero, 'bombThrowRange', 30);
+        const bombFuse = abilityNum(p.hero, 'bombFuse', 1.2);
+        const bombDamage = abilityNum(p.hero, 'bombDamage', 35);
+        const hit = rayWorld(eye.x, eye.y, eye.z, dir, throwRange);
         const at =
           hit.kind !== 'none'
             ? { x: hit.x, y: hit.y, z: hit.z }
-            : { x: eye.x + dir.x * 30, y: 0, z: eye.z + dir.z * 30 };
+            : { x: eye.x + dir.x * throwRange, y: 0, z: eye.z + dir.z * throwRange };
         at.y = Math.max(0, Math.min(at.y, 3));
-        this.addEffect('bomb', at, 0.5, 1.2, p.id, 0, 0, 1.2, 35);
+        this.addEffect('bomb', at, 0.5, bombFuse, p.id, 0, 0, bombFuse, bombDamage);
         p.skillCd = def.skillCd;
         this.pushEvent('skill', `${p.name} 投掷粘性炸弹 💣`, at, true, [], p.id);
         return { ok: true };
@@ -1024,23 +1045,27 @@ export class CorcodragonFightEngine {
 
   private useUlt(p: EnginePlayerState): { ok: boolean; error?: string } {
     if (!p.hero) return { ok: false, error: '尚未选择英雄' };
-    if (p.ultCharge < ULT_CHARGE_MAX) return { ok: false, error: '终极技能未充能完毕' };
+    if (p.ultCharge < BALANCE.combat.ultChargeMax) return { ok: false, error: '终极技能未充能完毕' };
     const def = HERO_DEFS[p.hero];
     switch (p.hero) {
       case 'yanren': {
-        this.explodeAt({ ...p.pos }, 9, 80, p);
+        const radius = abilityNum(p.hero, 'ultRadius', 9);
+        const damage = abilityNum(p.hero, 'ultDamage', 80);
+        this.explodeAt({ ...p.pos }, radius, damage, p);
         p.ultCharge = 0;
-        this.addEffect('explosion', { ...p.pos }, 9, 0.5, p.id, 0, 0, 0, 80);
+        this.addEffect('explosion', { ...p.pos }, radius, 0.5, p.id, 0, 0, 0, damage);
         this.pushEvent('ult', `${p.name} 释放 ${def.ultName} 💥`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'yingxiao': {
+        const markRange = abilityNum(p.hero, 'markRange', 20);
+        const markDelay = abilityNum(p.hero, 'markDelay', 2.5);
         let target: EnginePlayerState | null = null;
         let best = Infinity;
         for (const q of this.players) {
           if (!q.alive || !this.isEnemy(p, q)) continue;
           const dist = Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z);
-          if (dist > 20) continue;
+          if (dist > markRange) continue;
           if (!this.hasLOS(p.pos, q.pos)) continue;
           if (dist < best) {
             best = dist;
@@ -1048,32 +1073,46 @@ export class CorcodragonFightEngine {
           }
         }
         if (!target) return { ok: false, error: '没有可见的标记目标' };
-        this.addEffect('explosion', { ...target.pos }, 0.6, 2.5, p.id, 0, 0, 2.5, 0, target.id);
+        this.addEffect('explosion', { ...target.pos }, 0.6, markDelay, p.id, 0, 0, markDelay, 0, target.id);
         p.ultCharge = 0;
         this.pushEvent('ult', `${p.name} 标记了 ${target.name} ☠️`, { ...target.pos }, true, [], p.id, target.id);
         return { ok: true };
       }
       case 'tiebi': {
-        p.fortifyT = 6;
+        p.fortifyT = abilityNum(p.hero, 'fortifyDuration', 6);
         p.ultCharge = 0;
         this.pushEvent('ult', `${p.name} 进入堡垒模式 🏰`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'lingyin': {
-        this.addEffect('healZone', { ...p.pos }, 7, 5, p.id, 0, 25, 0, 0);
+        this.addEffect(
+          'healZone',
+          { ...p.pos },
+          abilityNum(p.hero, 'zoneRadius', 7),
+          abilityNum(p.hero, 'zoneDuration', 5),
+          p.id,
+          0,
+          abilityNum(p.hero, 'zoneHealPerSec', 25),
+          0,
+          0,
+        );
         p.ultCharge = 0;
         this.pushEvent('ult', `${p.name} 展开音障领域 🎵`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'guilei': {
         const dir = dirFromYawPitch(p.yaw, p.pitch);
-        const eye = { x: p.pos.x, y: p.pos.y + EYE_Y, z: p.pos.z };
-        const hit = rayWorld(eye.x, eye.y, eye.z, dir, 25);
+        const eye = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
+        const stormRange = abilityNum(p.hero, 'stormRange', 25);
+        const stormRadius = abilityNum(p.hero, 'stormRadius', 7);
+        const stormDuration = abilityNum(p.hero, 'stormDuration', 4);
+        const stormDps = abilityNum(p.hero, 'stormDps', 25);
+        const hit = rayWorld(eye.x, eye.y, eye.z, dir, stormRange);
         const at =
           hit.kind !== 'none'
             ? { x: hit.x, y: 0, z: hit.z }
-            : { x: eye.x + dir.x * 25, y: 0, z: eye.z + dir.z * 25 };
-        this.addEffect('stormZone', at, 7, 4, p.id, 25, 0, 0, 0);
+            : { x: eye.x + dir.x * stormRange, y: 0, z: eye.z + dir.z * stormRange };
+        this.addEffect('stormZone', at, stormRadius, stormDuration, p.id, stormDps, 0, 0, 0);
         p.ultCharge = 0;
         this.pushEvent('ult', `${p.name} 召唤雷暴云 ⛈️`, at, true, [], p.id);
         return { ok: true };
@@ -1088,7 +1127,7 @@ export class CorcodragonFightEngine {
       if (!q.alive || !this.isEnemy(owner, q)) continue;
       const dist = Math.hypot(q.pos.x - center.x, q.pos.z - center.z);
       if (dist <= radius) {
-        const falloff = 1 - (dist / radius) * 0.5;
+        const falloff = 1 - (dist / radius) * BALANCE.combat.explosionFalloff;
         this.damagePlayer(q, damage * falloff, owner, { ...q.pos });
       }
     }
@@ -1124,7 +1163,8 @@ export class CorcodragonFightEngine {
   }
 
   private stepEffects(): void {
-    const dt = TICK_MS / 1000;
+    const dt = BALANCE.tick.stepMs / 1000;
+    const chunkSec = BALANCE.tick.effectChunkMs / 1000;
     const keep: EngineEffect[] = [];
     for (const e of this.effects) {
       e.t = Math.max(0, e.t - dt);
@@ -1132,12 +1172,14 @@ export class CorcodragonFightEngine {
       const owner = this.player(e.ownerId);
 
       if (e.kind === 'bomb' && e.fuse <= 0) {
-        if (owner) this.explodeAt(e.pos, 5, e.damage, owner);
+        const bombRadius =
+          owner && owner.hero ? abilityNum(owner.hero, 'bombRadius', 5) : 5;
+        if (owner) this.explodeAt(e.pos, bombRadius, e.damage, owner);
         this.effects.push({
           id: this.effectSeq++,
           kind: 'explosion',
           pos: { ...e.pos },
-          radius: 5,
+          radius: bombRadius,
           t: 0.5,
           duration: 0.5,
           ownerId: e.ownerId,
@@ -1153,7 +1195,14 @@ export class CorcodragonFightEngine {
       if (e.kind === 'explosion' && e.targetId) {
         const target = this.player(e.targetId);
         if (e.fuse <= 0 && target) {
-          if (target.alive && owner) this.damagePlayer(target, 90, owner, { ...target.pos });
+          if (target.alive && owner && owner.hero) {
+            this.damagePlayer(
+              target,
+              abilityNum(owner.hero, 'markDamage', 90),
+              owner,
+              { ...target.pos },
+            );
+          }
           e.t = 0.4;
           e.targetId = undefined;
           this.pushEvent('ult', `☠️ 死亡标记引爆：${target.name}`, { ...target.pos }, true, []);
@@ -1167,9 +1216,12 @@ export class CorcodragonFightEngine {
           if (!q.alive || (owner && !this.isEnemy(owner, q))) continue;
           const d = Math.hypot(q.pos.x - e.pos.x, q.pos.z - e.pos.z);
           if (d > e.radius) continue;
-          if (e.kind === 'stormZone') q.slowT = 0.4;
-          if (e.accumulate >= EFFECT_DAMAGE_CHUNK_MS / 1000) {
-            if (owner) this.damagePlayer(q, e.dps * (EFFECT_DAMAGE_CHUNK_MS / 1000), owner, { ...q.pos });
+          if (e.kind === 'stormZone' && owner?.hero) {
+            q.slowT = abilityNum(owner.hero, 'slowDuration', 0.4);
+            q.slowMult = abilityNum(owner.hero, 'slowMult', 0.5);
+          }
+          if (e.accumulate >= chunkSec) {
+            if (owner) this.damagePlayer(q, e.dps * chunkSec, owner, { ...q.pos });
           }
         }
       }
@@ -1181,12 +1233,12 @@ export class CorcodragonFightEngine {
           if (!same) continue;
           const d = Math.hypot(q.pos.x - e.pos.x, q.pos.z - e.pos.z);
           if (d > e.radius) continue;
-          if (e.accumulate >= EFFECT_DAMAGE_CHUNK_MS / 1000 && owner) {
-            this.healPlayer(q, e.heal * (EFFECT_DAMAGE_CHUNK_MS / 1000), owner);
+          if (e.accumulate >= chunkSec && owner) {
+            this.healPlayer(q, e.heal * chunkSec, owner);
           }
         }
       }
-      if (e.accumulate >= EFFECT_DAMAGE_CHUNK_MS / 1000) e.accumulate = 0;
+      if (e.accumulate >= chunkSec) e.accumulate = 0;
       keep.push(e);
     }
     this.effects = keep;
@@ -1341,7 +1393,7 @@ export class CorcodragonFightEngine {
     }));
 
     return {
-      seq: Math.round(this.t / TICK_MS),
+      seq: Math.round(this.t / BALANCE.tick.stepMs),
       t: this.t,
       phase: this.phase,
       youId: playerId,
@@ -1363,7 +1415,7 @@ export class CorcodragonFightEngine {
       winnerId: this.winnerId,
       winnerTeam: this.winnerTeam,
       teamScores: { ...this.teamScores },
-      arena: { half: ARENA_HALF, obstacles: OBSTACLES.map((b) => ({ ...b })) },
+      arena: { half: BALANCE.arena.half, obstacles: OBSTACLES.map((b) => ({ ...b })) },
     };
   }
 
@@ -1385,7 +1437,7 @@ export class CorcodragonFightEngine {
     setUltCharge: (playerId, charge) => {
       const p = this.player(playerId);
       if (!p) return;
-      p.ultCharge = Math.max(0, Math.min(ULT_CHARGE_MAX, charge));
+      p.ultCharge = Math.max(0, Math.min(BALANCE.combat.ultChargeMax, charge));
     },
     forceSkillReady: (playerId) => {
       const p = this.player(playerId);

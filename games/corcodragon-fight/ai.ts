@@ -3,6 +3,7 @@
  * 返回一组可交给 applyInput 的白名单动作；非法/不可用的动作由引擎安全拒绝。
  */
 import { HERO_IDS, SPAWN_POINTS, segmentBlocked, wrapAngle } from './defs';
+import { BALANCE } from './balance';
 import type {
   AIStyle,
   HeroId,
@@ -88,14 +89,16 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
   const canSee = !segmentBlocked(me.pos.x, me.pos.z, target.pos.x, target.pos.z);
 
   // 武器选择：近身用匕首，远处用步枪/狙击（按英雄习惯）
-  const preferred: WeaponId = dist < 3.4 ? 'dagger' : dist > 18 && me.hero === 'yingxiao' ? 'sniper' : 'rifle';
+  const meleeRange = BALANCE.ai.meleeRange;
+  const preferred: WeaponId =
+    dist < meleeRange ? 'dagger' : dist > 18 && me.hero === 'yingxiao' ? 'sniper' : 'rifle';
   if (me.weapon !== preferred) {
     actions.push({ type: 'switchWeapon', weapon: preferred });
   }
 
   // 移动：接近/拉开 + 周期性横向拉扯，避免站桩
   const strafeSign = Math.sin(view.t / 900 + hash(me.id) % 13) > 0 ? 1 : -1;
-  const preferredDist = me.weapon === 'dagger' ? 1.6 : 9;
+  const preferredDist = me.weapon === 'dagger' ? 1.6 : BALANCE.ai.preferredRange;
   let mx = 0;
   let mz = 0;
   if (dist > preferredDist + 1) {
@@ -125,7 +128,9 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
 
   // 开火
   const aimOk =
-    me.weapon === 'dagger' ? aimYawDiff < 0.5 && dist < 2.9 : aimYawDiff < 0.12;
+    me.weapon === 'dagger'
+      ? aimYawDiff < BALANCE.ai.meleeAimTolerance && dist < meleeRange
+      : aimYawDiff < BALANCE.ai.aimTolerance;
   const canFire = me.fireCd <= 0.03 && me.ammo > 0 && !me.reloading;
   if (canSee && aimOk && canFire) {
     actions.push({ type: 'fire', pressed: true });
@@ -138,7 +143,12 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
   }
 
   // 换弹
-  if (me.ammo === 0 || (me.ammo <= Math.max(1, Math.floor((me.weapon === 'rifle' ? 30 : me.weapon === 'sniper' ? 5 : 12) * 0.25)) && dist > 10)) {
+  const magSize = BALANCE.weapons[me.weapon]?.magSize;
+  const lowAmmo =
+    typeof magSize === 'number' && magSize > 0
+      ? me.ammo <= Math.max(1, Math.floor(magSize * 0.25))
+      : me.ammo <= 1;
+  if (me.ammo === 0 || (lowAmmo && dist > 10)) {
     actions.push({ type: 'reload' });
   }
 

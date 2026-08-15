@@ -5,12 +5,18 @@
  * （GameUI.tsx）共享的“唯一事实源”。纯 TS、零依赖。
  */
 
+import { BALANCE } from './balance';
+
 export const GAME_ID = 'corcodragon-fight';
 export const GAME_NAME = '鳄龙咆哮';
-/** 服务端权威模拟固定步长（20Hz） */
-export const TICK_MS = 50;
-export const ARENA_HALF = 20;
-export const WALL_HEIGHT = 3.2;
+/**
+ * 手感/玩法数值以 gameplay.json + balance.ts 为唯一事实源。
+ * 以下导出是“模块加载时快照”，用于渲染/几何/测试；引擎运行时实时数值
+ * 直接读 BALANCE（见 engine.ts / GameUI.tsx 的调试面板热更新）。
+ */
+export const TICK_MS = BALANCE.tick.stepMs;
+export const ARENA_HALF = BALANCE.arena.half;
+export const WALL_HEIGHT = BALANCE.arena.wallHeight;
 
 export const HERO_IDS = ['yanren', 'yingxiao', 'tiebi', 'lingyin', 'guilei'] as const;
 export type HeroId = (typeof HERO_IDS)[number];
@@ -77,149 +83,57 @@ export interface WeaponDef {
   desc: string;
 }
 
-export const HERO_DEFS: Record<HeroId, HeroDef> = {
-  yanren: {
-    key: 'yanren',
-    name: '炎刃',
-    emoji: '🔥',
-    role: '突击',
-    hp: 150,
-    speed: 5.4,
-    skillName: '烈焰冲刺',
-    skillDesc: '向前突进 10 米并留下火焰路径，灼烧敌人（25/秒）',
-    skillCd: 8,
-    ultName: '焚天烈焰',
-    ultDesc: '以自身为中心半径 9 米爆炸，造成 80 伤害',
-  },
-  yingxiao: {
-    key: 'yingxiao',
-    name: '影枭',
-    emoji: '🦉',
-    role: '刺客',
-    hp: 120,
-    speed: 5.9,
-    skillName: '暗影潜行',
-    skillDesc: '隐身 4 秒并提速；隐身中首次命中伤害翻倍并显形',
-    skillCd: 10,
-    ultName: '死亡标记',
-    ultDesc: '标记 20 米内一名可见敌人，2.5 秒后造成 90 伤害',
-  },
-  tiebi: {
-    key: 'tiebi',
-    name: '铁壁',
-    emoji: '🛡️',
-    role: '坦克',
-    hp: 250,
-    speed: 4.5,
-    skillName: '能量护盾',
-    skillDesc: '获得 80 点临时护盾，持续 5 秒',
-    skillCd: 12,
-    ultName: '堡垒模式',
-    ultDesc: '6 秒内受伤 -50%，射速 +40%',
-  },
-  lingyin: {
-    key: 'lingyin',
-    name: '灵音',
-    emoji: '🎵',
-    role: '支援',
-    hp: 175,
-    speed: 5.0,
-    skillName: '治愈波',
-    skillDesc: '治疗自己 45（团队模式同时治疗 8 米内队友 30）',
-    skillCd: 8,
-    ultName: '音障领域',
-    ultDesc: '脚下创造持续 5 秒治疗领域（半径 7，25/秒）',
-  },
-  guilei: {
-    key: 'guilei',
-    name: '诡雷',
-    emoji: '💣',
-    role: '控场',
-    hp: 150,
-    speed: 5.1,
-    skillName: '粘性炸弹',
-    skillDesc: '投掷粘性炸弹，1.2 秒后爆炸（半径 5，35 伤害）',
-    skillCd: 6,
-    ultName: '雷暴云',
-    ultDesc: '目标区域召唤雷暴 4 秒（半径 7，25/秒并减速 50%）',
-  },
-};
+function heroDefOf(key: HeroId): HeroDef {
+  const h = BALANCE.heroes[key];
+  return {
+    key,
+    name: h.name,
+    emoji: h.emoji,
+    role: h.role,
+    hp: h.hp,
+    speed: h.speed,
+    skillName: h.skillName,
+    skillDesc: h.skillDesc,
+    skillCd: h.skillCd,
+    ultName: h.ultName,
+    ultDesc: h.ultDesc,
+  };
+}
 
-export const WEAPON_DEFS: Record<WeaponId, WeaponDef> = {
-  rifle: {
-    key: 'rifle',
-    name: '步枪',
-    emoji: '🔫',
-    damage: 20,
-    interval: 100,
-    magSize: 30,
-    reserve: 90,
-    reloadMs: 1500,
-    range: 45,
-    spread: 0.012,
-    adsSpread: 0.003,
-    headshot: 2,
-    falloffStart: 18,
-    falloffEnd: 45,
-    minDmgMult: 0.55,
-    desc: '均衡的自动步枪，右键开镜',
-  },
-  sniper: {
-    key: 'sniper',
-    name: '狙击枪',
-    emoji: '🎯',
-    damage: 100,
-    interval: 1100,
-    magSize: 5,
-    reserve: 15,
-    reloadMs: 2500,
-    range: 90,
-    spread: 0.003,
-    adsSpread: 0.0005,
-    headshot: 2.5,
-    falloffStart: 60,
-    falloffEnd: 90,
-    minDmgMult: 0.8,
-    desc: '高伤害、慢射速，爆头 250',
-  },
-  pistol: {
-    key: 'pistol',
-    name: '手枪',
-    emoji: '🔫',
-    damage: 15,
-    interval: 160,
-    magSize: 12,
-    reserve: Infinity,
-    reloadMs: 1000,
-    range: 30,
-    spread: 0.009,
-    adsSpread: 0.0025,
-    headshot: 1.5,
-    falloffStart: 12,
-    falloffEnd: 30,
-    minDmgMult: 0.5,
-    desc: '无限备弹的可靠副武器',
-  },
-  dagger: {
-    key: 'dagger',
-    name: '匕首',
-    emoji: '🔪',
-    damage: 40,
-    interval: 500,
-    magSize: Infinity,
-    reserve: Infinity,
-    reloadMs: 0,
-    range: 2.9,
-    spread: 0,
-    adsSpread: 0,
-    headshot: 1,
-    falloffStart: 2.9,
-    falloffEnd: 2.9,
-    minDmgMult: 1,
-    melee: true,
-    desc: '近战挥砍，不消耗弹药',
-  },
-};
+function weaponDefOf(key: WeaponId): WeaponDef {
+  const w = BALANCE.weapons[key];
+  return {
+    key,
+    name: w.name,
+    emoji: w.emoji,
+    damage: w.damage,
+    interval: w.interval,
+    magSize: w.magSize === -1 ? Infinity : w.magSize,
+    reserve: w.reserve === -1 ? Infinity : w.reserve,
+    reloadMs: w.reloadMs,
+    range: w.range,
+    spread: w.spread,
+    adsSpread: w.adsSpread,
+    headshot: w.headshot,
+    falloffStart: w.falloffStart,
+    falloffEnd: w.falloffEnd,
+    minDmgMult: w.minDmgMult,
+    melee: w.melee,
+    desc: w.desc,
+  };
+}
+
+/**
+ * 代理对象：每次访问都从 BALANCE 现取数值 → tweakpane 热更新后，
+ * 引擎/HUD/AI 无需刷新引用即可生效（结构字段除外，见 GAMEPLAY-TUNING.md）。
+ */
+export const HERO_DEFS = new Proxy({} as Record<HeroId, HeroDef>, {
+  get: (_target, key: string) => heroDefOf(key as HeroId),
+});
+
+export const WEAPON_DEFS = new Proxy({} as Record<WeaponId, WeaponDef>, {
+  get: (_target, key: string) => weaponDefOf(key as WeaponId),
+});
 
 export const HERO_LIST: HeroDef[] = HERO_IDS.map((k) => HERO_DEFS[k]);
 export const WEAPON_LIST: WeaponDef[] = WEAPON_IDS.map((k) => WEAPON_DEFS[k]);
@@ -247,19 +161,19 @@ export const SPAWN_POINTS: Vec3[] = [
 ];
 
 /** 玩家碰撞半径（米） */
-export const PLAYER_RADIUS = 0.55;
+export const PLAYER_RADIUS = BALANCE.arena.playerRadius;
 /** 命中胶囊：脚部到头顶的线段 */
-export const CAPSULE_BOTTOM_Y = 0.15;
-export const CAPSULE_TOP_Y = 1.85;
-export const EYE_Y = 1.62;
-export const CHEST_Y = 1.15;
-export const HEADSHOT_MIN_Y = 1.72;
+export const CAPSULE_BOTTOM_Y = BALANCE.arena.capsuleBottomY;
+export const CAPSULE_TOP_Y = BALANCE.arena.capsuleTopY;
+export const EYE_Y = BALANCE.arena.eyeY;
+export const CHEST_Y = BALANCE.arena.chestY;
+export const HEADSHOT_MIN_Y = BALANCE.arena.headshotMinY;
 
-export const ULT_CHARGE_MAX = 100;
-export const ULT_CHARGE_PER_DAMAGE = 0.05;
-export const ULT_CHARGE_PER_KILL = 40;
-export const ULT_CHARGE_PER_SECOND = 2;
-export const RESPAWN_MS = 3000;
+export const ULT_CHARGE_MAX = BALANCE.combat.ultChargeMax;
+export const ULT_CHARGE_PER_DAMAGE = BALANCE.combat.ultPerDamage;
+export const ULT_CHARGE_PER_KILL = BALANCE.combat.ultPerKill;
+export const ULT_CHARGE_PER_SECOND = BALANCE.combat.ultPerSecond;
+export const RESPAWN_MS = BALANCE.combat.respawnMs;
 
 export interface PlayerConfig {
   id: string;
@@ -290,9 +204,9 @@ export interface EngineOptions {
 
 export const DEFAULT_OPTIONS = {
   mode: 'ffa',
-  scoreLimit: 15,
-  matchTimeMs: 10 * 60_000,
-  heroSelectMs: 30_000,
+  scoreLimit: BALANCE.combat.scoreLimitDefault,
+  matchTimeMs: BALANCE.combat.matchTimeMsDefault,
+  heroSelectMs: BALANCE.combat.heroSelectMsDefault,
 } as const;
 
 // ---------------- 输入动作（客户端 → 引擎，全部白名单校验） ----------------
