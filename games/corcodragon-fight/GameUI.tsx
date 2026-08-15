@@ -136,6 +136,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const gunRecoilRef = useRef(0);
   const prevReloadingRef = useRef(false);
   const sparksRef = useRef<{ mesh: THREE.Mesh; vel: THREE.Vector3; born: number; life: number }[]>([]);
+  const dustRef = useRef<THREE.Points | null>(null);
   const [killFlash, setKillFlash] = useState<{ text: string; at: number } | null>(null);
 
   const getSfx = useCallback(() => {
@@ -192,10 +193,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     muzzleLightRef.current = muzzleLight;
     scene.add(camera);
 
-    scene.background = new THREE.Color(0x0b1220);
-    scene.fog = new THREE.Fog(0x0b1220, 35, 95);
-    const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x1a2432, 1.25);
-    const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    scene.background = new THREE.Color(0x16202e);
+    scene.fog = new THREE.Fog(0x16202e, 48, 130);
+    const hemi = new THREE.HemisphereLight(0xcfe2ff, 0x2a3648, 1.7);
+    const sun = new THREE.DirectionalLight(0xffffff, 3.0);
     sun.position.set(20, 30, 14);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
@@ -208,7 +209,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
 
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(ARENA_HALF * 2 + 8, ARENA_HALF * 2 + 8),
-      new THREE.MeshStandardMaterial({ color: 0x27303f, roughness: 0.95 }),
+      new THREE.MeshStandardMaterial({ color: 0x3b475c, roughness: 0.95 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -217,7 +218,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     grid.position.y = 0.02;
     scene.add(grid);
 
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0x8a6b4f, roughness: 0.9 });
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0xa5805e, roughness: 0.9 });
     for (const b of snap.arena.obstacles) {
       const w = b.maxX - b.minX;
       const d = b.maxZ - b.minZ;
@@ -225,9 +226,14 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       mesh.position.set((b.minX + b.maxX) / 2, b.height / 2, (b.minZ + b.maxZ) / 2);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(mesh.geometry),
+        new THREE.LineBasicMaterial({ color: 0xff9a4d, transparent: true, opacity: 0.35 }),
+      );
+      mesh.add(edge);
       scene.add(mesh);
     }
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b4b6b, roughness: 0.85 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x4e6183, roughness: 0.85 });
     const wallDefs = [
       { w: ARENA_HALF * 2 + 9, d: 1, x: 0, z: ARENA_HALF + 0.5 },
       { w: ARENA_HALF * 2 + 9, d: 1, x: 0, z: -ARENA_HALF - 0.5 },
@@ -239,8 +245,37 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       mesh.position.set(w.x, (WALL_HEIGHT + 1) / 2, w.z);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(mesh.geometry),
+        new THREE.LineBasicMaterial({ color: 0x57c7ff, transparent: true, opacity: 0.4 }),
+      );
+      mesh.add(edge);
       scene.add(mesh);
     }
+
+    // 环境尘埃粒子（氛围）
+    const dustCount = 160;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(dustCount * 3);
+    for (let i = 0; i < dustCount; i++) {
+      dustPos[i * 3] = (Math.random() * 2 - 1) * (ARENA_HALF + 2);
+      dustPos[i * 3 + 1] = Math.random() * 4.5;
+      dustPos[i * 3 + 2] = (Math.random() * 2 - 1) * (ARENA_HALF + 2);
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    const dust = new THREE.Points(
+      dustGeo,
+      new THREE.PointsMaterial({
+        color: 0x9fc7ff,
+        size: 0.04,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+      }),
+    );
+    dustRef.current = dust;
+    scene.add(dust);
+
     worldBuiltRef.current = true;
   }, []);
 
@@ -402,6 +437,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
       sparksRef.current = sparksRef.current.filter((sp) => (performance.now() - sp.born) / 1000 < sp.life);
 
+      if (dustRef.current) dustRef.current.rotation.y += dt * 0.02;
+
       renderer.render(scene, cam);
     };
     raf = requestAnimationFrame(loop);
@@ -465,7 +502,27 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 10), mat);
         head.position.y = 1.78;
         head.castShadow = true;
-        group.add(body, head);
+        const visor = new THREE.Mesh(
+          new THREE.SphereGeometry(0.17, 10, 8),
+          new THREE.MeshBasicMaterial({ color: 0xd7f4ff }),
+        );
+        visor.position.set(0, 1.78, 0.3);
+        const stripe = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.51, 0.56, 0.16, 12),
+          new THREE.MeshStandardMaterial({
+            color: p.team === 'B' ? 0x2d6bff : 0xff5a3c,
+            roughness: 0.5,
+            emissive: p.team === 'B' ? 0x12233f : 0x3a1208,
+            emissiveIntensity: 0.6,
+          }),
+        );
+        stripe.position.y = 1.25;
+        const handGun = new THREE.Mesh(
+          new THREE.BoxGeometry(0.09, 0.09, 0.55),
+          new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.4 }),
+        );
+        handGun.position.set(0.42, 1.15, 0.32);
+        group.add(body, head, visor, stripe, handGun);
         const shield = new THREE.Mesh(
           new THREE.SphereGeometry(1, 16, 12),
           new THREE.MeshBasicMaterial({
@@ -769,7 +826,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       )}
       {me && me.alive && snap?.phase === 'playing' && (
         <>
-          <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`} />
+          <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`}>
+            <i className="c-top" />
+            <i className="c-bottom" />
+            <i className="c-left" />
+            <i className="c-right" />
+          </div>
           {me.ads && me.weapon === 'sniper' && <div className="ccf-scope" />}
           <div className={`ccf-damage-vignette ${performance.now() - hitAt < 180 ? 'on' : ''}`} />
           {me.hp / me.maxHp < 0.3 && <div className="ccf-lowhp" />}
