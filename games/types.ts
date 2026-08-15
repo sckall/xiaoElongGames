@@ -28,6 +28,22 @@ export interface GameEngine {
   apply(playerId: string, action: unknown): { ok: boolean; error?: string };
 }
 
+/**
+ * 实时（FPS/动作）引擎契约：服务端权威 tick 模拟 + 高频输入 + 按玩家视角快照。
+ * 平台负责 tick 循环与快照广播；引擎只负责：推进一帧、校验输入、投影快照。
+ * 断线托管语义由平台调用方决定（站桩 / 移除 / 转 AI），引擎不感知连接状态。
+ */
+export interface RealtimeGameEngine {
+  /** 对局阶段（游戏自定字符串语义，如 heroSelect/playing/gameOver） */
+  phase: string;
+  /** 推进一帧（dtMs 为真实流逝毫秒，引擎内部按固定步长切分；dtMs 需为有限值） */
+  tick(dtMs: number): void;
+  /** 应用一个输入动作；返回 {ok} 或 {ok:false,error}，非法输入必须安全拒绝 */
+  applyInput(playerId: string, input: unknown): { ok: boolean; error?: string };
+  /** 以指定玩家视角投影快照（隐藏其不可见信息）；平台原样下发给该玩家 */
+  getSnapshot(playerId: string): unknown;
+}
+
 export interface GameModule {
   id: string;
   name: string;
@@ -38,9 +54,15 @@ export interface GameModule {
   maxPlayers: number;
   /** 一句话介绍（大厅卡片） */
   description: string;
-  /** 创建一局游戏（玩家座位顺序即传入顺序） */
-  createEngine(players: PlayerConfig[], rng?: () => number): GameEngine;
-  /** AI 决策：只用 getView 视角信息，返回发给 apply 的动作 */
+  /** 回合制/异步：创建一局游戏（玩家座位顺序即传入顺序） */
+  createEngine?(players: PlayerConfig[], rng?: () => number): GameEngine;
+  /** 实时：创建服务端权威 tick 引擎（options 由游戏自定并自行校验） */
+  createRealtimeEngine?(
+    players: PlayerConfig[],
+    options?: unknown,
+    rng?: () => number,
+  ): RealtimeGameEngine;
+  /** AI 决策：只用 getView/getSnapshot 视角信息，返回发给 apply/applyInput 的动作 */
   createAI?(view: unknown, options?: unknown): unknown;
   /** 是否已上线 */
   available: boolean;

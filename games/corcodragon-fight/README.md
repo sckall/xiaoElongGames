@@ -1,0 +1,63 @@
+# 《鳄龙咆哮》corcodragon-fight
+
+> 3D 实时英雄射击（FPS）：2-7 人联机，服务端权威 20Hz tick 模拟，
+> 5 位鳄龙英雄 × 4 种武器，自由混战 / 团队死斗。
+
+本包按 `games/<id>/` 接入小鳄龙之家大厅，遵守 `ARCHITECTURE.md` 的
+**realtime（FPS/动作）接入路线**与 `games/types.ts` 契约。
+
+## 新框架引入说明（必读）
+
+本项目原技术栈为 React + Socket.IO + 零依赖 TS 规则引擎，仅支撑回合制桌游。
+《鳄龙咆哮》是 FPS 3D 联机游戏，**新增引入以下依赖**，仅用于游戏包与平台侧
+渲染/同步，不影响出包魔法师：
+
+| 依赖 | 用途 | 引入位置 |
+|------|------|----------|
+| `three` / `@types/three` | 浏览器 3D 场景渲染（第一人称、英雄胶囊、特效） | 仅 `games/corcodragon-fight` |
+| Socket.IO 现有依赖 | 复用平台连接层，新增 `rtInput`/`rtSnapshot` 两个实时事件 | 平台协议层 |
+
+引擎（`engine.ts`/`ai.ts`/`defs.ts`）保持**纯 TS 零依赖、rng 可注入**，
+可独立单测；Three.js 只在 `GameUI.tsx`（子路径 `./GameUI`）中使用，服务端
+不会被打包 React/Three 代码。
+
+**不引入 Colyseus/WebRTC**：按 `ARCHITECTURE.md` 原型期路线先使用
+Socket.IO + 服务端 tick（20Hz）广播快照；正式期如需状态补丁/插值/重连开箱
+能力，再评估 Colyseus（见 docs/REALTIME.md 迁移说明）。
+
+## 引擎与动作契约
+
+`CorcodragonFightEngine` 实现 `games/types.ts` 的 `RealtimeGameEngine`：
+
+- `tick(dtMs)`：固定 50ms 步长推进移动/射击/技能/效果/重生/胜负；
+- `applyInput(playerId, input)`：**全部动作白名单 + 数值域校验**，非法输入返回
+  `{ok:false,error}` 绝不抛异常；
+- `getSnapshot(playerId)`：按玩家视角投影，隐身敌人不下发、私有伤害事件只给
+  双方、事件增量下发。
+
+| 输入动作 | 字段 | 校验 |
+|----------|------|------|
+| `selectHero` | `hero` | `HERO_IDS` 白名单；仅 heroSelect 阶段 |
+| `move` | `x,z` | 有限数值并钳制 [-1,1]；仅存活 |
+| `look` | `yaw,pitch` | 有限数值；pitch 钳制 ±1.4 rad |
+| `jump/fire/ads` | `pressed` | 必须布尔；开火仅存活 |
+| `reload` | - | 仅存活；非近战；弹匣未满且有备弹 |
+| `switchWeapon` | `weapon` | `WEAPON_IDS` 白名单；仅存活 |
+| `skill/ult` | - | 仅存活；冷却/充能未就绪则拒绝 |
+| `spawn` | - | 仅死亡且重生倒计时结束 |
+
+## 英雄与武器
+
+- 英雄：炎刃（冲刺+火径）、影枭（隐身+标记）、铁壁（护盾+堡垒）、
+  灵音（治疗+领域）、诡雷（粘弹+雷暴）。
+- 武器：步枪/狙击枪/手枪/匕首；命中为服务端射线（掩体遮挡 + 胶囊判定），
+  支持爆头、伤害衰减、开镜、换弹与近战锥形判定。
+
+## 开发
+
+```bash
+pnpm --filter @tm/game-corcodragon-fight test      # 引擎单测
+pnpm --filter @tm/game-corcodragon-fight typecheck
+```
+
+相关文档：`docs/REALTIME.md`（平台 realtime 通道设计）。
