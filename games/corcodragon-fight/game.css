@@ -356,6 +356,36 @@
   background: rgba(0, 0, 0, 0.85);
 }
 
+.ccf-killflash {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  transform: translateX(-50%);
+  color: #ffd166;
+  font-size: 22px;
+  font-weight: 900;
+  text-shadow: 0 0 12px rgba(255, 150, 40, 0.9);
+  z-index: 5;
+  pointer-events: none;
+  animation: ccf-kill-pop 0.18s ease-out;
+}
+@keyframes ccf-kill-pop {
+  from { transform: translateX(-50%) scale(1.6); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+.ccf-lowhp {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: inset 0 0 130px rgba(255, 20, 10, 0.4);
+  animation: ccf-lowhp-pulse 0.9s ease-in-out infinite;
+}
+@keyframes ccf-lowhp-pulse {
+  50% { opacity: 0.55; }
+}
+
 .ccf-damage-vignette {
   position: absolute;
   inset: 0;

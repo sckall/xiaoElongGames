@@ -157,6 +157,7 @@ export default function App() {
             playerCount={playerCount}
             myName={myName}
             config={fightConfig}
+            sound={settings.sound}
             onExit={() => setScreen('game')}
           />
         </Suspense>

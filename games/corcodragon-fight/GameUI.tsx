@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { chooseAIInputs } from './ai';
 import { CorcodragonFightEngine } from './engine';
+import { SfxPlayer } from './fx';
 import { BALANCE, balanceToJson, resetBalance } from './balance';
 import {
   ARENA_HALF,
@@ -79,6 +80,8 @@ export interface FpsDriver {
   onRestart?: () => void;
   /** 联机统计（联机 hook 提供；本地驱动省略） */
   stats?: { pingMs: number; pendingInputs: number };
+  /** 是否开启音效（大厅偏好） */
+  sound?: boolean;
 }
 
 export interface FightConfig {
@@ -128,6 +131,45 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const muzzleRef = useRef<THREE.Mesh | null>(null);
   const muzzleBornRef = useRef(-1);
   const clockRef = useRef(new THREE.Clock());
+  const sfxRef = useRef<SfxPlayer | null>(null);
+  const muzzleLightRef = useRef<THREE.PointLight | null>(null);
+  const gunRecoilRef = useRef(0);
+  const prevReloadingRef = useRef(false);
+  const sparksRef = useRef<{ mesh: THREE.Mesh; vel: THREE.Vector3; born: number; life: number }[]>([]);
+  const [killFlash, setKillFlash] = useState<{ text: string; at: number } | null>(null);
+
+  const getSfx = useCallback(() => {
+    if (!sfxRef.current) sfxRef.current = new SfxPlayer();
+    return sfxRef.current;
+  }, []);
+
+  useEffect(() => {
+    if (sfxRef.current) sfxRef.current.enabled = driver.sound !== false;
+  }, [driver.sound]);
+
+  const spawnSparks = useCallback((pos: { x: number; y: number; z: number }, color: number, count = 7) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    for (let i = 0; i < count; i++) {
+      const geo = new THREE.TetrahedronGeometry(0.035 + Math.random() * 0.03);
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(pos.x, Math.max(0.05, pos.y), pos.z);
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 3.2,
+        Math.random() * 2.6 + 0.6,
+        (Math.random() - 0.5) * 3.2,
+      );
+      scene.add(mesh);
+      sparksRef.current.push({ mesh, vel, born: performance.now(), life: 0.3 + Math.random() * 0.2 });
+    }
+  }, []);
 
   // ---- 静态 3D 世界 ----
   const buildWorld = useCallback((snap: Snapshot) => {
@@ -144,6 +186,11 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     );
     camera.rotation.order = 'YXZ';
     cameraRef.current = camera;
+    const muzzleLight = new THREE.PointLight(0xffc36b, 0, 7);
+    muzzleLight.position.set(0.22, -0.16, -1.1);
+    camera.add(muzzleLight);
+    muzzleLightRef.current = muzzleLight;
+    scene.add(camera);
 
     scene.background = new THREE.Color(0x0b1220);
     scene.fog = new THREE.Fog(0x0b1220, 35, 95);
@@ -323,10 +370,37 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
       tracerRef.current = tracerRef.current.filter((t) => now - t.born < 120);
 
-      // 枪口火光
+      // 枪口火光与点光源
       if (muzzleRef.current) {
         muzzleRef.current.visible = now - muzzleBornRef.current < 70;
       }
+      if (muzzleLightRef.current) {
+        muzzleLightRef.current.intensity = now - muzzleBornRef.current < 70 ? 4 : 0;
+      }
+
+      // 枪模后坐与呼吸摆动
+      if (gunRef.current) {
+        gunRecoilRef.current = Math.max(0, gunRecoilRef.current - dt * 4.5);
+        const sway = Math.sin(now / 700) * 0.006;
+        gunRef.current.position.set(0.22, -0.2 + sway, -0.55 - gunRecoilRef.current * 0.16);
+        gunRef.current.rotation.x = gunRecoilRef.current * 0.55;
+      }
+
+      // 命中火花粒子
+      for (const sp of sparksRef.current) {
+        const age = (now - sp.born) / 1000;
+        const mat = sp.mesh.material as THREE.MeshBasicMaterial;
+        if (age >= sp.life) {
+          scene.remove(sp.mesh);
+          sp.mesh.geometry.dispose();
+          mat.dispose();
+          continue;
+        }
+        sp.vel.y -= 9.8 * dt;
+        sp.mesh.position.addScaledVector(sp.vel, dt);
+        mat.opacity = Math.max(0, 1 - age / sp.life);
+      }
+      sparksRef.current = sparksRef.current.filter((sp) => (performance.now() - sp.born) / 1000 < sp.life);
 
       renderer.render(scene, cam);
     };
@@ -468,8 +542,15 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
     }
 
-    // 事件 → 弹道 / 命中反馈
+    // 换弹音效（状态跳变）
+    if (me && me.reloading && !prevReloadingRef.current && driver.sound !== false) {
+      getSfx().reload();
+    }
+    if (me) prevReloadingRef.current = me.reloading;
+
+    // 事件 → 弹道 / 攻击反馈 / 音效
     for (const ev of snap.events) {
+      const mine = ev.shooterId === driver.myId;
       if (ev.kind === 'shot' && ev.pos && scene) {
         const shooter = snap.players.find((p) => p.id === ev.shooterId);
         if (shooter && !shooter.visible && shooter.id !== driver.myId) continue;
@@ -478,6 +559,19 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         if (ev.shooterId === driver.myId) {
           start = new THREE.Vector3(localPosRef.current.x, localPosRef.current.y + EYE_Y, localPosRef.current.z);
           muzzleBornRef.current = performance.now();
+          if (driver.sound !== false) getSfx().shoot(me?.weapon ?? 'rifle');
+          // 后坐：视角轻微上跳并同步给引擎（联机服务端同样记录）
+          const wd = me ? WEAPON_DEFS[me.weapon] : WEAPON_DEFS.rifle;
+          gunRecoilRef.current = 1;
+          viewRef.current.pitch = Math.min(
+            BALANCE.arena.pitchClamp,
+            viewRef.current.pitch + wd.recoil,
+          );
+          driverRef.current.send({
+            type: 'look',
+            yaw: viewRef.current.yaw,
+            pitch: viewRef.current.pitch,
+          });
         } else if (shooter && shooter.visible) {
           start = new THREE.Vector3(shooter.pos.x, shooter.pos.y + EYE_Y, shooter.pos.z);
         } else {
@@ -491,15 +585,42 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         line.frustumCulled = false;
         scene.add(line);
         tracerRef.current.push({ line, born: performance.now() });
+        if (ev.shooterId === driver.myId) spawnSparks(ev.pos, 0xffd27a, 6);
       }
-      if (ev.kind === 'hit' && ev.targetId === driver.myId) {
-        setHitAt(performance.now());
+      if (ev.kind === 'hit') {
+        if (ev.targetId === driver.myId) {
+          setHitAt(performance.now());
+          if (driver.sound !== false) getSfx().hurt();
+        }
+        if (mine) {
+          if (driver.sound !== false) getSfx().hit(ev.text === '爆头！');
+          if (ev.pos) spawnSparks(ev.pos, 0xff7050, 8);
+        }
       }
       if (ev.kind === 'kill' && ev.text) {
         setKillFeed((f) => [...f.slice(-5), ev.text]);
+        if (mine) {
+          if (driver.sound !== false) getSfx().kill();
+          const target = snap.players.find((p) => p.id === ev.targetId);
+          setKillFlash({ text: `击杀 ${target?.name ?? '敌人'}`, at: performance.now() });
+        } else if (ev.targetId === driver.myId && driver.sound !== false) {
+          getSfx().hurt();
+        }
+      }
+      if (mine && ev.kind === 'skill' && driver.sound !== false) {
+        getSfx().skill(me?.hero ?? null);
+      }
+      if (mine && ev.kind === 'ult' && driver.sound !== false) {
+        getSfx().ult(me?.hero ?? null);
+      }
+      if (ev.kind === 'heal' && ev.targetId === driver.myId && driver.sound !== false) {
+        getSfx().heal();
+      }
+      if (ev.kind === 'respawn' && ev.shooterId === driver.myId && driver.sound !== false) {
+        getSfx().respawn();
       }
     }
-  }, [driver.snapshot, driver.myId, buildWorld]);
+  }, [driver.snapshot, driver.myId, buildWorld, driver.sound, getSfx, spawnSparks]);
 
   // ---- 输入 ----
   useEffect(() => {
@@ -535,21 +656,26 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           break;
         case 'Space':
           send({ type: 'jump', pressed: true });
+          if (driverRef.current.sound !== false) getSfx().jump();
           break;
         case 'KeyR':
           send({ type: 'reload' });
           break;
         case 'Digit1':
           send({ type: 'switchWeapon', weapon: 'rifle' });
+          if (driverRef.current.sound !== false) getSfx().switchWeapon();
           break;
         case 'Digit2':
           send({ type: 'switchWeapon', weapon: 'sniper' });
+          if (driverRef.current.sound !== false) getSfx().switchWeapon();
           break;
         case 'Digit3':
           send({ type: 'switchWeapon', weapon: 'pistol' });
+          if (driverRef.current.sound !== false) getSfx().switchWeapon();
           break;
         case 'Digit4':
           send({ type: 'switchWeapon', weapon: 'dagger' });
+          if (driverRef.current.sound !== false) getSfx().switchWeapon();
           break;
         case 'KeyQ':
           send({ type: 'skill' });
@@ -587,6 +713,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const onLockChange = () => setLocked(document.pointerLockElement === canvas);
     const onContext = (e: Event) => e.preventDefault();
     const onClick = () => {
+      getSfx().unlock();
       const snap = snapRef.current;
       if (snap?.phase === 'playing') canvas.requestPointerLock();
     };
@@ -645,6 +772,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`} />
           {me.ads && me.weapon === 'sniper' && <div className="ccf-scope" />}
           <div className={`ccf-damage-vignette ${performance.now() - hitAt < 180 ? 'on' : ''}`} />
+          {me.hp / me.maxHp < 0.3 && <div className="ccf-lowhp" />}
+          {killFlash && performance.now() - killFlash.at < 1200 && (
+            <div className="ccf-killflash">{killFlash.text}</div>
+          )}
           <Hud snap={snap} me={me} killFeed={killFeed} />
         </>
       )}
@@ -714,23 +845,22 @@ function makeNameSprite(name: string, color: number): THREE.Sprite {
 
 function makeGun(weapon: WeaponId): THREE.Group {
   const g = new THREE.Group();
-  const colors: Record<WeaponId, number> = {
-    rifle: 0x2b3242,
-    sniper: 0x1d2533,
-    pistol: 0x3a4252,
-    dagger: 0x9aa4b5,
+  const mat = (color: number, rough = 0.4) =>
+    new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.25 });
+  const box = (
+    w: number,
+    h: number,
+    d: number,
+    color: number,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+    m.position.set(x, y, z);
+    return m;
   };
-  const len = weapon === 'sniper' ? 1.0 : weapon === 'dagger' ? 0.42 : 0.62;
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.09, 0.12, len),
-    new THREE.MeshStandardMaterial({ color: colors[weapon], roughness: 0.4 }),
-  );
-  body.position.set(0.22, -0.2, -0.55);
-  const barrel = new THREE.Mesh(
-    new THREE.BoxGeometry(0.045, 0.045, weapon === 'sniper' ? 0.5 : 0.22),
-    new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.3 }),
-  );
-  barrel.position.set(0.22, -0.14, -0.55 - len / 2 - 0.1);
+
   const muzzle = new THREE.Mesh(
     new THREE.PlaneGeometry(0.34, 0.34),
     new THREE.MeshBasicMaterial({
@@ -743,7 +873,27 @@ function makeGun(weapon: WeaponId): THREE.Group {
   );
   muzzle.position.set(0.22, -0.14, -1.15);
   muzzle.visible = false;
-  g.add(body, barrel, muzzle);
+
+  if (weapon === 'rifle') {
+    g.add(box(0.1, 0.14, 0.52, 0x2b3242, 0.22, -0.2, -0.42)); // 机匣
+    g.add(box(0.05, 0.05, 0.3, 0x11151d, 0.22, -0.15, -0.78)); // 枪管
+    g.add(box(0.06, 0.13, 0.16, 0x39445a, 0.22, -0.22, -0.2)); // 弹匣
+    g.add(box(0.07, 0.09, 0.2, 0x1c2330, 0.22, -0.12, -0.12)); // 瞄具
+    g.add(box(0.045, 0.06, 0.18, 0x7c4a2a, 0.22, -0.24, -0.36)); // 护木
+  } else if (weapon === 'sniper') {
+    g.add(box(0.09, 0.12, 0.66, 0x1d2533, 0.22, -0.2, -0.5)); // 枪身
+    g.add(box(0.04, 0.04, 0.56, 0x0d1118, 0.22, -0.14, -1.0)); // 长枪管
+    g.add(box(0.06, 0.06, 0.2, 0x0d1118, 0.22, -0.08, -0.28)); // 瞄镜
+    g.add(box(0.05, 0.12, 0.14, 0x39445a, 0.22, -0.22, -0.12)); // 握把
+  } else if (weapon === 'pistol') {
+    g.add(box(0.07, 0.11, 0.2, 0x3a4252, 0.22, -0.2, -0.32)); // 套筒
+    g.add(box(0.06, 0.13, 0.09, 0x252d3a, 0.22, -0.24, -0.2)); // 握把
+    g.add(box(0.04, 0.04, 0.12, 0x11151d, 0.22, -0.16, -0.46)); // 枪管
+  } else {
+    g.add(box(0.03, 0.02, 0.28, 0xb9c4d6, 0.22, -0.18, -0.4)); // 刀刃
+    g.add(box(0.05, 0.06, 0.12, 0x39445a, 0.22, -0.2, -0.24)); // 护手/握柄
+  }
+  g.add(muzzle);
   g.userData.muzzle = muzzle;
   return g;
 }
@@ -851,6 +1001,7 @@ function TuningPanel({ enabled }: { enabled: boolean }) {
           bind(f, w, 'adsSpread', { min: 0, max: 0.05, step: 0.0005, label: '开镜散布' });
           bind(f, w, 'headshot', { min: 0.5, max: 5, step: 0.1, label: '爆头倍率' });
           bind(f, w, 'reloadMs', { min: 0, max: 5000, step: 50, label: '换弹(ms)' });
+          bind(f, w, 'recoil', { min: 0, max: 0.1, step: 0.001, label: '后坐上跳' });
         }
 
         const skill = pane.addFolder({ title: '技能与终极技' });
@@ -1061,11 +1212,13 @@ export function CorcodragonFightLocalScreen({
   playerCount,
   myName,
   config,
+  sound,
   onExit,
 }: {
   playerCount: number;
   myName: string;
   config: FightConfig;
+  sound: boolean;
   onExit: () => void;
 }) {
   const [round, setRound] = useState(0);
@@ -1119,6 +1272,7 @@ export function CorcodragonFightLocalScreen({
         myId: 'you',
         online: false,
         error: null,
+        sound,
         send,
         onExit,
         onRestart: () => setRound((r) => r + 1),

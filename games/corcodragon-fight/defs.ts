@@ -70,6 +70,8 @@ export interface WeaponDef {
   range: number;
   /** 开镜 FOV（度） */
   adsFov: number;
+  /** 单发视角上跳（弧度，客户端后坐表现） */
+  recoil: number;
   /** 腰射散布（弧度，±） */
   spread: number;
   /** 开镜散布（弧度，±） */
@@ -115,6 +117,7 @@ function weaponDefOf(key: WeaponId): WeaponDef {
     reloadMs: w.reloadMs,
     range: w.range,
     adsFov: w.adsFov,
+    recoil: w.recoil,
     spread: w.spread,
     adsSpread: w.adsSpread,
     headshot: w.headshot,
