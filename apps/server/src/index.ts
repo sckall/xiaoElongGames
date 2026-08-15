@@ -12,6 +12,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
 import { Room, RoomSocket, genRoomCode, sanitizeName } from './room';
+import { RealtimeRoom, RT_GAME_ID } from './realtime-room';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -32,7 +33,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: { origin: corsOrigin },
 });
 
-const rooms = new Map<string, Room>();
+const rooms = new Map<string, Room | RealtimeRoom>();
 const connByIp = new Map<string, number>();
 const roomsByIp = new Map<string, number>();
 
@@ -99,22 +100,35 @@ io.on('connection', (socket: RoomSocket) => {
       const playerId = randomUUID();
       const code = uniqueCode();
       const creatorIp = ip;
-      const room = new Room(
-        code,
-        playerId,
-        name,
-        payload?.settings,
-        payload?.password,
-        payload?.botCount,
-        io,
-        (c) => {
-          // 房间销毁时回退该 IP 的建房计数（防计数泄漏导致误限流）
-          rooms.delete(c);
-          const n = (roomsByIp.get(creatorIp) ?? 1) - 1;
-          if (n <= 0) roomsByIp.delete(creatorIp);
-          else roomsByIp.set(creatorIp, n);
-        },
-      );
+      const onEmpty = (c: string) => {
+        // 房间销毁时回退该 IP 的建房计数（防计数泄漏导致误限流）
+        rooms.delete(c);
+        const n = (roomsByIp.get(creatorIp) ?? 1) - 1;
+        if (n <= 0) roomsByIp.delete(creatorIp);
+        else roomsByIp.set(creatorIp, n);
+      };
+      const room: Room | RealtimeRoom =
+        payload?.gameId === RT_GAME_ID
+          ? new RealtimeRoom(
+              code,
+              playerId,
+              name,
+              payload?.config,
+              payload?.password,
+              payload?.botCount,
+              io,
+              onEmpty,
+            )
+          : new Room(
+              code,
+              playerId,
+              name,
+              payload?.settings,
+              payload?.password,
+              payload?.botCount,
+              io,
+              onEmpty,
+            );
       rooms.set(code, room);
       roomsByIp.set(ip, (roomsByIp.get(ip) ?? 0) + 1);
       socket.join(code);
@@ -144,8 +158,12 @@ io.on('connection', (socket: RoomSocket) => {
       room.attach(socket.id, res.playerId);
       cb({ ok: true, code, playerId: res.playerId, rejoin: res.rejoin });
       if (room.status === 'playing') {
-        room.emitViewTo(socket.id, res.playerId);
-        room.broadcastViews();
+        if (room instanceof RealtimeRoom) {
+          room.emitSnapshotTo(socket.id, res.playerId);
+        } else {
+          room.emitViewTo(socket.id, res.playerId);
+          room.broadcastViews();
+        }
       } else {
         room.broadcastLobby();
       }
@@ -188,7 +206,8 @@ io.on('connection', (socket: RoomSocket) => {
     guard(() => {
       const d = socket.data;
       if (!d.roomCode || !d.playerId) return;
-      rooms.get(d.roomCode)?.nextRound(d.playerId, socket.id);
+      const room = rooms.get(d.roomCode);
+      if (room instanceof Room) room.nextRound(d.playerId, socket.id);
     });
   });
 
@@ -196,7 +215,8 @@ io.on('connection', (socket: RoomSocket) => {
     guard(() => {
       const d = socket.data;
       if (!d.roomCode || !d.playerId || !payload?.magic) return;
-      rooms.get(d.roomCode)?.declareSpell(d.playerId, payload.magic, socket.id);
+      const room = rooms.get(d.roomCode);
+      if (room instanceof Room) room.declareSpell(d.playerId, payload.magic, socket.id);
     });
   });
 
@@ -204,7 +224,19 @@ io.on('connection', (socket: RoomSocket) => {
     guard(() => {
       const d = socket.data;
       if (!d.roomCode || !d.playerId) return;
-      rooms.get(d.roomCode)?.endTurn(d.playerId, socket.id);
+      const room = rooms.get(d.roomCode);
+      if (room instanceof Room) room.endTurn(d.playerId, socket.id);
+    });
+  });
+
+  socket.on('rtInput', (payload) => {
+    guard(() => {
+      const d = socket.data;
+      if (!d.roomCode || !d.playerId) return;
+      const room = rooms.get(d.roomCode);
+      if (room instanceof RealtimeRoom) {
+        room.applyRealtimeInput(d.playerId, payload?.input, socket.id);
+      }
     });
   });
 

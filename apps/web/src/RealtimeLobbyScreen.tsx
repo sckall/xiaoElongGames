@@ -1,19 +1,39 @@
+/**
+ * 《鳄龙咆哮》realtime 联机大厅：房间列表 / 创建加入 / 密码 / AI 补位 / 开始。
+ * 复用大厅 CSS，独立于出包魔法师的 LobbyScreen，避免影响旧游戏。
+ */
 import { useEffect, useState } from 'react';
-import { AUTOPILOT_LABELS, type AutopilotMode, type RoomListItem } from '@tm/rules';
-import type { RemoteApi } from './useRemoteGame';
-import { lastSavedRoom } from './useRemoteGame';
-import { AI_SPEED_PRESETS } from './GameSettings';
+import type { RoomListItem } from '@tm/rules';
+import type { RealtimeApi } from './useRealtimeGame';
+import type { FightConfig } from '@tm/game-corcodragon-fight/GameUI';
 
-export default function LobbyScreen({
+const savedLastRoom = (): { code: string; token: string; name: string } | null => {
+  try {
+    const raw = localStorage.getItem('tm-room-tokens');
+    if (!raw) return null;
+    const tokens = JSON.parse(raw) as Record<string, { playerId: string; name: string; ts: number }>;
+    let best: { code: string; token: string; name: string; ts: number } | null = null;
+    for (const [code, t] of Object.entries(tokens)) {
+      if (!best || t.ts > best.ts) best = { code, token: t.playerId, name: t.name, ts: t.ts };
+    }
+    return best ? { code: best.code, token: best.token, name: best.name } : null;
+  } catch {
+    return null;
+  }
+};
+
+export default function RealtimeLobbyScreen({
   remote,
   defaultName,
   serverUrl,
+  config,
   onServerUrlChange,
   onExit,
 }: {
-  remote: RemoteApi;
+  remote: RealtimeApi;
   defaultName: string;
   serverUrl: string;
+  config: FightConfig;
   onServerUrlChange: (url: string) => void;
   onExit: () => void;
 }) {
@@ -21,9 +41,8 @@ export default function LobbyScreen({
   const [joinPw, setJoinPw] = useState('');
   const [createPw, setCreatePw] = useState('');
   const [selected, setSelected] = useState<RoomListItem | null>(null);
-  const saved = lastSavedRoom();
+  const saved = savedLastRoom();
 
-  // 进入界面拉取一次房间列表
   useEffect(() => {
     remote.listRooms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -38,35 +57,34 @@ export default function LobbyScreen({
     }
   };
 
-  // ---- 房间内 ----
+  const configLabel = `${config.mode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${config.scoreLimit} 杀`;
+
   if (remote.lobby) {
     const me = remote.lobby.players.find((p) => p.id === remote.myId);
     const isHost = me?.isHost ?? false;
     const total = remote.lobby.players.length;
-    const st = remote.lobby.settings;
     return (
       <div className="page lobby-page">
         <div className="panel lobby-panel">
-          <h1>🧙 联机大厅</h1>
+          <h1>🐊 鳄龙咆哮 · 联机</h1>
           <div className="room-code" title="点击复制">
             <span className="rc-label">房间码{remote.lobby.hasPassword ? ' 🔒（有密码）' : ''}</span>
             <button className="rc-code" onClick={copyCode}>
               {remote.lobby.code} <span className="rc-copy">📋</span>
             </button>
-            <span className="rc-tip">把房间码发给朋友，即可加入对战</span>
+            <span className="rc-tip">把房间码发给朋友，即可加入对战｜{configLabel}</span>
           </div>
 
           <ul className="room-players">
             {remote.lobby.players.map((p) => (
               <li key={p.id} className={p.id === remote.myId ? 'is-me' : ''}>
-                <span className="rp-avatar">{p.isBot ? '🤖' : '🧙'}</span>
+                <span className="rp-avatar">{p.isBot ? '🤖' : '🐊'}</span>
                 <span className="rp-name">
                   {p.name}
                   {p.id === remote.myId && '（你）'}
                 </span>
                 {p.isHost && <span className="rp-host">👑 房主</span>}
-                {!p.connected && !p.autopilot && <span className="rp-off">⏳ 断线等待重连</span>}
-                {!p.connected && p.autopilot && <span className="rp-off">🤖 AI 托管中</span>}
+                {!p.connected && p.autopilot && <span className="rp-off">🤖 AI 接管中</span>}
               </li>
             ))}
           </ul>
@@ -76,45 +94,10 @@ export default function LobbyScreen({
               <div className="field">
                 <span>AI 对手数量：{remote.lobby.botCount}</span>
                 <div className="stepper">
-                  <button onClick={() => remote.setBots(Math.max(0, remote.lobby!.botCount - 1))}>
-                    −
-                  </button>
+                  <button onClick={() => remote.setBots(Math.max(0, remote.lobby!.botCount - 1))}>−</button>
                   <button onClick={() => remote.setBots(remote.lobby!.botCount + 1)}>＋</button>
                 </div>
               </div>
-
-              <div className="field">
-                <span>断线托管策略（断线多久后交给 AI）</span>
-                <select
-                  className="bot-select"
-                  value={st.autopilot}
-                  onChange={(e) =>
-                    remote.updateSettings({ autopilot: e.target.value as AutopilotMode })
-                  }
-                >
-                  {(Object.keys(AUTOPILOT_LABELS) as AutopilotMode[]).map((m) => (
-                    <option key={m} value={m}>
-                      {AUTOPILOT_LABELS[m]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <span>AI 行动节奏</span>
-                <select
-                  className="bot-select"
-                  value={st.aiSpeed}
-                  onChange={(e) => remote.updateSettings({ aiSpeed: Number(e.target.value) })}
-                >
-                  {AI_SPEED_PRESETS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}（{p.value}ms）
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div className="field">
                 <span>房间密码（可选）</span>
                 <div className="create-row">
@@ -136,39 +119,20 @@ export default function LobbyScreen({
                   </button>
                 </div>
               </div>
-
               <button
                 className="primary-btn big"
-                disabled={total < 2}
+                disabled={total < 2 || total > 7}
                 onClick={remote.start}
                 title={total < 2 ? '至少 2 名玩家（可添加 AI）' : ''}
               >
-                🎮 开始对战（{total} 人）
+                🎮 开始对战（{total} 人 · {configLabel}）
               </button>
             </div>
           )}
-          {isHost && remote.lobby.status === 'playing' && (
-            <div className="host-controls">
-              <div className="field">
-                <span>AI 行动节奏（对局中可调）</span>
-                <select
-                  className="bot-select"
-                  value={st.aiSpeed}
-                  onChange={(e) => remote.updateSettings({ aiSpeed: Number(e.target.value) })}
-                >
-                  {AI_SPEED_PRESETS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}（{p.value}ms）
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
           {!isHost && <p className="muted">等待房主开始游戏……</p>}
+          {isHost && remote.lobby.status === 'playing' && <p className="muted">对局进行中（20Hz 服务端权威同步）</p>}
 
           {remote.error && <div className="error-box">{remote.error}</div>}
-
           <button className="ghost-btn" onClick={remote.leave}>
             离开房间
           </button>
@@ -177,24 +141,20 @@ export default function LobbyScreen({
     );
   }
 
-  // ---- 房间列表 + 创建/加入 ----
-  // 只显示出包魔法师的房间（realtime 房间在各自游戏大厅中列出）
-  const rooms = (remote.roomList ?? []).filter((r) => !r.gameId || r.gameId === 'trouble-magician');
+  const rooms = (remote.roomList ?? []).filter((r) => r.gameId === 'corcodragon-fight');
   return (
     <div className="page lobby-page">
       <div className="panel lobby-panel">
-        <h1>🧙 出包魔法师 · 联机</h1>
-        <p className="tagline">加入公开房间，或创建自己的房间</p>
+        <h1>🐊 鳄龙咆哮 · 联机</h1>
+        <p className="tagline">加入公开房间，或创建自己的房间（{configLabel}）</p>
 
         <div className="room-list-block">
           <div className="rl-head">
             <span className="rl-title">🏠 房间列表</span>
-            <button className="ghost-btn" onClick={remote.listRooms}>
-              🔄 刷新
-            </button>
+            <button className="ghost-btn" onClick={remote.listRooms}>🔄 刷新</button>
           </div>
           {rooms.length === 0 ? (
-            <p className="muted">暂无房间，创建一个吧～</p>
+            <p className="muted">暂无鳄龙咆哮房间，创建一个吧～</p>
           ) : (
             <ul className="room-list">
               {rooms.map((r) => (
@@ -205,9 +165,7 @@ export default function LobbyScreen({
                 >
                   <span className="rl-lock">{r.hasPassword ? '🔒' : '🔓'}</span>
                   <span className="rl-code">{r.code}</span>
-                  <span className="rl-count">
-                    👥 {r.playerCount}/{r.maxPlayers}
-                  </span>
+                  <span className="rl-count">👥 {r.playerCount}/{r.maxPlayers}</span>
                   <span className={r.status === 'playing' ? 'rl-status playing' : 'rl-status'}>
                     {r.status === 'playing' ? '⏳ 对局中' : '等待中'}
                   </span>
@@ -275,7 +233,7 @@ export default function LobbyScreen({
           </div>
 
           <div className="field">
-            <span>创建新房间</span>
+            <span>创建新房间（模式与击杀线在详情页设置）</span>
             <div className="create-row">
               <input
                 className="code-input pw"
@@ -287,14 +245,14 @@ export default function LobbyScreen({
               <button
                 className="primary-btn"
                 onClick={() => {
-                  remote.create(defaultName, 0, createPw);
+                  remote.create(defaultName, 0, createPw, { mode: config.mode, scoreLimit: config.scoreLimit });
                   setCreatePw('');
                 }}
               >
                 ➕ 创建房间
               </button>
             </div>
-            <span className="muted">AI 补位在房间内添加</span>
+            <span className="muted">AI 补位在房间内添加（最多 7 人）</span>
           </div>
 
           {saved && (
@@ -313,12 +271,12 @@ export default function LobbyScreen({
             onChange={(e) => onServerUrlChange(e.target.value)}
           />
           <p className="muted">
-            局域网联机：填主机的局域网地址 + 服务端端口；公网服务器：填域名或 IP+端口。修改后重新连接生效。
+            局域网联机：填主机的局域网地址 + 服务端端口；公网服务器：填域名或 IP+端口。
+            操作：点击画面锁定鼠标；WASD 移动、左键射击、右键开镜、R 换弹、1-4 切枪、Q/E 技能。
           </p>
         </details>
 
         {remote.error && <div className="error-box">{remote.error}</div>}
-
         <button className="ghost-btn" onClick={onExit}>
           ← 返回游戏大厅
         </button>

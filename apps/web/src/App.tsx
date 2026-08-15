@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
+import CorcodragonFightOnlineScreen from './CorcodragonFightOnlineScreen';
 import HallScreen from './HallScreen';
 import GameDetailScreen from './GameDetailScreen';
 import { DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
@@ -8,6 +9,11 @@ import {
   CorcodragonDetailScreen,
   CorcodragonLocalScreen,
 } from '@tm/game-corcodragon-fire/GameUI';
+import {
+  CorcodragonFightDetailScreen,
+  CorcodragonFightLocalScreen,
+  type FightConfig,
+} from '@tm/game-corcodragon-fight/GameUI';
 
 function loadSettings(): GameSettings {
   try {
@@ -37,6 +43,7 @@ export default function App() {
   const [sessionKey, setSessionKey] = useState(0);
   const [selectedGameId, setSelectedGameId] = useState('trouble-magician');
   const [settings, setSettings] = useState<GameSettings>(loadSettings);
+  const [fightConfig, setFightConfig] = useState<FightConfig>({ mode: 'ffa', scoreLimit: 15 });
 
   const updateSettings = (patch: Partial<GameSettings>) => {
     setSettings((s) => {
@@ -63,6 +70,26 @@ export default function App() {
   }
 
   if (screen === 'game') {
+    if (selectedGameId === 'corcodragon-fight') {
+      return (
+        <CorcodragonFightDetailScreen
+          playerCount={playerCount}
+          onPlayerCountChange={setPlayerCount}
+          onPlayLocal={(config) => {
+            setFightConfig(config);
+            setSessionKey((k) => k + 1);
+            setScreen('local');
+          }}
+          onPlayOnline={(config) => {
+            setFightConfig(config);
+            setSessionKey((k) => k + 1);
+            setScreen('online');
+          }}
+          onlineReady={true}
+          onBack={() => setScreen('hall')}
+        />
+      );
+    }
     if (selectedGameId === 'corcodragon-fire') {
       return (
         <CorcodragonDetailScreen
@@ -100,6 +127,17 @@ export default function App() {
   }
 
   if (screen === 'local') {
+    if (selectedGameId === 'corcodragon-fight') {
+      return (
+        <CorcodragonFightLocalScreen
+          key={sessionKey}
+          playerCount={playerCount}
+          myName={myName}
+          config={fightConfig}
+          onExit={() => setScreen('game')}
+        />
+      );
+    }
     if (selectedGameId === 'corcodragon-fire') {
       return (
         <CorcodragonLocalScreen
@@ -129,6 +167,18 @@ export default function App() {
   }
 
   if (screen === 'online') {
+    if (selectedGameId === 'corcodragon-fight') {
+      return (
+        <CorcodragonFightOnlineScreen
+          key={sessionKey}
+          settings={settings}
+          defaultName={myName}
+          config={fightConfig}
+          onExit={() => setScreen('game')}
+          onServerUrlChange={(url) => updateSettings({ serverUrl: url.trim() })}
+        />
+      );
+    }
     return (
       <OnlineScreen
         key={sessionKey}

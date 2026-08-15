@@ -66,6 +66,8 @@ export interface LobbyInfo {
   settings: RoomSettings;
   /** 房间是否设有密码 */
   hasPassword: boolean;
+  /** 游戏 id（realtime 房间必填；旧回合制房间可省略，默认 trouble-magician） */
+  gameId?: string;
 }
 
 export type Ack<T> = (res: T) => void;
@@ -76,6 +78,10 @@ export interface CreateRoomPayload {
   settings?: Partial<RoomSettings>;
   /** 可选房间密码（空 = 无密码） */
   password?: string;
+  /** 游戏 id（缺省 = trouble-magician，兼容旧客户端） */
+  gameId?: string;
+  /** 游戏自定对局配置（由游戏引擎校验，平台不透传语义） */
+  config?: Record<string, unknown>;
 }
 
 export interface JoinRoomPayload {
@@ -106,10 +112,14 @@ export interface ClientToServerEvents {
   nextRound: () => void;
   declareSpell: (payload: { magic: Magic }) => void;
   endTurn: () => void;
+  /** realtime 游戏输入流（载荷由游戏引擎白名单校验） */
+  rtInput: (payload: { input: unknown }) => void;
 }
 
 export interface ServerToClientEvents {
   lobby: (info: LobbyInfo) => void;
   state: (view: PlayerView) => void;
+  /** realtime 游戏按玩家视角快照（20Hz） */
+  rtSnapshot: (snapshot: unknown) => void;
   error: (message: string) => void;
 }

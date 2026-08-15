@@ -382,6 +382,33 @@ export class CorcodragonFightEngine {
     this.pushEvent('info', text, undefined, true, []);
   }
 
+  /**
+   * 平台断线托管开关：真人断线 → 引擎按 bot 接管（AI 只用该座位视角）；
+   * 真人重连 → 关闭托管并清空其输入。站桩/移除语义可在此扩展。
+   */
+  setAutopilot(playerId: string, on: boolean): { ok: boolean; error?: string } {
+    const p = this.player(playerId);
+    if (!p) return { ok: false, error: `未知玩家 ${playerId}` };
+    if (p.isBot === on) return { ok: true };
+    p.isBot = on;
+    if (on) {
+      p.moveX = 0;
+      p.moveZ = 0;
+      p.fireHeld = false;
+      p.adsHeld = false;
+      p.ads = false;
+      this.botNextThink.set(p.id, this.t + 200);
+      this.log(`${p.name} 断线，由 AI 接管 🤖`);
+    } else {
+      this.botNextThink.delete(p.id);
+      p.moveX = 0;
+      p.moveZ = 0;
+      p.fireHeld = false;
+      this.log(`${p.name} 重新上线，恢复操作 ✅`);
+    }
+    return { ok: true };
+  }
+
   // ---------------- 输入校验 ----------------
 
   applyInput(playerId: string, raw: unknown): { ok: boolean; error?: string } {
