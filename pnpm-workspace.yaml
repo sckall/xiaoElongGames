@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - apps/*
+  - games/*
 
 allowBuilds:
   esbuild: true

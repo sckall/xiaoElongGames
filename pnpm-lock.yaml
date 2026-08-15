@@ -42,6 +42,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@tm/game-trouble-magician':
+        specifier: workspace:*
+        version: link:../../games/trouble-magician
       '@tm/rules':
         specifier: workspace:*
         version: link:../../packages/rules
@@ -70,6 +73,16 @@ importers:
       vite:
         specifier: ^6.0.7
         version: 6.4.3(@types/node@22.20.1)(tsx@4.23.12)
+
+  games/trouble-magician:
+    dependencies:
+      '@tm/rules':
+        specifier: workspace:*
+        version: link:../../packages/rules
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/rules:
     devDependencies:

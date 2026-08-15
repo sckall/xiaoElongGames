@@ -102,3 +102,51 @@ apps/server  Socket.IO
 2. **引擎保持零依赖、可注入随机**：便于单测与未来迁移（如 boardgame.io）。
 3. **协议改动 = 双端一起改**：`protocol.ts` 是唯一事件契约；服务端对所有入参做白名单/数值校验。
 4. **本地/联机 UI 共用**：新界面逻辑放 `GameTable`/组件，行为差异通过 `GameApi` 适配。
+
+## 新游戏接入指南（平台/游戏两层分离）
+
+> 目的：往大厅加新游戏时，**只新建一个 games/<id>/ 目录**，不动大厅/房间/连接代码。
+> 给 AI 的上下文 = 本文档 + `games/types.ts`（GameModule 契约）+ 一个参考游戏目录（trouble-magician）。
+
+### 目录约定
+
+```
+games/
+├─ types.ts            GameModule 契约（平台与游戏的唯一接口）
+├─ registry.ts         游戏注册表（新游戏在此登记）
+└─ <game-id>/          每个游戏一个目录
+   ├─ engine.ts        规则引擎：状态 + apply(playerId, action) + getView(playerId) 投影
+   ├─ ai.ts            AI 决策（只用 getView 视角信息）
+   ├─ GameUI.tsx       对局界面（本地/联机共用，props 自定）
+   ├─ RoomConfig.tsx   房间设置表单（可选）
+   └─ index.ts         GameModule 描述符（注册入口）
+```
+
+### 接入步骤（checklist）
+
+1. 在 `games/<id>/` 实现引擎与 AI；引擎必须：随机数可注入（可测）、动作入参白名单校验、`getView` 隐藏玩家不可见信息。
+2. 写 `index.ts` 导出 `GameModule`（id/name/emoji/mode/人数/描述/createEngine/createAI/GameUI）。
+3. 在 `games/registry.ts` 的 `GAMES` 数组登记 → 大厅自动出现该游戏卡片。
+4. **服务端通用化（第二个游戏接入时做一次）**：把 `apps/server` 里出包专属的动作事件
+   （`declareSpell`/`endTurn`/`nextRound`）替换为通用 `gameAction { gameId, action }`，
+   Room 按 `gameId` 从注册表 `createEngine` 并调用 `engine.apply()`；协议加 `gameId` 字段。
+   平台能力（建房/密码/托管/重连/关房）保持不变。
+5. UI：`GameDetailScreen`/`LobbyScreen`/`GameTable` 按 `gameId` 路由（当前仅一个游戏为硬编码，
+   第二个游戏接入时抽象为按注册表分发）。
+6. 验收：引擎单测 + `pnpm test/typecheck/build` + 冒烟 + 双窗口回归 + 布局 QA。
+
+### 三种模式的平台差异（规划）
+
+| 模式 | 引擎要求 | 平台补充 |
+|------|----------|----------|
+| turn-based | 状态+动作+投影（现状） | 无 |
+| async | 同上 + 状态可序列化落库 | 房间持久化 + 通知（需引入数据库） |
+| realtime | 高频状态/快照 | 插值/预测（或换 Colyseus 类引擎） |
+
+### 给 AI 的上下文模板（开发新游戏时直接粘贴）
+
+> 本项目是小鳄龙之家游戏大厅（monorepo：apps/web 平台壳 + apps/server 平台服务 +
+> packages/rules 通用类型 + games/ 游戏目录）。请先读 ARCHITECTURE.md 与
+> games/types.ts（GameModule 契约）、参考 games/trouble-magician/ 的实现。
+> 任务：在 games/<新游戏id>/ 实现新游戏《XXX》，遵守契约与接入步骤，
+> 不修改大厅/房间/连接代码；引擎动作入参必须校验；每个阶段 git 提交并跑全量测试。

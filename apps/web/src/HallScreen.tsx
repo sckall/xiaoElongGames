@@ -1,10 +1,15 @@
+import { GAMES } from './games';
+
 export default function HallScreen({
   onEnter,
   onBack,
 }: {
-  onEnter: () => void;
+  onEnter: (gameId: string) => void;
   onBack: () => void;
 }) {
+  const available = GAMES.filter((g) => g.available);
+  const modeLabel = (mode: string) =>
+    mode === 'turn-based' ? '回合制 · 实时房间' : mode === 'async' ? '异步 · 小数据' : '同步 · 低延迟';
   return (
     <div className="page hall-page">
       <div className="hall-wrap">
@@ -18,15 +23,17 @@ export default function HallScreen({
           </div>
         </header>
         <div className="hall-grid">
-          <button className="hall-card playable" onClick={onEnter}>
-            <span className="hall-emoji">🧙</span>
-            <span className="hall-name">出包魔法师</span>
-            <span className="hall-meta">回合制 · 实时房间｜2-5 人</span>
-            <span className="hall-desc">
-              见习魔法师瞎放魔法的欢乐桌游：看不到自己的手牌，喊错魔法就出包！
-            </span>
-            <span className="hall-cta">进入游戏 →</span>
-          </button>
+          {available.map((g) => (
+            <button key={g.id} className="hall-card playable" onClick={() => onEnter(g.id)}>
+              <span className="hall-emoji">{g.emoji}</span>
+              <span className="hall-name">{g.name}</span>
+              <span className="hall-meta">
+                {modeLabel(g.mode)}｜{g.minPlayers}-{g.maxPlayers} 人
+              </span>
+              <span className="hall-desc">{g.description}</span>
+              <span className="hall-cta">进入游戏 →</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
