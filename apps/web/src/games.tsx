@@ -4,9 +4,14 @@
  */
 import { troubleMagicianModule } from '@tm/game-trouble-magician';
 import { corcodragonFireModule } from '@tm/game-corcodragon-fire';
+import { corcodragonFightModule } from '@tm/game-corcodragon-fight';
 import type { GameModule } from '../../../games/types';
 
-export const GAMES: GameModule[] = [troubleMagicianModule, corcodragonFireModule];
+export const GAMES: GameModule[] = [
+  troubleMagicianModule,
+  corcodragonFightModule,
+  corcodragonFireModule,
+];
 
 export function getGame(id: string): GameModule | undefined {
   return GAMES.find((g) => g.id === id);

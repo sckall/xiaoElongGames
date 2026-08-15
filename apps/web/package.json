@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tm/game-corcodragon-fight": "workspace:*",
     "@tm/game-trouble-magician": "workspace:*",
     "@tm/rules": "workspace:*",
     "react": "^18.3.1",

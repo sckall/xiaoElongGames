@@ -1,0 +1,427 @@
+/* 《鳄龙咆哮》3D FPS 客户端样式（独立于大厅样式，全部使用 ccf- 前缀） */
+
+.ccf-root {
+  position: fixed;
+  inset: 0;
+  background: #05070c;
+  color: #e8f0ff;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+.ccf-canvas-host {
+  position: absolute;
+  inset: 0;
+}
+
+.ccf-canvas-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- 准星 ---- */
+.ccf-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.ccf-crosshair::before,
+.ccf-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+.ccf-crosshair::before {
+  width: 2px;
+  height: 14px;
+  left: -1px;
+  top: -7px;
+}
+.ccf-crosshair::after {
+  width: 14px;
+  height: 2px;
+  left: -7px;
+  top: -1px;
+}
+.ccf-crosshair.hit {
+  color: #ff5040;
+}
+.ccf-crosshair.hit::before,
+.ccf-crosshair.hit::after {
+  background: #ff5040;
+  transform: rotate(45deg);
+}
+
+/* ---- HUD ---- */
+.ccf-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.ccf-hud-top {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ccf-chips {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ccf-chip {
+  background: rgba(10, 16, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ccf-killfeed {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+.ccf-kill-item {
+  background: rgba(10, 16, 28, 0.66);
+  border-left: 3px solid #ff6b4a;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  animation: ccf-fade-in 0.18s ease-out;
+}
+@keyframes ccf-fade-in {
+  from { transform: translateX(12px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.ccf-hud-bottom-left {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+}
+.ccf-hp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ccf-hp-label {
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 48px;
+}
+.ccf-hp-bar,
+.ccf-shield-bar {
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  flex: 1;
+}
+.ccf-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3fd06a, #a0f06a);
+  transition: width 0.15s linear;
+}
+.ccf-shield-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3d8cff, #7bc0ff);
+  transition: width 0.15s linear;
+}
+.ccf-ammo {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.ccf-ammo-cur {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+}
+.ccf-ammo-sep {
+  color: rgba(255, 255, 255, 0.5);
+}
+.ccf-ammo-res {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.ccf-ammo-meta {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #ffd166;
+}
+
+.ccf-hud-bottom-right {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.ccf-skill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 16, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 180px;
+}
+.ccf-skill-key {
+  font-size: 18px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.ccf-skill-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.ccf-cd {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+.ccf-skill-box {
+  position: relative;
+  overflow: hidden;
+}
+.ccf-skill.ready {
+  border-color: rgba(120, 255, 160, 0.55);
+}
+.ccf-ult-ready {
+  color: #ffd166;
+  animation: ccf-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ccf-pulse {
+  50% { text-shadow: 0 0 10px #ffd166; }
+}
+
+/* ---- 遮罩 ---- */
+.ccf-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 7, 13, 0.82);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+.ccf-overlay-panel {
+  background: rgba(14, 22, 36, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: min(92vw, 860px);
+  max-height: 90vh;
+  overflow: auto;
+  text-align: center;
+}
+.ccf-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+.ccf-hero-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.ccf-hero-card:hover {
+  transform: translateY(-3px);
+  border-color: #ffd166;
+}
+.ccf-hero-emoji {
+  font-size: 34px;
+}
+.ccf-hero-name {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 6px 0 2px;
+}
+.ccf-hero-role {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+.ccf-hero-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.ccf-big-num {
+  font-size: 52px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.ccf-title {
+  font-size: 26px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.ccf-muted {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+}
+.ccf-overlay-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.ccf-overlay-actions button {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ccf-overlay-actions button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.ccf-damage-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: inset 0 0 120px rgba(255, 40, 20, 0.55);
+  opacity: 0;
+  transition: opacity 0.08s ease-out;
+}
+.ccf-damage-vignette.on {
+  opacity: 1;
+}
+.ccf-hint {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  background: rgba(10, 16, 28, 0.8);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 8;
+}
+
+.ccf-scoreboard {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  transform: translateX(-50%);
+  width: min(92vw, 460px);
+  background: rgba(10, 16, 28, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 14px 18px;
+  z-index: 9;
+}
+.ccf-scoreboard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ccf-scoreboard td,
+.ccf-scoreboard th {
+  padding: 6px 4px;
+  text-align: left;
+}
+.ccf-scoreboard tr.me-row {
+  color: #ffd166;
+}
+
+/* ---- 详情页 ---- */
+.ccf-detail-panel {
+  max-width: 880px;
+}
+.ccf-mode-row {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+}
+.ccf-mode-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #f4f7fb;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ccf-mode-btn.active {
+  background: #ffd166;
+  border-color: #d9a413;
+}
+.ccf-hero-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+.ccf-hero-line b {
+  min-width: 56px;
+}
+.ccf-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 4px 14px;
+  font-size: 13px;
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .ccf-killfeed {
+    width: 200px;
+  }
+  .ccf-hud-bottom-left {
+    min-width: 220px;
+  }
+  .ccf-ammo-cur {
+    font-size: 30px;
+  }
+}
