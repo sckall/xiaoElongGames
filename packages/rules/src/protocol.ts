@@ -114,8 +114,10 @@ export interface ClientToServerEvents {
   nextRound: () => void;
   declareSpell: (payload: { magic: Magic }) => void;
   endTurn: () => void;
-  /** realtime 游戏输入流（载荷由游戏引擎白名单校验） */
-  rtInput: (payload: { input: unknown }) => void;
+  /** realtime 游戏输入流（载荷由游戏引擎白名单校验；seq 为客户端输入序号） */
+  rtInput: (payload: { input: unknown; seq?: number }) => void;
+  /** realtime 延迟探测（ack 立即返回服务端时钟） */
+  rtPing: (payload: { sentAt: number }, cb: Ack<{ serverNow: number; sentAt: number }>) => void;
 }
 
 export interface ServerToClientEvents {

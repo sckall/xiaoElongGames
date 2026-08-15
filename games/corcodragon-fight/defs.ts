@@ -296,6 +296,8 @@ export interface SnapshotPlayer {
   score: number;
   /** 该玩家是否对当前视图者可见（隐身投影） */
   visible: boolean;
+  /** 服务端已确认的该玩家最后输入序号（仅本人快照有意义，用于客户端回滚） */
+  lastInputSeq: number;
 }
 
 export interface SnapshotEffect {

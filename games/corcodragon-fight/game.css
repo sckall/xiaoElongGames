@@ -332,6 +332,20 @@
 .ccf-damage-vignette.on {
   opacity: 1;
 }
+.ccf-netstats {
+  position: absolute;
+  left: 14px;
+  top: 56px;
+  z-index: 7;
+  background: rgba(10, 16, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #9fd8ff;
+}
+
 .ccf-tuning-host {
   position: absolute;
   top: 12px;

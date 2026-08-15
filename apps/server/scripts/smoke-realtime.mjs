@@ -81,6 +81,25 @@ console.log(`✅ 进入 playing（t=${playing.t}ms，seq=${playing.seq}）`);
 a.emit('rtInput', { input: { type: 'move', x: 0, z: 1 } });
 a.emit('rtInput', { input: { type: 'look', yaw: 0.5, pitch: 0.1 } });
 
+// 输入序号回执：seq=42 送达后，本人快照 lastInputSeq 应 >= 42
+a.emit('rtInput', { input: { type: 'move', x: 0.4, z: 0.2 }, seq: 42 });
+let acked = false;
+for (let i = 0; i < 100 && !acked; i++) {
+  await sleep(50);
+  const s = await waitEvent(a, 'rtSnapshot', 500).catch(() => null);
+  const me = s?.players.find((p) => p.id === s.youId);
+  if (me && me.lastInputSeq >= 42) acked = true;
+}
+if (!acked) fail('输入序号未收到服务端回执');
+console.log('✅ 输入 seq=42 已回执');
+
+// 延迟探测：rtPing ack
+const sentAt = Date.now();
+const pong = await new Promise((resolve) => a.emit('rtPing', { sentAt }, resolve));
+const rtt = Date.now() - sentAt;
+if (!pong || typeof pong.serverNow !== 'number') fail('rtPing 返回异常');
+console.log(`✅ 延迟探测：RTT=${rtt}ms（估算单程 ${Math.round(rtt / 2)}ms）`);
+
 // 非法输入必须被服务端安全拒绝（1s 节流内首个错误会下发）
 const errorPromise = waitEvent(a, 'error', 2000).catch(() => null);
 a.emit('rtInput', { input: { type: 'hackThePlanet' } });

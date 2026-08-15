@@ -265,6 +265,7 @@ export class CorcodragonFightEngine {
   /** 全部事件环（供测试/回放检查；平台只消费 getSnapshot 的增量投影） */
   readonly events: EngineEvent[] = [];
   private lastSentSeq = new Map<string, number>();
+  private lastInputSeq = new Map<string, number>();
   private botNextThink = new Map<string, number>();
   private effects: EngineEffect[] = [];
 
@@ -368,6 +369,16 @@ export class CorcodragonFightEngine {
   /** 平台日志（加入/离开/断线等），进入公开事件流 */
   log(text: string): void {
     this.pushEvent('info', text, undefined, true, []);
+  }
+
+  /**
+   * 记录该玩家最新输入序号（平台在 applyInput 前调用）。
+   * 快照会把最后确认序号回带，客户端据此丢弃已确认的待回滚输入。
+   */
+  recordInputSeq(playerId: string, seq: unknown): void {
+    if (typeof seq !== 'number' || !Number.isFinite(seq) || seq < 0) return;
+    const prev = this.lastInputSeq.get(playerId) ?? -1;
+    if (seq > prev) this.lastInputSeq.set(playerId, Math.floor(seq));
   }
 
   /**
@@ -1376,6 +1387,7 @@ export class CorcodragonFightEngine {
         deaths: visible ? p.deaths : 0,
         score: visible ? p.score : 0,
         visible,
+        lastInputSeq: p.id === you.id ? (this.lastInputSeq.get(p.id) ?? -1) : -1,
       };
       void wd;
       return base;

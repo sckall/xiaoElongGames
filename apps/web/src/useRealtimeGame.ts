@@ -4,7 +4,7 @@
  * - 对局期发送 `rtInput { input }`，接收 20Hz `rtSnapshot`；
  * - 与 useRemoteGame 并存，不改动出包魔法师的连接代码。
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type {
   AckResult,
@@ -63,6 +63,13 @@ function lastSavedRoom(): { code: string; token: string; name: string } | null {
 
 export type RealtimeStage = 'disconnected' | 'lobby' | 'playing';
 
+export interface NetworkStats {
+  /** 估算单程延迟（RTT/2，毫秒） */
+  pingMs: number;
+  /** 已发送但服务端尚未回执的输入数 */
+  pendingInputs: number;
+}
+
 export interface RealtimeApi {
   stage: RealtimeStage;
   lobby: LobbyInfo | null;
@@ -70,6 +77,7 @@ export interface RealtimeApi {
   error: string | null;
   myId: string | null;
   roomList: RoomListItem[] | null;
+  stats: NetworkStats;
   create: (name: string, botCount: number, password: string | undefined, config: Record<string, unknown>) => void;
   join: (code: string, name: string, password?: string) => void;
   rejoin: () => void;
@@ -83,12 +91,30 @@ export interface RealtimeApi {
 
 export function useRealtimeGame(serverUrl: string): RealtimeApi {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
+  const seqRef = useRef(0);
+  const pendingRef = useRef(new Map<number, RealtimeInputAction>());
+  const pingRef = useRef(0);
   const [stage, setStage] = useState<RealtimeStage>('disconnected');
   const [lobby, setLobby] = useState<LobbyInfo | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
   const [roomList, setRoomList] = useState<RoomListItem[] | null>(null);
+  const [stats, setStats] = useState<NetworkStats>({ pingMs: 0, pendingInputs: 0 });
+
+  // 延迟探测：每 2 秒一次 rtPing，RTT/2 作为单程延迟估计
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const s = socketRef.current;
+      if (!s?.connected) return;
+      const sentAt = performance.now();
+      s.emit('rtPing', { sentAt }, () => {
+        pingRef.current = Math.max(0, Math.round((performance.now() - sentAt) / 2));
+        setStats((prev) => ({ ...prev, pingMs: pingRef.current }));
+      });
+    }, 2000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const ensure = useCallback(() => {
     if (socketRef.current) return socketRef.current;
@@ -98,7 +124,14 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
       setStage((prev) => (prev === 'playing' ? 'playing' : 'lobby'));
     });
     s.on('rtSnapshot', (snap) => {
-      setSnapshot(snap as Snapshot);
+      const view = snap as Snapshot;
+      const me = view.players.find((p) => p.id === view.youId);
+      const ack = me?.lastInputSeq ?? -1;
+      for (const key of pendingRef.current.keys()) {
+        if (key <= ack) pendingRef.current.delete(key);
+      }
+      setStats((prev) => ({ ...prev, pendingInputs: pendingRef.current.size }));
+      setSnapshot(view);
       setStage('playing');
     });
     s.on('error', (m) => setError(m));
@@ -179,7 +212,12 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
   }, []);
 
   const sendInput = useCallback((input: RealtimeInputAction) => {
-    socketRef.current?.emit('rtInput', { input });
+    const s = socketRef.current;
+    if (!s) return;
+    const seq = seqRef.current++;
+    pendingRef.current.set(seq, input);
+    setStats((prev) => ({ ...prev, pendingInputs: pendingRef.current.size }));
+    s.emit('rtInput', { input, seq });
   }, []);
 
   const leave = useCallback(() => {
@@ -188,12 +226,16 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     socketRef.current?.disconnect();
     socketRef.current = null;
     if (code) removeToken(code);
+    seqRef.current = 0;
+    pendingRef.current.clear();
+    pingRef.current = 0;
     setStage('disconnected');
     setLobby(null);
     setSnapshot(null);
     setMyId(null);
     setError(null);
     setRoomList(null);
+    setStats({ pingMs: 0, pendingInputs: 0 });
   }, [lobby?.code]);
 
   return {
@@ -203,6 +245,7 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     error,
     myId,
     roomList,
+    stats,
     create,
     join,
     rejoin,

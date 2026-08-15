@@ -278,9 +278,15 @@ export class RealtimeRoom {
     this.tickTimer = null;
   }
 
-  applyRealtimeInput(playerId: string, input: unknown, socketId: string): void {
+  applyRealtimeInput(playerId: string, payload: unknown, socketId: string): void {
     if (!this.engine || this.status !== 'playing') return;
-    const r = this.engine.applyInput(playerId, input);
+    const envelope =
+      payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as { input?: unknown; seq?: unknown })
+        : { input: payload };
+    // 无论输入是否合法都先回执 seq（表示“已收到”，客户端只关心送达确认）
+    this.engine.recordInputSeq(playerId, envelope.seq);
+    const r = this.engine.applyInput(playerId, envelope.input);
     if (!r.ok) this.emitError(socketId, r.error ?? '非法输入');
   }
 

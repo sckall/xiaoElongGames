@@ -77,6 +77,8 @@ export interface FpsDriver {
   send: (input: RealtimeInputAction) => void;
   onExit: () => void;
   onRestart?: () => void;
+  /** 联机统计（联机 hook 提供；本地驱动省略） */
+  stats?: { pingMs: number; pendingInputs: number };
 }
 
 export interface FightConfig {
@@ -105,6 +107,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const [locked, setLocked] = useState(false);
   const [showScore, setShowScore] = useState(false);
   const [hitAt, setHitAt] = useState(0);
+  const [driftM, setDriftM] = useState(0);
   const [killFeed, setKillFeed] = useState<string[]>([]);
 
   // 视图/输入状态（本帧立即生效，再同步给引擎）
@@ -354,6 +357,18 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       localPosRef.current.set(me.pos.x, me.pos.y, me.pos.z);
     }
     if (me) lastAliveRef.current = me.alive;
+
+    // 联机软校正：统计预测漂移；超过阈值立即吸附到服务端（回滚）
+    if (driver.online && me) {
+      const drift = Math.hypot(
+        localPosRef.current.x - me.pos.x,
+        localPosRef.current.z - me.pos.z,
+      );
+      if (drift > BALANCE.client.softCorrectionThreshold) {
+        localPosRef.current.set(me.pos.x, me.pos.y, me.pos.z);
+      }
+      setDriftM(drift);
+    }
 
     // 其他玩家模型
     for (const p of snap.players) {
@@ -610,6 +625,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       <button className="ccf-exit" onClick={driver.onExit} title="退出对局">
         ← 退出
       </button>
+      {tuningEnabled && (
+        <div className="ccf-netstats">
+          🛰 ping {driver.stats?.pingMs ?? 0}ms · drift {driftM.toFixed(2)}m · pending{' '}
+          {driver.stats?.pendingInputs ?? 0}
+          {driver.online ? '' : '（本地模式无网络）'}
+        </div>
+      )}
       {me && me.alive && snap?.phase === 'playing' && (
         <>
           <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`} />

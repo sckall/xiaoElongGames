@@ -235,8 +235,14 @@ io.on('connection', (socket: RoomSocket) => {
       if (!d.roomCode || !d.playerId) return;
       const room = rooms.get(d.roomCode);
       if (room instanceof RealtimeRoom) {
-        room.applyRealtimeInput(d.playerId, payload?.input, socket.id);
+        room.applyRealtimeInput(d.playerId, payload, socket.id);
       }
+    });
+  });
+
+  socket.on('rtPing', (payload, cb) => {
+    guard(() => {
+      cb({ serverNow: Date.now(), sentAt: typeof payload?.sentAt === 'number' ? payload.sentAt : 0 });
     });
   });
 

@@ -399,6 +399,27 @@ describe('英雄技能与终极技', () => {
   });
 });
 
+describe('输入序号回执（客户端回滚依据）', () => {
+  it('recordInputSeq 只接受非负有限数，快照回带最后确认序号', () => {
+    const e = mkEngine();
+    const id = e.players[0].id;
+    e.recordInputSeq(id, -1);
+    e.recordInputSeq(id, '3' as unknown);
+    e.recordInputSeq(id, NaN);
+    expect(e.getSnapshot(id).players.find((p) => p.id === id)?.lastInputSeq).toBe(-1);
+    e.recordInputSeq(id, 3.9);
+    e.recordInputSeq(id, 2); // 乱序不回退
+    expect(e.getSnapshot(id).players.find((p) => p.id === id)?.lastInputSeq).toBe(3);
+  });
+
+  it('他人快照不包含我的输入序号', () => {
+    const e = mkEngine();
+    const [a, b] = [e.players[0].id, e.players[1].id];
+    e.recordInputSeq(a, 5);
+    expect(e.getSnapshot(b).players.find((p) => p.id === b)?.lastInputSeq).toBe(-1);
+  });
+});
+
 describe('快照投影', () => {
   it('事件增量下发且私有伤害只给双方', () => {
     const e = mkEngine();
