@@ -16,6 +16,7 @@
 |------|------|----------|
 | `three` / `@types/three` | 浏览器 3D 场景渲染（第一人称、英雄胶囊、特效） | 仅 `games/corcodragon-fight` |
 | `tweakpane` | `?debug=1` 手感调试面板（按需动态加载，不进线上主包） | 仅 `games/corcodragon-fight` |
+| Kenney Blaster Kit（CC0） | 掩体木箱 GLB 模型（`assets/models/`，含 License.txt） | 仅客户端资源 |
 | Socket.IO 现有依赖 | 复用平台连接层，新增 `rtInput`/`rtSnapshot`/`rtPing` 事件 | 平台协议层 |
 
 引擎（`engine.ts`/`ai.ts`/`defs.ts`）保持**纯 TS 零依赖、rng 可注入**，

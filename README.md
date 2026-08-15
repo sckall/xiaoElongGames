@@ -17,6 +17,7 @@
 | [CHANGELOG.md](CHANGELOG.md) | 所有人 | 版本更新日志（v1 ~ 最新） |
 | [docs/REALTIME.md](docs/REALTIME.md) | 开发者 / Agent | 实时 FPS 通道设计（tick/快照协议/断线语义/演进路线） |
 | [docs/GAMEPLAY-TUNING.md](docs/GAMEPLAY-TUNING.md) | 策划 / 开发者 | 《鳄龙咆哮》手感调参（gameplay.json + `?debug=1` 面板） |
+| [docs/ASSETS.md](docs/ASSETS.md) | 美术 / 开发者 | 素材来源（CC0 音效/模型）、已接入资产与后续替换计划 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端详细部署（系统要求/依赖/命令/测试/发布包） |
 
 ## 🎮 客户端形态（重要）

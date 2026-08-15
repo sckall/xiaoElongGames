@@ -25,6 +25,15 @@
   - 联机同步调试：输入 `seq` + 快照 `lastInputSeq` 回执、`rtPing` 延迟探测、
     预测漂移统计与 `softCorrectionThreshold` 硬回滚软校正
   - 调试文档：`docs/GAMEPLAY-TUNING.md`；面板冒烟 `scripts/smoke-tuning.mjs`
+- 🎨 《鳄龙咆哮》手感/表现打磨：
+  - 修复移动方向契约（move 为世界系，客户端视角换算唯一出口）与开镜真实生效
+    （FOV 平滑过渡、狙击镜内视野、开镜移速降低）
+  - 程序化 WebAudio 音效（射击/命中/爆头/击杀/换弹/技能/终极技/治疗/重生），
+    接入大厅声音偏好；武器多部件枪模 + 呼吸摆动 + 后坐（weapons.recoil 可调参）
+  - 攻击反馈：枪口点光源、命中火花粒子、中央击杀确认、低血量红屏、
+    无畏契约风格四段准星/命中红 X；场景提亮+霓虹描边+尘埃粒子+角色护目镜队色胸带
+  - 素材：联网调研并下载 Kenney Blaster Kit（CC0），木箱 GLB 已接入场景；
+    素材来源与后续替换计划见 `docs/ASSETS.md`
 - 🐛 修复出包魔法师模糊测试 Math.random 偶发超时（改为可复现种子）
 - 大厅品牌化：「小鳄龙之家-游戏大厅」，游戏偏好移入出包魔法师详情页
 - 开发者文档体系：ARCHITECTURE / AGENTS / CHANGELOG / README 索引 / DEPLOY 扩充

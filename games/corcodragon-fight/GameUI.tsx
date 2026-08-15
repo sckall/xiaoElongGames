@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { chooseAIInputs } from './ai';
 import { CorcodragonFightEngine } from './engine';
 import { SfxPlayer } from './fx';
@@ -219,11 +220,15 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     scene.add(grid);
 
     const boxMat = new THREE.MeshStandardMaterial({ color: 0xa5805e, roughness: 0.9 });
-    for (const b of snap.arena.obstacles) {
+    const crateVariants = ['small', 'small', 'medium', 'medium', 'medium', 'wide', 'wide'];
+    const gltfLoader = new GLTFLoader();
+    snap.arena.obstacles.forEach((b, idx) => {
       const w = b.maxX - b.minX;
       const d = b.maxZ - b.minZ;
+      const cx = (b.minX + b.maxX) / 2;
+      const cz = (b.minZ + b.maxZ) / 2;
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, b.height, d), boxMat);
-      mesh.position.set((b.minX + b.maxX) / 2, b.height / 2, (b.minZ + b.maxZ) / 2);
+      mesh.position.set(cx, b.height / 2, cz);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       const edge = new THREE.LineSegments(
@@ -232,7 +237,42 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       );
       mesh.add(edge);
       scene.add(mesh);
-    }
+
+      // Kenney Blaster Kit（CC0）木箱模型：加载成功后替换占位盒，失败保留占位
+      const crate = crateVariants[idx % crateVariants.length];
+      const crateUrl = new URL(`./assets/models/crate-${crate}.glb`, import.meta.url).href;
+      gltfLoader.load(
+        crateUrl,
+        (gltf) => {
+          const model = gltf.scene;
+          const bounds = new THREE.Box3().setFromObject(model);
+          const size = new THREE.Vector3();
+          bounds.getSize(size);
+          const targetW = w * 0.92;
+          const targetD = d * 0.92;
+          const sx = size.x > 0.01 ? targetW / size.x : 1;
+          const sz = size.z > 0.01 ? targetD / size.z : 1;
+          const s = Math.min(sx, sz);
+          model.scale.setScalar(s);
+          const center = new THREE.Vector3();
+          bounds.getCenter(center);
+          model.position.set(cx - center.x * s, b.height / 2 - bounds.min.y * s, cz - center.z * s);
+          model.traverse((o) => {
+            const m = o as THREE.Mesh;
+            if (m.isMesh) {
+              m.castShadow = true;
+              m.receiveShadow = true;
+            }
+          });
+          scene.add(model);
+          mesh.visible = false;
+        },
+        undefined,
+        () => {
+          // 加载失败：保留程序化占位盒（console.warn 一次即可）
+        },
+      );
+    });
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x4e6183, roughness: 0.85 });
     const wallDefs = [
       { w: ARENA_HALF * 2 + 9, d: 1, x: 0, z: ARENA_HALF + 0.5 },

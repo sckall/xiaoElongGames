@@ -1,0 +1,69 @@
+# 《鳄龙咆哮》素材资产与视觉参考方案
+
+> 回答“音效/交互/素材能不能上网获取”：**可以**。本阶段已实际从 [Kenney](https://kenney.nl)
+> 下载 CC0 素材包并把木箱模型接入场景；音效当前使用 WebAudio 程序化合成（零版权风险），
+> 后续可按本文件逐步替换为 CC0 实录音效与正式枪模。
+
+## 1. 已接入的素材（本次提交）
+
+| 素材 | 来源 | 许可证 | 用途 | 位置 |
+|------|------|--------|------|------|
+| `crate-small/medium/wide.glb` + `Textures/colormap.png` | [Kenney · Blaster Kit 2.1](https://kenney.nl/assets/blaster-kit)（直链 zip 已归档 `tools/assets-archive/`，1.6MB） | **CC0**（公有领域，可商用，署名非必须） | 竞技场掩体木箱替换占位盒 | `games/corcodragon-fight/assets/models/` |
+| 程序化音效（射击/命中/爆头/击杀/换弹/技能/终极技/跳跃/治疗/重生） | 自研 WebAudio（`fx.ts`） | 自有 | 全部音效 | `games/corcodragon-fight/fx.ts` |
+| 程序化枪模（步枪/狙击/手枪/匕首多部件） | 自研 Three.js 几何体 | 自有 | 第一人称武器 | `GameUI.tsx` |
+
+> 下载前已核对包内 `License.txt`：CC0 1.0，允许个人/教育/商业使用。
+> 完整包（含 18 支 blaster 枪模 FBX/GLB、弹药、手雷等）保存在
+> `tools/assets-archive/kenney_blaster-kit_2.1.zip`（gitignore，不占仓库体积）。
+
+## 2. 可用的免费/CC0 素材来源（已联网调研）
+
+### 音效
+
+- [Freesound](https://freesound.org/)：搜索时按 `License: Creative Commons 0` 过滤，
+  即可拿到可商用的 CC0 实录音效（枪声/脚步/环境音）。
+- [OpenGameArt](https://opengameart.org/)：CC0 / CC-BY 游戏音效包（注意逐个核对 license）。
+- [Kenney 音频包](https://kenney.nl/assets?q=audio)：CC0，含 UI/冲击/射击风格音效。
+- [Creazilla 免费音频区](https://creazilla.com/media/audio)：大量 CC0 音效。
+
+### 3D 模型与贴图
+
+- [Kenney Blaster Kit](https://kenney.nl/assets/blaster-kit)（CC0，枪械/弹药/木箱）✅ 已下载；
+- [Kenney 全站资产](https://kenney.nl/assets)：CC0 主题包（科幻/自然/室内）；
+- [OpenGameArt 3D 区](https://opengameart.org/art-search-advanced?field_art_type_tid%5B%5D=10)：
+  CC0/CC-BY 枪械与场景模型；
+- [Poly Pizza](https://poly.pizza/) / [Quaternius](https://quaternius.com/)：
+  低多边形模型（部分 CC0）。
+
+### 开源浏览器 FPS 参考（联网调研结果）
+
+| 项目 | 可借鉴点 | 链接 |
+|------|----------|------|
+| `luckeyfaraday/pastel-nuketown` | 浏览器 FPS 架构：主机权威 WebSocket、AI bot、LAN 玩法 | [GitHub](https://github.com/luckeyfaraday/pastel-nuketown) |
+| `vincenzo-afk/NIGHTFALL` | TS+Three.js+Socket.IO 多人 FPS，英雄/模式/地图组织方式 | [GitHub](https://github.com/vincenzo-afk/NIGHTFALL) |
+| `nickyvanurk/3d-multiplayer-browser-shooter` | 经典 three.js+ws 多人射击样板（插值/同步） | [GitHub](https://github.com/nickyvanurk/3d-multiplayer-browser-shooter) |
+| `rhulha/Instagib2` | WebGL Quake3 地图 + Octree 碰撞思路 | [GitHub](https://github.com/rhulha/Instagib2) |
+
+**向无畏契约（Valorant）看齐时，我们优先借鉴的是“感觉层”而不是素材**：
+短杠准星 + 命中变红 X、狙击镜内视野、击杀确认弹出、低血量红屏、后坐视角上跳、
+简洁 HUD（血/弹药/技能角标）、干净的角色轮廓。这些已在本阶段逐步落地。
+
+## 3. 下一步接入计划（建议顺序）
+
+1. **枪模替换**：从 Blaster Kit 选 `blaster-a/d/e/f.glb` 对应步枪/手枪/狙击，
+   用 GLTFLoader 加载；先在 `?debug=1` 下加一个“模型方向预览”辅助线，确认枪口朝向与缩放
+   后再替换程序化枪模（避免方向错乱上线）。
+2. **实录音效替换**：从 Freesound/OpenGameArt 下载 CC0 音效（每类选 2-3 个候选），
+   按 `fx.ts` 的接口替换为 `AudioBuffer` 播放；保留程序化音效作为 fallback。
+3. **脚步/环境音**：给英雄速度加脚步声节拍，场景加风/环境底噪（音量可调）。
+4. **地图皮肤**：用 Kenney 科幻/自然包替换地板与围墙贴图，做 1-2 套主题（白天/夜间）。
+5. **角色模型**：评估 Quaternius/Poly Pizza 的机器人或低模角色，替换胶囊角色
+   （保持碰撞盒不变，只换视觉层）。
+
+## 4. 素材引入规则（Agent 必读）
+
+1. 只引入 **CC0 / 自研** 素材进 git；CC-BY 需保留署名文件；其他许可证一律不进仓库。
+2. 原始下载包放 `tools/assets-archive/`（gitignore），**不要**提交大 zip。
+3. 拷贝进 `games/corcodragon-fight/assets/` 的文件必须附带对应 `License.txt` 与来源。
+4. 任何外网下载前在 `tools/RISK_LOG.md` 登记（本次为 #31），下载后回填结果。
+5. 二进制大文件控制体积：单文件 >5MB 先压缩/降面；GLB 优先（内嵌贴图，少文件依赖）。
