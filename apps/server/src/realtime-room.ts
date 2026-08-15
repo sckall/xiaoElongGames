@@ -20,7 +20,7 @@ import {
 } from '@tm/rules';
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
-import { genRoomCode, sanitizeName, sanitizePassword, type RoomSocketData } from './room';
+import { sanitizeName, sanitizePassword, type RoomSocketData } from './room';
 
 export const RT_GAME_ID = 'corcodragon-fight';
 export const RT_TICK_MS = 50;
@@ -112,6 +112,7 @@ export class RealtimeRoom {
       hostId: this.hostId,
       status: this.status,
       gameId: this.gameId,
+      config: this.config,
       players: this.seats.map((s) => ({
         id: s.id,
         name: s.name,

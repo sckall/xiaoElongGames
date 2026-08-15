@@ -57,7 +57,11 @@ export default function RealtimeLobbyScreen({
     }
   };
 
-  const configLabel = `${config.mode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${config.scoreLimit} 杀`;
+  const roomConfig = remote.lobby?.config as Partial<FightConfig> | undefined;
+  const effectiveMode = roomConfig?.mode === 'tdm' ? 'tdm' : config.mode;
+  const effectiveLimit =
+    typeof roomConfig?.scoreLimit === 'number' ? roomConfig.scoreLimit : config.scoreLimit;
+  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀`;
 
   if (remote.lobby) {
     const me = remote.lobby.players.find((p) => p.id === remote.myId);

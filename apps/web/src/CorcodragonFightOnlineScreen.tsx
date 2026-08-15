@@ -32,7 +32,10 @@ export default function CorcodragonFightOnlineScreen({
           online: true,
           error: remote.error,
           send: remote.sendInput,
-          onExit: remote.leave,
+          onExit: () => {
+            remote.leave();
+            onExit();
+          },
         }}
       />
     );

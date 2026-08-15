@@ -113,7 +113,6 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const muzzleRef = useRef<THREE.Mesh | null>(null);
   const muzzleBornRef = useRef(-1);
   const clockRef = useRef(new THREE.Clock());
-  const keysAliveRef = useRef(false);
 
   // ---- 静态 3D 世界 ----
   const buildWorld = useCallback((snap: Snapshot) => {
@@ -604,6 +603,9 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   return (
     <div className="ccf-root">
       <div className="ccf-canvas-host" ref={hostRef} />
+      <button className="ccf-exit" onClick={driver.onExit} title="退出对局">
+        ← 退出
+      </button>
       {me && me.alive && snap?.phase === 'playing' && (
         <>
           <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`} />
@@ -618,6 +620,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           snap={snap}
           myId={driver.myId}
           onPick={(hero) => driver.send({ type: 'selectHero', hero })}
+          onExit={driver.onExit}
         />
       )}
       {snap?.phase === 'playing' && me && !me.alive && (
@@ -864,10 +867,12 @@ function HeroSelect({
   snap,
   myId,
   onPick,
+  onExit,
 }: {
   snap: Snapshot;
   myId: string | null;
   onPick: (hero: HeroId) => void;
+  onExit: () => void;
 }) {
   const me = snap.players.find((p) => p.id === myId);
   return (
@@ -896,6 +901,9 @@ function HeroSelect({
           ))}
         </div>
         <p className="ccf-muted">已选：{snap.players.filter((p) => p.hero).map((p) => `${p.name}→${p.hero ? HERO_DEFS[p.hero].name : ''}`).join(' · ') || '暂无'}</p>
+        <div className="ccf-overlay-actions">
+          <button onClick={onExit}>← 退出</button>
+        </div>
       </div>
     </div>
   );

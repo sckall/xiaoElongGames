@@ -1,8 +1,11 @@
 # 🐊 小鳄龙之家 · 游戏大厅
 
-「小鳄龙之家」是一个网页游戏大厅，当前入驻第一款游戏《出包魔法师》（Trouble Magician）：
-见习魔法师聚在一起乱放魔法——你的手牌背对自己，看不到自己会什么，只能靠观察别人来猜；
-喊对魔法生效，喊错就出包扣血。支持本地 vs AI 与联机房间对战。
+「小鳄龙之家」是一个网页游戏大厅，当前入驻：
+
+- **《出包魔法师》（Trouble Magician）**：见习魔法师聚在一起乱放魔法——你的手牌背对自己，
+  看不到自己会什么，只能靠观察别人来猜；喊对魔法生效，喊错就出包扣血。支持本地 vs AI 与联机房间对战。
+- **《鳄龙咆哮》（corcodragon-fight）**：2-7 人 3D 实时英雄射击，5 位英雄 × 4 种武器，
+  20Hz 服务端权威联机（Socket.IO + Three.js）。详见 `games/corcodragon-fight/README.md`。
 
 - 游戏规则规格：`出包魔法师桌游基本规则.md`
 
@@ -12,6 +15,7 @@
 |------|------|------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 开发者 / Agent | 项目架构、前后端职责、数据流、文件与接口说明 |
 | [CHANGELOG.md](CHANGELOG.md) | 所有人 | 版本更新日志（v1 ~ 最新） |
+| [docs/REALTIME.md](docs/REALTIME.md) | 开发者 / Agent | 实时 FPS 通道设计（tick/快照协议/断线语义/演进路线） |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端详细部署（系统要求/依赖/命令/测试/发布包） |
 
 ## 🎮 客户端形态（重要）
@@ -62,6 +66,12 @@ node apps/server/scripts/smoke.mjs http://127.0.0.1:8787
 node scripts/e2e-twowindow.mjs
 # 多分辨率布局 QA（4 视口）
 node scripts/qa-layout.mjs
+
+# —— 《鳄龙咆哮》realtime 专属 ——
+node apps/server/scripts/smoke-realtime.mjs        # realtime 端到端冒烟（需服务端）
+node scripts/smoke-corcodragon-fight.mjs           # 3D 本地冒烟 + 截图（需前端）
+node scripts/e2e-twowindow-corcodragon.mjs         # 双窗口联机回归 + 截图（需前端+服务端）
+node scripts/qa-layout-corcodragon-fight.mjs       # 桌面/平板/手机三档布局 QA（需前端）
 # 界面截图（存 docs/screenshots/ 与 tools/vision-results/shots/）
 node scripts/shots.mjs && node scripts/shots-5p.mjs
 ```

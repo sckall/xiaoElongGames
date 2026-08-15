@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
-import CorcodragonFightOnlineScreen from './CorcodragonFightOnlineScreen';
 import HallScreen from './HallScreen';
 import GameDetailScreen from './GameDetailScreen';
 import { DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
@@ -9,11 +8,28 @@ import {
   CorcodragonDetailScreen,
   CorcodragonLocalScreen,
 } from '@tm/game-corcodragon-fire/GameUI';
-import {
-  CorcodragonFightDetailScreen,
-  CorcodragonFightLocalScreen,
-  type FightConfig,
-} from '@tm/game-corcodragon-fight/GameUI';
+import type { FightConfig } from '@tm/game-corcodragon-fight/GameUI';
+
+// 鳄龙咆哮含 Three.js（约 600KB），按需分包加载，避免拖慢大厅首屏
+const CorcodragonFightDetailScreen = lazy(() =>
+  import('@tm/game-corcodragon-fight/GameUI').then((m) => ({
+    default: m.CorcodragonFightDetailScreen,
+  })),
+);
+const CorcodragonFightLocalScreen = lazy(() =>
+  import('@tm/game-corcodragon-fight/GameUI').then((m) => ({
+    default: m.CorcodragonFightLocalScreen,
+  })),
+);
+const CorcodragonFightOnlineScreen = lazy(() => import('./CorcodragonFightOnlineScreen'));
+
+const Loading = () => (
+  <div className="page">
+    <div className="panel">
+      <p className="tagline">🐊 正在加载 3D 引擎……</p>
+    </div>
+  </div>
+);
 
 function loadSettings(): GameSettings {
   try {
@@ -72,22 +88,24 @@ export default function App() {
   if (screen === 'game') {
     if (selectedGameId === 'corcodragon-fight') {
       return (
-        <CorcodragonFightDetailScreen
-          playerCount={playerCount}
-          onPlayerCountChange={setPlayerCount}
-          onPlayLocal={(config) => {
-            setFightConfig(config);
-            setSessionKey((k) => k + 1);
-            setScreen('local');
-          }}
-          onPlayOnline={(config) => {
-            setFightConfig(config);
-            setSessionKey((k) => k + 1);
-            setScreen('online');
-          }}
-          onlineReady={true}
-          onBack={() => setScreen('hall')}
-        />
+        <Suspense fallback={<Loading />}>
+          <CorcodragonFightDetailScreen
+            playerCount={playerCount}
+            onPlayerCountChange={setPlayerCount}
+            onPlayLocal={(config) => {
+              setFightConfig(config);
+              setSessionKey((k) => k + 1);
+              setScreen('local');
+            }}
+            onPlayOnline={(config) => {
+              setFightConfig(config);
+              setSessionKey((k) => k + 1);
+              setScreen('online');
+            }}
+            onlineReady={true}
+            onBack={() => setScreen('hall')}
+          />
+        </Suspense>
       );
     }
     if (selectedGameId === 'corcodragon-fire') {
@@ -129,13 +147,15 @@ export default function App() {
   if (screen === 'local') {
     if (selectedGameId === 'corcodragon-fight') {
       return (
-        <CorcodragonFightLocalScreen
-          key={sessionKey}
-          playerCount={playerCount}
-          myName={myName}
-          config={fightConfig}
-          onExit={() => setScreen('game')}
-        />
+        <Suspense fallback={<Loading />}>
+          <CorcodragonFightLocalScreen
+            key={sessionKey}
+            playerCount={playerCount}
+            myName={myName}
+            config={fightConfig}
+            onExit={() => setScreen('game')}
+          />
+        </Suspense>
       );
     }
     if (selectedGameId === 'corcodragon-fire') {
@@ -169,14 +189,16 @@ export default function App() {
   if (screen === 'online') {
     if (selectedGameId === 'corcodragon-fight') {
       return (
-        <CorcodragonFightOnlineScreen
-          key={sessionKey}
-          settings={settings}
-          defaultName={myName}
-          config={fightConfig}
-          onExit={() => setScreen('game')}
-          onServerUrlChange={(url) => updateSettings({ serverUrl: url.trim() })}
-        />
+        <Suspense fallback={<Loading />}>
+          <CorcodragonFightOnlineScreen
+            key={sessionKey}
+            settings={settings}
+            defaultName={myName}
+            config={fightConfig}
+            onExit={() => setScreen('game')}
+            onServerUrlChange={(url) => updateSettings({ serverUrl: url.trim() })}
+          />
+        </Suspense>
       );
     }
     return (

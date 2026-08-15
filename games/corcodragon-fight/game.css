@@ -332,6 +332,24 @@
 .ccf-damage-vignette.on {
   opacity: 1;
 }
+.ccf-exit {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 7;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 16, 28, 0.66);
+  color: #e8f0ff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ccf-exit:hover {
+  background: rgba(30, 42, 62, 0.9);
+}
+
 .ccf-hint {
   position: absolute;
   left: 50%;

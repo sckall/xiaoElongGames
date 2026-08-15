@@ -4,6 +4,16 @@
 
 ## 未发布（0.2.x 工作区）
 
+- 🐊 **新游戏《鳄龙咆哮》（corcodragon-fight）**：2-7 人 3D 实时英雄射击（自由混战/团队死斗）
+  - 服务端权威 20Hz tick：移动/重力/碰撞/弹道/爆头/技能/效果/重生/胜负全在引擎结算；
+    `applyInput` 全动作白名单 + 数值域校验，非法输入安全拒绝
+  - 5 位英雄 × 4 种武器，断线转 AI 接管、重连恢复；bot AI 只用玩家视角快照
+  - 平台新增 realtime 通道：`rtInput`/`rtSnapshot`、RealtimeRoom 与旧 Room 平行，
+    旧回合制大厅/房间/连接代码不受影响；Three.js 按需分包加载
+  - 文档：`docs/REALTIME.md`（实时通道设计）与 `games/corcodragon-fight/README.md`
+    （新框架引入说明）；截图留档 `docs/screenshots/corcodragon-fight/`
+  - 测试：30 个引擎单测、realtime 端到端冒烟、双窗口联机回归、三档布局 QA 全部通过
+- 🐛 修复出包魔法师模糊测试 Math.random 偶发超时（改为可复现种子）
 - 大厅品牌化：「小鳄龙之家-游戏大厅」，游戏偏好移入出包魔法师详情页
 - 开发者文档体系：ARCHITECTURE / AGENTS / CHANGELOG / README 索引 / DEPLOY 扩充
 - 发布打包脚本 `scripts/pack-release.mjs`（4.4MB 单包，含服务端+前端静态产物）

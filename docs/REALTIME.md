@@ -1,4 +1,4 @@
-# 平台 Realtime（FPS/动作类）通道设计
+# 平台 Realtime（FPS/动作类）通道设计与实施记录
 
 > 依据 `ARCHITECTURE.md` 的 realtime 接入路线，为《鳄龙咆哮》（games/corcodragon-fight）
 > 落地的实时联机方案说明。本文是平台改造的“唯一决策文档”。
@@ -55,3 +55,15 @@
    状态补丁/插值/重连；切换点集中在 `apps/server/src/realtime-room.ts`，
    `RealtimeGameEngine` 契约不变。
 4. 不采用 WebRTC P2P（作弊面大、主机掉线迁移复杂，见 ARCHITECTURE.md）。
+
+## 7. 实施状态（2026-08-15 已落地）
+
+- [x] 契约：`games/types.ts` `RealtimeGameEngine` + `createRealtimeEngine`
+- [x] 协议：`rtInput` / `rtSnapshot` / `createRoom.gameId+config`（旧事件全保留）
+- [x] 服务端：`apps/server/src/realtime-room.ts`（50ms tick、视角快照、断线 AI 接管/重连）
+- [x] 引擎：移动/碰撞/弹道/爆头/技能/效果/重生/胜负，全动作白名单校验（30 单测）
+- [x] 客户端：Three.js 第一人称（本地 60fps tick / 联机软校正），HUD/选英雄/计分板
+- [x] 验证：`apps/server/scripts/smoke-realtime.mjs`、`scripts/e2e-twowindow-corcodragon.mjs`、
+  `scripts/qa-layout-corcodragon-fight.mjs`、截图留档 `docs/screenshots/corcodragon-fight/`
+- [ ] 待演进：差量快照（公网高并发）、TDM 房内英雄锁定细化、Colyseus 正式期评估
+- [ ] 已知限制：全量快照 2-7 人局域网足够；断线当前语义为 AI 接管（非站桩/移除）

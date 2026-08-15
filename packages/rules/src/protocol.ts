@@ -68,6 +68,8 @@ export interface LobbyInfo {
   hasPassword: boolean;
   /** 游戏 id（realtime 房间必填；旧回合制房间可省略，默认 trouble-magician） */
   gameId?: string;
+  /** 游戏自定对局配置（realtime 房间回显给大厅/对局 UI） */
+  config?: Record<string, unknown>;
 }
 
 export type Ack<T> = (res: T) => void;

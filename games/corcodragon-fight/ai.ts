@@ -27,7 +27,7 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
 
   if (view.phase === 'heroSelect') {
     if (!me.hero) {
-      const hero = HERO_IDS[Math.floor(rng() * HERO_IDS.length)] as HeroId;
+      const hero = HERO_IDS[Math.min(HERO_IDS.length - 1, Math.floor(rng() * HERO_IDS.length))] as HeroId;
       return [{ type: 'selectHero', hero }];
     }
     return [];
