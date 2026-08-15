@@ -332,6 +332,18 @@
 .ccf-damage-vignette.on {
   opacity: 1;
 }
+.ccf-tuning-host {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 310px;
+  max-height: calc(100vh - 70px);
+  overflow: auto;
+  z-index: 30;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
 .ccf-exit {
   position: absolute;
   left: 14px;

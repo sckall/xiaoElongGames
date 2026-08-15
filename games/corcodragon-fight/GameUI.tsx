@@ -11,11 +11,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { chooseAIInputs } from './ai';
 import { CorcodragonFightEngine } from './engine';
-import { BALANCE } from './balance';
+import { BALANCE, balanceToJson, resetBalance } from './balance';
 import {
   ARENA_HALF,
   EYE_Y,
   HERO_DEFS,
+  HERO_IDS,
   HERO_LIST,
   WEAPON_DEFS,
   WEAPON_IDS,
@@ -94,6 +95,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   driverRef.current = driver;
   const snapRef = useRef<Snapshot | null>(null);
   snapRef.current = driver.snapshot;
+
+  const [tuningEnabled] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('debug'),
+  );
 
   const [locked, setLocked] = useState(false);
   const [showScore, setShowScore] = useState(false);
@@ -652,6 +659,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         </button>
       )}
       {driver.error && <div className="ccf-hint" style={{ top: 10 }}>⚠️ {driver.error}</div>}
+      {tuningEnabled && !driver.online && <TuningPanel enabled />}
     </div>
   );
 }
@@ -757,6 +765,116 @@ function disposeObject(obj: THREE.Object3D): void {
     if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
     else if (mat) mat.dispose();
   });
+}
+
+// ---------------- 手感调试面板（?debug=1，仅本地 vs AI） ----------------
+
+function TuningPanel({ enabled }: { enabled: boolean }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let disposed = false;
+
+    const build = (container: HTMLElement): Promise<{ dispose: () => void }> => {
+      return import('tweakpane').then(({ Pane }) => {
+        // tweakpane v4 的声明文件引用了未随包发布的 @tweakpane/core 类型，
+        // 这里用结构化类型包装，避免 skipLibCheck 下的错误推导。
+        type TPane = {
+          addFolder: (params: { title: string }) => TPane;
+          addBinding: (obj: object, key: string, opt?: Record<string, unknown>) => unknown;
+          addButton: (params: { title: string }) => { on: (event: 'click', cb: () => void) => unknown };
+          dispose: () => void;
+        };
+        const pane = new Pane({ container, title: '🐊 手感调参（本地）' }) as unknown as TPane;
+        const bind = (
+          folder: TPane,
+          obj: object,
+          key: string,
+          opt: Record<string, unknown>,
+        ) => {
+          folder.addBinding(obj, key, opt);
+        };
+
+        const mov = pane.addFolder({ title: '移动' });
+        bind(mov, BALANCE.movement, 'gravity', { min: 0, max: 100, step: 0.5, label: '重力' });
+        bind(mov, BALANCE.movement, 'jumpVelocity', { min: 0, max: 30, step: 0.2, label: '跳跃初速' });
+        bind(mov, BALANCE.movement, 'adsSpeedMult', { min: 0, max: 1, step: 0.05, label: '开镜移速倍率' });
+
+        const heroFolder = pane.addFolder({ title: '英雄' });
+        for (const id of HERO_IDS) {
+          const h = BALANCE.heroes[id];
+          const f = heroFolder.addFolder({ title: `${h.emoji} ${h.name}` });
+          bind(f, h, 'hp', { min: 50, max: 500, step: 5, label: '生命' });
+          bind(f, h, 'speed', { min: 1, max: 15, step: 0.1, label: '移速' });
+          bind(f, h, 'skillCd', { min: 0, max: 60, step: 0.5, label: '技能CD(秒)' });
+        }
+
+        const wpn = pane.addFolder({ title: '武器' });
+        for (const id of WEAPON_IDS) {
+          const w = BALANCE.weapons[id];
+          const f = wpn.addFolder({ title: `${w.emoji} ${w.name}` });
+          bind(f, w, 'damage', { min: 0, max: 300, step: 1, label: '伤害' });
+          bind(f, w, 'interval', { min: 20, max: 3000, step: 10, label: '射击间隔(ms)' });
+          bind(f, w, 'spread', { min: 0, max: 0.2, step: 0.001, label: '腰射散布' });
+          bind(f, w, 'adsSpread', { min: 0, max: 0.05, step: 0.0005, label: '开镜散布' });
+          bind(f, w, 'headshot', { min: 0.5, max: 5, step: 0.1, label: '爆头倍率' });
+          bind(f, w, 'reloadMs', { min: 0, max: 5000, step: 50, label: '换弹(ms)' });
+        }
+
+        const skill = pane.addFolder({ title: '技能与终极技' });
+        bind(skill, BALANCE.heroes.yanren.ability, 'dashDistance', { min: 1, max: 30, step: 0.5, label: '炎刃冲刺距离' });
+        bind(skill, BALANCE.heroes.yanren.ability, 'trailDps', { min: 0, max: 100, step: 1, label: '火焰路径DPS' });
+        bind(skill, BALANCE.heroes.yingxiao.ability, 'stealthDuration', { min: 0.5, max: 15, step: 0.5, label: '影枭隐身(秒)' });
+        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldValue', { min: 0, max: 300, step: 5, label: '铁壁护盾值' });
+        bind(skill, BALANCE.heroes.lingyin.ability, 'selfHeal', { min: 0, max: 300, step: 5, label: '灵音自疗' });
+        bind(skill, BALANCE.heroes.guilei.ability, 'bombDamage', { min: 0, max: 200, step: 1, label: '诡雷炸弹伤害' });
+        bind(skill, BALANCE.heroes.guilei.ability, 'stormDps', { min: 0, max: 100, step: 1, label: '雷暴DPS' });
+
+        const combat = pane.addFolder({ title: '战斗' });
+        bind(combat, BALANCE.combat, 'respawnMs', { min: 0, max: 10000, step: 100, label: '重生(ms)' });
+        bind(combat, BALANCE.combat, 'ultPerSecond', { min: 0, max: 20, step: 0.5, label: '终极充能/秒' });
+        bind(combat, BALANCE.combat, 'ultPerKill', { min: 0, max: 100, step: 1, label: '击杀充能' });
+        bind(combat, BALANCE.combat, 'explosionFalloff', { min: 0, max: 1, step: 0.05, label: '爆炸距离衰减' });
+
+        const client = pane.addFolder({ title: '客户端手感' });
+        bind(client, BALANCE.client, 'mouseSensitivity', { min: 0.0005, max: 0.02, step: 0.0002, label: '鼠标灵敏度' });
+        bind(client, BALANCE.client, 'correctionRate', { min: 0, max: 60, step: 0.5, label: '服务端校正速率' });
+        bind(client, BALANCE.client, 'interpolationRate', { min: 0, max: 60, step: 0.5, label: '他人插值速率' });
+
+        pane.addButton({ title: '⬇️ 导出 gameplay.tuned.json' }).on('click', () => {
+          const blob = new Blob([balanceToJson()], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'gameplay.tuned.json';
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        });
+        pane.addButton({ title: '♻️ 恢复出厂配置' }).on('click', () => {
+          resetBalance();
+          pane.dispose();
+          void build(container);
+        });
+        return pane;
+      });
+    };
+
+    const host = hostRef.current;
+    if (!host) return;
+    let pane: { dispose: () => void } | null = null;
+    void build(host).then((p) => {
+      if (disposed) p.dispose();
+      else pane = p;
+    });
+    return () => {
+      disposed = true;
+      pane?.dispose();
+    };
+  }, [enabled]);
+
+  if (!enabled) return null;
+  return <div className="ccf-tuning-host" ref={hostRef} />;
 }
 
 // ---------------- HUD / 计分板 / 英雄选择 ----------------
