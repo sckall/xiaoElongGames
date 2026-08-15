@@ -25,6 +25,15 @@
   - 联机同步调试：输入 `seq` + 快照 `lastInputSeq` 回执、`rtPing` 延迟探测、
     预测漂移统计与 `softCorrectionThreshold` 硬回滚软校正
   - 调试文档：`docs/GAMEPLAY-TUNING.md`；面板冒烟 `scripts/smoke-tuning.mjs`
+- 🛠️ 《鳄龙咆哮》联机体验修正与下一阶段：
+  - TDM AI 只以敌方为目标；队友绿名◈+绿环、敌人红名+红环（FFA 无环）；
+    `killLog` 完整击杀流水
+  - 按住方向键转动视角时，move 向量实时按新视角重算（不再锁定按键瞬间方向）
+  - 木箱 GLB 按碰撞盒逐轴拉伸，视觉=物理；`?debug=1` 可显示并调参玩家胶囊/掩体 AABB
+  - 匕首改挥砍动画+弧光+火花，不再套用子弹 tracer/枪口火光
+  - 音效/特效偏好分离：`tm-fight-settings` 独立于出包魔法师
+  - 弹道 tracer 起点改为枪口世界坐标；新增 docs/COMBAT.md（hitscan/延迟补偿路线）
+  - Kenney `blaster-a/e/h.glb` 接入步枪/狙击/手枪第一人称枪模（vision 复核通过）
 - 🎨 《鳄龙咆哮》手感/表现打磨：
   - 修复移动方向契约（move 为世界系，客户端视角换算唯一出口）与开镜真实生效
     （FOV 平滑过渡、狙击镜内视野、开镜移速降低）

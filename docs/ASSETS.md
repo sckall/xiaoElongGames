@@ -9,8 +9,9 @@
 | 素材 | 来源 | 许可证 | 用途 | 位置 |
 |------|------|--------|------|------|
 | `crate-small/medium/wide.glb` + `Textures/colormap.png` | [Kenney · Blaster Kit 2.1](https://kenney.nl/assets/blaster-kit)（直链 zip 已归档 `tools/assets-archive/`，1.6MB） | **CC0**（公有领域，可商用，署名非必须） | 竞技场掩体木箱替换占位盒 | `games/corcodragon-fight/assets/models/` |
+| `blaster-a.glb`（步枪）/ `blaster-e.glb`（狙击）/ `blaster-h.glb`（手枪） | 同上 | **CC0** | 第一人称枪模（GLTFLoader 加载，失败回退程序化枪模） | `games/corcodragon-fight/assets/models/` |
 | 程序化音效（射击/命中/爆头/击杀/换弹/技能/终极技/跳跃/治疗/重生） | 自研 WebAudio（`fx.ts`） | 自有 | 全部音效 | `games/corcodragon-fight/fx.ts` |
-| 程序化枪模（步枪/狙击/手枪/匕首多部件） | 自研 Three.js 几何体 | 自有 | 第一人称武器 | `GameUI.tsx` |
+| 程序化匕首模型 + 挥砍动画 | 自研 Three.js 几何体 | 自有 | 近战武器 | `GameUI.tsx` |
 
 > 下载前已核对包内 `License.txt`：CC0 1.0，允许个人/教育/商业使用。
 > 完整包（含 18 支 blaster 枪模 FBX/GLB、弹药、手雷等）保存在
@@ -50,13 +51,12 @@
 
 ## 3. 下一步接入计划（建议顺序）
 
-1. **枪模替换**：从 Blaster Kit 选 `blaster-a/d/e/f.glb` 对应步枪/手枪/狙击，
-   用 GLTFLoader 加载；先在 `?debug=1` 下加一个“模型方向预览”辅助线，确认枪口朝向与缩放
-   后再替换程序化枪模（避免方向错乱上线）。
+1. ~~枪模替换~~ ✅ 已完成：`blaster-a/e/h.glb` 已接入步枪/狙击/手枪
+   （vision 复核“枪管朝前、正常握持、无错位/遮挡”），匕首保留程序化挥砍刀；
 2. **实录音效替换**：从 Freesound/OpenGameArt 下载 CC0 音效（每类选 2-3 个候选），
-   按 `fx.ts` 的接口替换为 `AudioBuffer` 播放；保留程序化音效作为 fallback。
-3. **脚步/环境音**：给英雄速度加脚步声节拍，场景加风/环境底噪（音量可调）。
-4. **地图皮肤**：用 Kenney 科幻/自然包替换地板与围墙贴图，做 1-2 套主题（白天/夜间）。
+   按 `fx.ts` 的接口替换为 `AudioBuffer` 播放；保留程序化音效作为 fallback；
+3. **脚步/环境音**：给英雄速度加脚步声节拍，场景加风/环境底噪（音量可调）；
+4. **地图皮肤**：用 Kenney 科幻/自然包替换地板与围墙贴图，做 1-2 套主题（白天/夜间）；
 5. **角色模型**：评估 Quaternius/Poly Pizza 的机器人或低模角色，替换胶囊角色
    （保持碰撞盒不变，只换视觉层）。
 

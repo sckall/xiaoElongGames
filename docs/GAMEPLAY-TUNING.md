@@ -33,11 +33,11 @@ open 'http://127.0.0.1:5173/?debug=1'
 | 分组 | 关键字段 | 单位/说明 | 热更新 |
 |------|----------|-----------|--------|
 | `tick` | `stepMs` / `maxAccumulatedMs` / `botThinkMs` / `effectChunkMs` | 服务端步长/追帧上限/bot 决策周期/持续伤害结算粒度（毫秒） | ✅ |
-| `arena` | `half` / `wallHeight` / `playerRadius` / `eyeY` / `chestY` / `capsuleTopY` / `headshotMinY` / `pitchClamp` | 场地与命中盒（米） | ⚠️ 部分生效（掩体/渲染为模块加载快照，建议改后刷新页面） |
+| `arena` | `half` / `wallHeight` / `playerRadius` / `eyeY` / `chestY` / `capsuleTopY` / `headshotMinY` / `pitchClamp` | 场地与命中盒（米）；`?debug=1` 面板可实时调并勾选显示玩家胶囊+掩体 AABB | ⚠️ 部分生效（掩体/渲染为模块加载快照，建议改后刷新页面） |
 | `movement` | `gravity` / `jumpVelocity` / `adsSpeedMult` | 重力(m/s²)/跳跃初速/开镜移速倍率 | ✅ |
 | `combat` | `ultChargeMax` / `ultPerDamage` / `ultPerKill` / `ultPerSecond` / `respawnMs` / `explosionFalloff` / 默认局参数 | 充能与重生 | ✅ |
 | `heroes.*` | `hp` / `speed` / `skillCd` / `ability.*` | 英雄基础 + 各技能参数（如 `dashDistance`、`shieldValue`、`markDamage`） | ✅ |
-| `weapons.*` | `damage` / `interval` / `spread` / `adsSpread` / `headshot` / `reloadMs` / `falloffStart/End` / `minDmgMult` / `range` | 武器手感 | ✅ |
+| `weapons.*` | `damage` / `interval` / `spread` / `adsSpread` / `adsFov` / `recoil` / `headshot` / `reloadMs` / `falloffStart/End` / `minDmgMult` / `range` | 武器手感（开镜 FOV 与后坐上跳可实时调） | ✅ |
 | `ai` | `preferredRange` / `meleeRange` / `aimTolerance` / `meleeAimTolerance` | bot 战斗风格 | ✅ |
 | `client` | `mouseSensitivity` / `interpolationRate` / `correctionRate` / `softCorrectionThreshold` / `maxDeltaMs` | 灵敏度、他人插值、服务端校正、预测回滚阈值 | ✅ |
 

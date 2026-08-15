@@ -53,6 +53,53 @@ function heroColor(hero: HeroId | null, team: string): number {
   return team === 'B' ? TEAM_COLORS.B : TEAM_COLORS.A;
 }
 
+/** Kenney Blaster Kit（CC0）第一人称枪模：GLB 文件名 + 枪口本地坐标 */
+const GUN_GLB: Partial<Record<WeaponId, { file: string; muzzle: THREE.Vector3 }>> = {
+  rifle: { file: 'blaster-a.glb', muzzle: new THREE.Vector3(0.22, -0.14, -1.0) },
+  sniper: { file: 'blaster-e.glb', muzzle: new THREE.Vector3(0.22, -0.14, -1.32) },
+  pistol: { file: 'blaster-h.glb', muzzle: new THREE.Vector3(0.22, -0.14, -0.66) },
+  dagger: { file: '', muzzle: new THREE.Vector3(0.22, -0.14, -0.6) },
+};
+
+function loadWeaponGltf(group: THREE.Group, weapon: WeaponId, muzzle: THREE.Mesh): void {
+  const spec = GUN_GLB[weapon];
+  if (!spec?.file) return;
+  const url = new URL(`./assets/models/${spec.file}`, import.meta.url).href;
+  const targetLen = weapon === 'sniper' ? 0.95 : weapon === 'rifle' ? 0.72 : 0.45;
+  new GLTFLoader().load(
+    url,
+    (gltf) => {
+      const model = gltf.scene;
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      bounds.getSize(size);
+      const s = targetLen / Math.max(size.z, size.x, 0.01);
+      model.scale.setScalar(s);
+      const center = new THREE.Vector3();
+      bounds.getCenter(center);
+      // 模型长轴沿 +z，相机朝 -z：枪口自然指向屏幕深处
+      model.position.set(0.22 - center.x * s, -0.22 - bounds.min.y * s, -0.55 - center.z * s);
+      model.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) m.castShadow = false;
+      });
+      for (const child of [...group.children]) {
+        if (child === muzzle) continue;
+        group.remove(child);
+        disposeObject(child);
+      }
+      group.add(model);
+      muzzle.position.copy(spec.muzzle);
+      group.userData.gltfReady = true;
+      group.userData.muzzlePos = spec.muzzle;
+    },
+    undefined,
+    () => {
+      // 加载失败：保留程序化枪模
+    },
+  );
+}
+
 interface PlayerRender {
   group: THREE.Group;
   label: THREE.Sprite;
@@ -748,7 +795,9 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         let start: THREE.Vector3;
         if (ev.shooterId === driver.myId) {
           // 弹道从枪口出发（成熟 FPS 的 tracer 视觉），命中点仍是服务端射线结果
-          const muzzleLocal = new THREE.Vector3(0.22, -0.14, -1.15);
+          const muzzleLocal =
+            (gunRef.current?.userData.muzzlePos as THREE.Vector3 | undefined) ??
+            new THREE.Vector3(0.22, -0.14, -1.0);
           start = gunRef.current
             ? gunRef.current.localToWorld(muzzleLocal.clone())
             : new THREE.Vector3(localPosRef.current.x, localPosRef.current.y + EYE_Y, localPosRef.current.z);
@@ -1191,6 +1240,14 @@ function makeGun(weapon: WeaponId): THREE.Group {
   }
   g.add(muzzle);
   g.userData.muzzle = muzzle;
+  if (GUN_GLB[weapon]) {
+    muzzle.position.copy(GUN_GLB[weapon]!.muzzle);
+    g.userData.muzzlePos = GUN_GLB[weapon]!.muzzle.clone();
+    loadWeaponGltf(g, weapon, muzzle);
+  } else {
+    muzzle.position.copy(GUN_GLB.dagger!.muzzle);
+    g.userData.muzzlePos = GUN_GLB.dagger!.muzzle.clone();
+  }
   return g;
 }
 
