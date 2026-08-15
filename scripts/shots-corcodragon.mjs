@@ -1,5 +1,5 @@
 /**
- * 《鳄龙咆哮》截图脚本：捕获大厅/详情/英雄选择/对局界面，存至 docs/screenshots/corcodragon-fire/。
+ * 《鳄龙战场》截图脚本：捕获大厅/详情/英雄选择/对局界面，存至 docs/screenshots/corcodragon-fire/。
  * 用法：先启动服务端(8787，可选)与前端(5173)，再 `node scripts/shots-corcodragon.mjs`
  */
 import { chromium } from 'playwright';
@@ -21,7 +21,7 @@ try {
   await page.waitForSelector('.setup-panel');
   await sleep(300);
 
-  // 大厅：确认鳄龙咆哮卡片出现
+  // 大厅：确认鳄龙战场卡片出现
   await page.click('button.primary-btn.big');
   await page.waitForSelector('.hall-page');
   await sleep(400);
@@ -29,7 +29,7 @@ try {
   console.log('✅ hall');
 
   // 详情页
-  const card = page.locator('.hall-card').filter({ hasText: '鳄龙咆哮' });
+  const card = page.locator('.hall-card').filter({ hasText: '鳄龙战场' });
   await card.click();
   await page.waitForSelector('.cdf-detail-panel');
   await sleep(400);

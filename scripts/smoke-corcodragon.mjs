@@ -1,5 +1,5 @@
 /**
- * 《鳄龙咆哮》本地对局 UI 冒烟：选英雄后自动结束回合，等待 AI 打完一局并截图结算。
+ * 《鳄龙战场》本地对局 UI 冒烟：选英雄后自动结束回合，等待 AI 打完一局并截图结算。
  * 用法：先启动前端(5173)，`node scripts/smoke-corcodragon.mjs`
  */
 import { chromium } from 'playwright';
@@ -19,7 +19,7 @@ try {
   await page.waitForSelector('.setup-panel');
   await page.click('button.primary-btn.big');
   await page.waitForSelector('.hall-page');
-  await page.locator('.hall-card').filter({ hasText: '鳄龙咆哮' }).click();
+  await page.locator('.hall-card').filter({ hasText: '鳄龙战场' }).click();
   await page.waitForSelector('.cdf-detail-panel');
   await page.click('button:has-text("开始（本地 vs AI）")');
   await page.waitForSelector('.cdf-hero-panel');

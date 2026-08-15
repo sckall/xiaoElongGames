@@ -56,7 +56,7 @@ function HeroSelect({
   return (
     <div className="cdf-page">
       <div className="cdf-panel cdf-hero-panel">
-        <h1>🐊 鳄龙咆哮</h1>
+        <h1>🐊 鳄龙战场</h1>
         <p className="cdf-tagline">选择你的英雄，进入竞技场</p>
         <div className="cdf-hero-grid">
           {HERO_LIST.map((h) => {
@@ -319,7 +319,7 @@ export function CorcodragonLocalScreen({
     <div className={`cdf-page ${showLog ? '' : 'no-log'}`}>
       <style>{CDF_CSS}</style>
       <header className="cdf-topbar">
-        <div className="cdf-title">🐊 鳄龙咆哮</div>
+        <div className="cdf-title">🐊 鳄龙战场</div>
         <div className="cdf-chips">
           <span className="cdf-chip">回合 {view.turnNo}</span>
           <span className="cdf-chip">
@@ -526,7 +526,7 @@ export function CorcodragonDetailScreen({
         <div className="cdf-detail-head">
           <span className="cdf-detail-emoji">🐊</span>
           <div>
-            <h1>鳄龙咆哮</h1>
+            <h1>鳄龙战场</h1>
             <span className="cdf-detail-meta">回合制 · 本地 vs AI｜2-7 人｜5 英雄 × 4 武器</span>
           </div>
         </div>

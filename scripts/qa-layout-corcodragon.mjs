@@ -1,5 +1,5 @@
 /**
- * 《鳄龙咆哮》布局 QA：多分辨率下检查横向溢出与关键元素可见性，并截图留档。
+ * 《鳄龙战场》布局 QA：多分辨率下检查横向溢出与关键元素可见性，并截图留档。
  * 用法：先启动前端(5173)，`node scripts/qa-layout-corcodragon.mjs`
  */
 import { chromium } from 'playwright';
@@ -37,7 +37,7 @@ try {
     );
     if (overflow > 1) fail(`大厅 ${vp.name}(${vp.w}px) 横向溢出 ${overflow}px`);
 
-    await page.locator('.hall-card').filter({ hasText: '鳄龙咆哮' }).click();
+    await page.locator('.hall-card').filter({ hasText: '鳄龙战场' }).click();
     await page.waitForSelector('.cdf-detail-panel');
     overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -68,5 +68,5 @@ try {
 }
 
 if (failed) process.exit(1);
-console.log('✅ 鳄龙咆哮布局 QA 全部通过');
+console.log('✅ 鳄龙战场布局 QA 全部通过');
 process.exit(0);

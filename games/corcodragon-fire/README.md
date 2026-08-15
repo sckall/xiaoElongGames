@@ -1,4 +1,6 @@
-# 《鳄龙咆哮》（corcodragon-fire）
+# 《鳄龙战场》（corcodragon-fire，已归档）
+
+> 当前 `available: false`，已从大厅隐藏。开发情况、偏差说明与重启清单见 [ARCHIVE.md](./ARCHIVE.md)。
 
 2-7 人回合制英雄战术射击，作为 `games/<id>/` 游戏包接入小鳄龙之家大厅。
 
