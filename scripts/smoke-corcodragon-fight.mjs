@@ -30,6 +30,11 @@ try {
   await page.locator('.hall-card').filter({ hasText: '鳄龙咆哮' }).click();
   await page.waitForSelector('.ccf-detail-panel');
   const aiStyle = process.env.TM_AI_STYLE === 'movement' ? 'movement' : 'combat';
+  const mode = process.env.TM_MODE === 'tdm' ? 'tdm' : 'ffa';
+  if (mode === 'tdm') {
+    await page.locator('.ccf-mode-btn').filter({ hasText: '团队死斗' }).click();
+    await sleep(200);
+  }
   if (aiStyle === 'movement') {
     await page.locator('.bot-select').last().selectOption('movement');
     await sleep(200);

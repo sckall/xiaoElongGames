@@ -57,6 +57,7 @@ interface PlayerRender {
   group: THREE.Group;
   label: THREE.Sprite;
   shield: THREE.Mesh;
+  ring?: THREE.Mesh;
   target: THREE.Vector3;
   yaw: number;
   alive: boolean;
@@ -81,8 +82,10 @@ export interface FpsDriver {
   onRestart?: () => void;
   /** 联机统计（联机 hook 提供；本地驱动省略） */
   stats?: { pingMs: number; pendingInputs: number };
-  /** 是否开启音效（大厅偏好） */
+  /** 是否开启音效（鳄龙咆哮专属偏好） */
   sound?: boolean;
+  /** 是否开启打击特效（火光/弹道/火花等） */
+  fx?: boolean;
 }
 
 export interface FightConfig {
@@ -90,6 +93,12 @@ export interface FightConfig {
   scoreLimit: number;
   /** bot 行为：combat=实战 AI；movement=移动测试 AI（只走位不攻击） */
   aiStyle: AIStyle;
+}
+
+/** 鳄龙咆哮专属偏好（与出包魔法师 tm-settings 分离存储） */
+export interface FightPrefs {
+  sound: boolean;
+  fx: boolean;
 }
 
 // ---------------- 3D 视图 + HUD ----------------
@@ -112,6 +121,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const [showScore, setShowScore] = useState(false);
   const [hitAt, setHitAt] = useState(0);
   const [driftM, setDriftM] = useState(0);
+  const [showColliders, setShowColliders] = useState(false);
   const [killFeed, setKillFeed] = useState<string[]>([]);
 
   // 视图/输入状态（本帧立即生效，再同步给引擎）
@@ -135,9 +145,14 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const sfxRef = useRef<SfxPlayer | null>(null);
   const muzzleLightRef = useRef<THREE.PointLight | null>(null);
   const gunRecoilRef = useRef(0);
+  const meleeSwingRef = useRef(-1);
+  const slashRefs = useRef<{ mesh: THREE.Mesh; born: number }[]>([]);
   const prevReloadingRef = useRef(false);
   const sparksRef = useRef<{ mesh: THREE.Mesh; vel: THREE.Vector3; born: number; life: number }[]>([]);
   const dustRef = useRef<THREE.Points | null>(null);
+  const colliderGroupRef = useRef<THREE.Group | null>(null);
+  const playerCollidersRef = useRef(new Map<string, THREE.Mesh>());
+  const colliderShapeRef = useRef('');
   const [killFlash, setKillFlash] = useState<{ text: string; at: number } | null>(null);
 
   const getSfx = useCallback(() => {
@@ -248,15 +263,20 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           const bounds = new THREE.Box3().setFromObject(model);
           const size = new THREE.Vector3();
           bounds.getSize(size);
-          const targetW = w * 0.92;
-          const targetD = d * 0.92;
+          // 按碰撞盒实际尺寸逐轴拉伸，模型外沿与物理盒一致（视觉=碰撞）
+          const targetW = w * 0.98;
+          const targetH = b.height * 0.98;
+          const targetD = d * 0.98;
           const sx = size.x > 0.01 ? targetW / size.x : 1;
+          const sy = size.y > 0.01 ? targetH / size.y : 1;
           const sz = size.z > 0.01 ? targetD / size.z : 1;
-          const s = Math.min(sx, sz);
-          model.scale.setScalar(s);
-          const center = new THREE.Vector3();
-          bounds.getCenter(center);
-          model.position.set(cx - center.x * s, b.height / 2 - bounds.min.y * s, cz - center.z * s);
+          model.scale.set(sx, sy, sz);
+          // 底部贴地、中心对准碰撞盒中心
+          model.position.set(
+            cx - (bounds.min.x + size.x / 2) * sx,
+            -bounds.min.y * sy,
+            cz - (bounds.min.z + size.z / 2) * sz,
+          );
           model.traverse((o) => {
             const m = o as THREE.Mesh;
             if (m.isMesh) {
@@ -446,20 +466,43 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       tracerRef.current = tracerRef.current.filter((t) => now - t.born < 120);
 
       // 枪口火光与点光源
+      const fxOn = driverRef.current.fx !== false;
       if (muzzleRef.current) {
-        muzzleRef.current.visible = now - muzzleBornRef.current < 70;
+        muzzleRef.current.visible = fxOn && now - muzzleBornRef.current < 70;
       }
       if (muzzleLightRef.current) {
-        muzzleLightRef.current.intensity = now - muzzleBornRef.current < 70 ? 4 : 0;
+        muzzleLightRef.current.intensity = fxOn && now - muzzleBornRef.current < 70 ? 4 : 0;
       }
 
-      // 枪模后坐与呼吸摆动
+      // 枪模后坐与呼吸摆动 / 匕首挥砍
       if (gunRef.current) {
         gunRecoilRef.current = Math.max(0, gunRecoilRef.current - dt * 4.5);
         const sway = Math.sin(now / 700) * 0.006;
         gunRef.current.position.set(0.22, -0.2 + sway, -0.55 - gunRecoilRef.current * 0.16);
         gunRef.current.rotation.x = gunRecoilRef.current * 0.55;
+        const swingAge = (now - meleeSwingRef.current) / 1000;
+        if (swingAge >= 0 && swingAge < 0.24) {
+          const t = swingAge / 0.24;
+          gunRef.current.rotation.y = Math.sin(t * Math.PI) * -1.1;
+          gunRef.current.position.x = 0.22 - Math.sin(t * Math.PI) * 0.28;
+        } else {
+          gunRef.current.rotation.y = 0;
+        }
       }
+
+      // 挥砍弧光
+      for (const sl of slashRefs.current) {
+        const age = (now - sl.born) / 1000;
+        const mat = sl.mesh.material as THREE.MeshBasicMaterial;
+        mat.opacity = Math.max(0, 0.65 * (1 - age / 0.18));
+      }
+      const expiredSlash = slashRefs.current.filter((s) => (now - s.born) / 1000 >= 0.18);
+      for (const s of expiredSlash) {
+        scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        (s.mesh.material as THREE.Material).dispose();
+      }
+      slashRefs.current = slashRefs.current.filter((s) => (now - s.born) / 1000 < 0.18);
 
       // 命中火花粒子
       for (const sp of sparksRef.current) {
@@ -477,7 +520,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
       sparksRef.current = sparksRef.current.filter((sp) => (performance.now() - sp.born) / 1000 < sp.life);
 
-      if (dustRef.current) dustRef.current.rotation.y += dt * 0.02;
+      if (dustRef.current) {
+        dustRef.current.visible = fxOn;
+        dustRef.current.rotation.y += dt * 0.02;
+      }
 
       renderer.render(scene, cam);
     };
@@ -529,6 +575,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     }
 
     // 其他玩家模型
+    const myTeam = me?.team;
     for (const p of snap.players) {
       if (p.id === driver.myId) continue;
       let pr = playerRendersRef.current.get(p.id);
@@ -574,13 +621,29 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         );
         shield.position.y = 1.0;
         group.add(shield);
-        const label = makeNameSprite(p.name, color);
+        const isAlly = snap.mode === 'tdm' && p.team === myTeam;
+        const labelColor = snap.mode === 'tdm' ? (isAlly ? 0x5cffa0 : 0xff7a6b) : color;
+        const label = makeNameSprite(`${isAlly ? '◈ ' : ''}${p.name}`, labelColor);
         group.add(label);
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.64, 0.06, 8, 24),
+          new THREE.MeshBasicMaterial({
+            color: isAlly ? 0x5cffa0 : 0xff6b5e,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+          }),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.05;
+        ring.visible = snap.mode === 'tdm';
+        group.add(ring);
         scene.add(group);
         pr = {
           group,
           label,
           shield,
+          ring,
           target: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
           yaw: p.yaw,
           alive: p.alive,
@@ -595,6 +658,11 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         pr.alive = p.alive;
         pr.visible = p.visible;
         pr.shieldVal = p.shield;
+        if (pr.ring) {
+          const isAlly = snap.mode === 'tdm' && p.team === myTeam;
+          pr.ring.visible = snap.mode === 'tdm' && p.visible && p.alive;
+          (pr.ring.material as THREE.MeshBasicMaterial).color.set(isAlly ? 0x5cffa0 : 0xff6b5e);
+        }
       }
     }
 
@@ -646,16 +714,45 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     if (me) prevReloadingRef.current = me.reloading;
 
     // 事件 → 弹道 / 攻击反馈 / 音效
+    const fxOn = driver.fx !== false;
     for (const ev of snap.events) {
       const mine = ev.shooterId === driver.myId;
       if (ev.kind === 'shot' && ev.pos && scene) {
+        // 匕首：挥砍动画 + 弧光，不产生弹道/枪口火光
+        if (mine && me?.weapon === 'dagger') {
+          meleeSwingRef.current = performance.now();
+          if (driver.sound !== false) getSfx().shoot('dagger');
+          if (fxOn) {
+            spawnSparks(ev.pos, 0xdbe7ff, 5);
+            const slash = new THREE.Mesh(
+              new THREE.PlaneGeometry(1.1, 0.34),
+              new THREE.MeshBasicMaterial({
+                color: 0xcfe2ff,
+                transparent: true,
+                opacity: 0.65,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+              }),
+            );
+            slash.position.set(ev.pos.x, Math.max(0.05, ev.pos.y), ev.pos.z);
+            if (cameraRef.current) slash.quaternion.copy(cameraRef.current.quaternion);
+            scene.add(slash);
+            slashRefs.current.push({ mesh: slash, born: performance.now() });
+          }
+          continue;
+        }
         const shooter = snap.players.find((p) => p.id === ev.shooterId);
         if (shooter && !shooter.visible && shooter.id !== driver.myId) continue;
         const from = new THREE.Vector3(ev.pos.x, ev.pos.y, ev.pos.z).clone();
         let start: THREE.Vector3;
         if (ev.shooterId === driver.myId) {
-          start = new THREE.Vector3(localPosRef.current.x, localPosRef.current.y + EYE_Y, localPosRef.current.z);
-          muzzleBornRef.current = performance.now();
+          // 弹道从枪口出发（成熟 FPS 的 tracer 视觉），命中点仍是服务端射线结果
+          const muzzleLocal = new THREE.Vector3(0.22, -0.14, -1.15);
+          start = gunRef.current
+            ? gunRef.current.localToWorld(muzzleLocal.clone())
+            : new THREE.Vector3(localPosRef.current.x, localPosRef.current.y + EYE_Y, localPosRef.current.z);
+          if (fxOn) muzzleBornRef.current = performance.now();
           if (driver.sound !== false) getSfx().shoot(me?.weapon ?? 'rifle');
           // 后坐：视角轻微上跳并同步给引擎（联机服务端同样记录）
           const wd = me ? WEAPON_DEFS[me.weapon] : WEAPON_DEFS.rifle;
@@ -674,15 +771,17 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         } else {
           continue;
         }
-        const geo = new THREE.BufferGeometry().setFromPoints([start, from]);
-        const line = new THREE.Line(
-          geo,
-          new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.85 }),
-        );
-        line.frustumCulled = false;
-        scene.add(line);
-        tracerRef.current.push({ line, born: performance.now() });
-        if (ev.shooterId === driver.myId) spawnSparks(ev.pos, 0xffd27a, 6);
+        if (fxOn) {
+          const geo = new THREE.BufferGeometry().setFromPoints([start, from]);
+          const line = new THREE.Line(
+            geo,
+            new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.85 }),
+          );
+          line.frustumCulled = false;
+          scene.add(line);
+          tracerRef.current.push({ line, born: performance.now() });
+          if (ev.shooterId === driver.myId) spawnSparks(ev.pos, 0xffd27a, 6);
+        }
       }
       if (ev.kind === 'hit') {
         if (ev.targetId === driver.myId) {
@@ -691,7 +790,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         }
         if (mine) {
           if (driver.sound !== false) getSfx().hit(ev.text === '爆头！');
-          if (ev.pos) spawnSparks(ev.pos, 0xff7050, 8);
+          if (ev.pos && fxOn) spawnSparks(ev.pos, 0xff7050, 8);
         }
       }
       if (ev.kind === 'kill' && ev.text) {
@@ -718,6 +817,89 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
     }
   }, [driver.snapshot, driver.myId, buildWorld, driver.sound, getSfx, spawnSparks]);
+
+  // ---- 调试碰撞盒 ----
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const removeGroup = () => {
+      if (colliderGroupRef.current) {
+        scene.remove(colliderGroupRef.current);
+        disposeObject(colliderGroupRef.current);
+        colliderGroupRef.current = null;
+        playerCollidersRef.current.clear();
+        colliderShapeRef.current = '';
+      }
+    };
+    if (!showColliders) {
+      removeGroup();
+      return;
+    }
+    const snap = driver.snapshot;
+    if (!snap) return;
+    const r = BALANCE.arena.playerRadius;
+    const bottom = BALANCE.arena.capsuleBottomY;
+    const top = BALANCE.arena.capsuleTopY;
+    const shapeKey = `${r}|${bottom}|${top}|${snap.arena.obstacles.length}`;
+    if (!colliderGroupRef.current || colliderShapeRef.current !== shapeKey || playerCollidersRef.current.size !== snap.players.length) {
+      removeGroup();
+      const group = new THREE.Group();
+      group.name = 'debug-colliders';
+      // 掩体碰撞盒（绿色线框，与引擎 AABB 完全一致）
+      for (const b of snap.arena.obstacles) {
+        const geo = new THREE.BoxGeometry(b.maxX - b.minX, b.height, b.maxZ - b.minZ);
+        const line = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({ color: 0x39ff88, transparent: true, opacity: 0.7 }),
+        );
+        line.position.set((b.minX + b.maxX) / 2, b.height / 2, (b.minZ + b.maxZ) / 2);
+        group.add(line);
+      }
+      const myTeam = snap.players.find((p) => p.id === driver.myId)?.team;
+      for (const p of snap.players) {
+        const color =
+          p.id === driver.myId
+            ? 0x00e5ff
+            : snap.mode === 'tdm'
+              ? p.team === myTeam
+                ? 0x39ff88
+                : 0xff5060
+              : 0xff5060;
+        const cyl = new THREE.Mesh(
+          new THREE.CylinderGeometry(r, r, top - bottom, 18, 1, true),
+          new THREE.MeshBasicMaterial({
+            color,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.85,
+            depthTest: false,
+          }),
+        );
+        cyl.position.set(p.pos.x, bottom + (top - bottom) / 2, p.pos.z);
+        group.add(cyl);
+        playerCollidersRef.current.set(p.id, cyl);
+      }
+      scene.add(group);
+      colliderGroupRef.current = group;
+      colliderShapeRef.current = shapeKey;
+      return;
+    }
+    const myTeam = snap.players.find((p) => p.id === driver.myId)?.team;
+    for (const p of snap.players) {
+      const cyl = playerCollidersRef.current.get(p.id);
+      if (!cyl) continue;
+      cyl.position.set(p.pos.x, bottom + (top - bottom) / 2, p.pos.z);
+      const color =
+        p.id === driver.myId
+          ? 0x00e5ff
+          : snap.mode === 'tdm'
+            ? p.team === myTeam
+              ? 0x39ff88
+              : 0xff5060
+            : 0xff5060;
+      (cyl.material as THREE.MeshBasicMaterial).color.set(color);
+    }
+  }, [driver.snapshot, showColliders, driver.myId]);
 
   // ---- 输入 ----
   useEffect(() => {
@@ -797,6 +979,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       v.pitch -= e.movementY * BALANCE.client.mouseSensitivity;
       v.pitch = Math.max(-BALANCE.arena.pitchClamp, Math.min(BALANCE.arena.pitchClamp, v.pitch));
       send({ type: 'look', yaw: v.yaw, pitch: v.pitch });
+      // 按住方向键转身时，立即按新视角重算移动向量（服务器以世界系执行）
+      syncMove();
     };
     const onMouseDown = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;
@@ -873,10 +1057,14 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
             <i className="c-right" />
           </div>
           {me.ads && me.weapon === 'sniper' && <div className="ccf-scope" />}
-          <div className={`ccf-damage-vignette ${performance.now() - hitAt < 180 ? 'on' : ''}`} />
-          {me.hp / me.maxHp < 0.3 && <div className="ccf-lowhp" />}
-          {killFlash && performance.now() - killFlash.at < 1200 && (
-            <div className="ccf-killflash">{killFlash.text}</div>
+          {driver.fx !== false && (
+            <>
+              <div className={`ccf-damage-vignette ${performance.now() - hitAt < 180 ? 'on' : ''}`} />
+              {me.hp / me.maxHp < 0.3 && <div className="ccf-lowhp" />}
+              {killFlash && performance.now() - killFlash.at < 1200 && (
+                <div className="ccf-killflash">{killFlash.text}</div>
+              )}
+            </>
           )}
           <Hud snap={snap} me={me} killFeed={killFeed} />
         </>
@@ -923,7 +1111,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         </button>
       )}
       {driver.error && <div className="ccf-hint" style={{ top: 10 }}>⚠️ {driver.error}</div>}
-      {tuningEnabled && !driver.online && <TuningPanel enabled />}
+      {tuningEnabled && !driver.online && (
+        <TuningPanel
+          enabled
+          showColliders={showColliders}
+          onShowColliders={setShowColliders}
+        />
+      )}
     </div>
   );
 }
@@ -1052,7 +1246,15 @@ function disposeObject(obj: THREE.Object3D): void {
 
 // ---------------- 手感调试面板（?debug=1，仅本地 vs AI） ----------------
 
-function TuningPanel({ enabled }: { enabled: boolean }) {
+function TuningPanel({
+  enabled,
+  showColliders,
+  onShowColliders,
+}: {
+  enabled: boolean;
+  showColliders: boolean;
+  onShowColliders: (show: boolean) => void;
+}) {
   const hostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1083,6 +1285,18 @@ function TuningPanel({ enabled }: { enabled: boolean }) {
         bind(mov, BALANCE.movement, 'gravity', { min: 0, max: 100, step: 0.5, label: '重力' });
         bind(mov, BALANCE.movement, 'jumpVelocity', { min: 0, max: 30, step: 0.2, label: '跳跃初速' });
         bind(mov, BALANCE.movement, 'adsSpeedMult', { min: 0, max: 1, step: 0.05, label: '开镜移速倍率' });
+
+        const hit = pane.addFolder({ title: '碰撞/命中盒（实时）' });
+        const colliderFlags = { show: showColliders };
+        const showBinding = hit.addBinding(colliderFlags, 'show', { label: '显示玩家碰撞盒' }) as unknown as {
+          on: (event: 'change', cb: (ev: { value: boolean }) => void) => unknown;
+        };
+        showBinding.on('change', (ev) => onShowColliders(ev.value));
+        bind(hit, BALANCE.arena, 'playerRadius', { min: 0.1, max: 1.5, step: 0.05, label: '玩家半径' });
+        bind(hit, BALANCE.arena, 'capsuleBottomY', { min: 0, max: 2, step: 0.05, label: '胶囊底高' });
+        bind(hit, BALANCE.arena, 'capsuleTopY', { min: 0.5, max: 4, step: 0.05, label: '胶囊顶高' });
+        bind(hit, BALANCE.arena, 'eyeY', { min: 0.5, max: 4, step: 0.05, label: '眼高' });
+        bind(hit, BALANCE.arena, 'headshotMinY', { min: 0.5, max: 4, step: 0.05, label: '爆头线高度' });
 
         const heroFolder = pane.addFolder({ title: '英雄' });
         for (const id of HERO_IDS) {
@@ -1315,12 +1529,14 @@ export function CorcodragonFightLocalScreen({
   myName,
   config,
   sound,
+  fx,
   onExit,
 }: {
   playerCount: number;
   myName: string;
   config: FightConfig;
   sound: boolean;
+  fx: boolean;
   onExit: () => void;
 }) {
   const [round, setRound] = useState(0);
@@ -1375,6 +1591,7 @@ export function CorcodragonFightLocalScreen({
         online: false,
         error: null,
         sound,
+        fx,
         send,
         onExit,
         onRestart: () => setRound((r) => r + 1),
@@ -1388,6 +1605,9 @@ export function CorcodragonFightLocalScreen({
 export function CorcodragonFightDetailScreen({
   playerCount,
   onPlayerCountChange,
+  prefs,
+  onToggleSound,
+  onToggleFx,
   onPlayLocal,
   onPlayOnline,
   onlineReady = false,
@@ -1395,6 +1615,9 @@ export function CorcodragonFightDetailScreen({
 }: {
   playerCount: number;
   onPlayerCountChange: (n: number) => void;
+  prefs: FightPrefs;
+  onToggleSound: () => void;
+  onToggleFx: () => void;
   onPlayLocal: (config: FightConfig) => void;
   onPlayOnline: (config: FightConfig) => void;
   onlineReady?: boolean;
@@ -1475,6 +1698,27 @@ export function CorcodragonFightDetailScreen({
             <button className="primary-btn big" disabled={!onlineReady} onClick={() => onPlayOnline(config)}>
               {onlineReady ? '🌐 进入联机大厅' : '🔧 联机通道接入中……'}
             </button>
+          </section>
+
+          <section className="detail-mode">
+            <h2>⚙️ 鳄龙咆哮偏好（独立于出包魔法师）</h2>
+            <div className="pref-row">
+              <button
+                className={`pref-btn ${prefs.sound ? 'active' : ''}`}
+                onClick={onToggleSound}
+                title="程序化枪声/技能/击杀音效"
+              >
+                {prefs.sound ? '🔊 音效开' : '🔇 音效关'}
+              </button>
+              <button
+                className={`pref-btn ${prefs.fx ? 'active' : ''}`}
+                onClick={onToggleFx}
+                title="弹道/枪口火光/命中火花/受击与击杀反馈"
+              >
+                {prefs.fx ? '✨ 特效开' : '💤 特效关'}
+              </button>
+            </div>
+            <p className="muted">保存在本机 `tm-fight-settings`，不与出包魔法师共用。</p>
           </section>
         </div>
 

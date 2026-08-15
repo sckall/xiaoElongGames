@@ -60,7 +60,14 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
     return actions;
   }
 
-  const enemies = view.players.filter((p) => p.id !== view.youId && p.alive && p.visible);
+  // 团队死斗只攻击敌方；自由混战除自己外都是敌人
+  const enemies = view.players.filter(
+    (p) =>
+      p.alive &&
+      p.visible &&
+      p.id !== view.youId &&
+      (view.mode === 'tdm' ? p.team !== me.team : true),
+  );
   const actions: RealtimeInputAction[] = [];
 
   // 没有可见敌人：原地转圈巡逻

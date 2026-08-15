@@ -8,7 +8,7 @@ import {
   CorcodragonDetailScreen,
   CorcodragonLocalScreen,
 } from '@tm/game-corcodragon-fire/GameUI';
-import type { FightConfig } from '@tm/game-corcodragon-fight/GameUI';
+import type { FightConfig, FightPrefs } from '@tm/game-corcodragon-fight/GameUI';
 
 // 鳄龙咆哮含 Three.js（约 600KB），按需分包加载，避免拖慢大厅首屏
 const CorcodragonFightDetailScreen = lazy(() =>
@@ -50,6 +50,20 @@ function loadSettings(): GameSettings {
   return { ...DEFAULT_SETTINGS };
 }
 
+/** 鳄龙咆哮专属偏好：与出包魔法师 tm-settings 分离存储 */
+function loadFightPrefs(): FightPrefs {
+  try {
+    const raw = localStorage.getItem('tm-fight-settings');
+    if (raw) {
+      const s = JSON.parse(raw) as Partial<FightPrefs>;
+      return { sound: s.sound !== false, fx: s.fx !== false };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { sound: true, fx: true };
+}
+
 type Screen = 'setup' | 'hall' | 'game' | 'local' | 'online';
 
 export default function App() {
@@ -64,12 +78,25 @@ export default function App() {
     scoreLimit: 15,
     aiStyle: 'combat',
   });
+  const [fightPrefs, setFightPrefs] = useState<FightPrefs>(loadFightPrefs);
 
   const updateSettings = (patch: Partial<GameSettings>) => {
     setSettings((s) => {
       const next = { ...s, ...patch };
       try {
         localStorage.setItem('tm-settings', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const updateFightPrefs = (patch: Partial<FightPrefs>) => {
+    setFightPrefs((s) => {
+      const next = { ...s, ...patch };
+      try {
+        localStorage.setItem('tm-fight-settings', JSON.stringify(next));
       } catch {
         /* ignore */
       }
@@ -96,6 +123,9 @@ export default function App() {
           <CorcodragonFightDetailScreen
             playerCount={playerCount}
             onPlayerCountChange={setPlayerCount}
+            prefs={fightPrefs}
+            onToggleSound={() => updateFightPrefs({ sound: !fightPrefs.sound })}
+            onToggleFx={() => updateFightPrefs({ fx: !fightPrefs.fx })}
             onPlayLocal={(config) => {
               setFightConfig(config);
               setSessionKey((k) => k + 1);
@@ -157,7 +187,8 @@ export default function App() {
             playerCount={playerCount}
             myName={myName}
             config={fightConfig}
-            sound={settings.sound}
+            sound={fightPrefs.sound}
+            fx={fightPrefs.fx}
             onExit={() => setScreen('game')}
           />
         </Suspense>
@@ -198,6 +229,7 @@ export default function App() {
           <CorcodragonFightOnlineScreen
             key={sessionKey}
             settings={settings}
+            prefs={fightPrefs}
             defaultName={myName}
             config={fightConfig}
             onExit={() => setScreen('game')}

@@ -5,17 +5,19 @@
  */
 import { useRealtimeGame } from './useRealtimeGame';
 import RealtimeLobbyScreen from './RealtimeLobbyScreen';
-import { FpsGameView, type FightConfig } from '@tm/game-corcodragon-fight/GameUI';
+import { FpsGameView, type FightConfig, type FightPrefs } from '@tm/game-corcodragon-fight/GameUI';
 import type { GameSettings } from './GameSettings';
 
 export default function CorcodragonFightOnlineScreen({
   settings,
+  prefs,
   defaultName,
   config,
   onExit,
   onServerUrlChange,
 }: {
   settings: GameSettings;
+  prefs: FightPrefs;
   defaultName: string;
   config: FightConfig;
   onExit: () => void;
@@ -32,7 +34,8 @@ export default function CorcodragonFightOnlineScreen({
           online: true,
           error: remote.error,
           stats: remote.stats,
-          sound: settings.sound,
+          sound: prefs.sound,
+          fx: prefs.fx,
           send: remote.sendInput,
           onExit: () => {
             remote.leave();

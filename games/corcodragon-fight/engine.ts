@@ -264,6 +264,8 @@ export class CorcodragonFightEngine {
   private eventSeq = 0;
   /** 全部事件环（供测试/回放检查；平台只消费 getSnapshot 的增量投影） */
   readonly events: EngineEvent[] = [];
+  /** 击杀完整流水（事件环可能被裁剪，此日志不裁剪，供测试/统计） */
+  readonly killLog: { at: number; shooterId: string | null; targetId: string }[] = [];
   private lastSentSeq = new Map<string, number>();
   private lastInputSeq = new Map<string, number>();
   private botNextThink = new Map<string, number>();
@@ -890,6 +892,7 @@ export class CorcodragonFightEngine {
     victim.moveX = 0;
     victim.moveZ = 0;
     victim.respawnAt = this.t + BALANCE.combat.respawnMs;
+    this.killLog.push({ at: this.t, shooterId: killer?.id ?? null, targetId: victim.id });
     if (killer) {
       killer.kills += 1;
       killer.score += 1;
