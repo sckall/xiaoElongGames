@@ -13,6 +13,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { chooseAIInputs } from './ai';
 import { CorcodragonFightEngine } from './engine';
 import { SfxPlayer } from './fx';
+import { heroModelPlacement } from './heroModel';
 import { BALANCE, balanceToJson, resetBalance } from './balance';
 import { sampleRemote, type RemoteSample } from './interp';
 import {
@@ -113,16 +114,12 @@ async function attachHeroModel(holder: THREE.Group, hero: HeroId): Promise<void>
   if (!spec) return;
   try {
     const source = await loadHeroCharacter(hero);
-    // 共享材质，克隆节点树；按 1.85m 高度归一，底部贴地、中心对齐
+    // 共享材质，克隆节点树；用身体核心 AABB（而非整树 AABB）归一高度并中心对齐，
+    // 避免武器/盾牌/法杖/帽子把角色视觉中心带偏，使模型与引擎胶囊碰撞盒一致。
     const model = source.clone();
-    const bounds = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3();
-    bounds.getSize(size);
-    const center = new THREE.Vector3();
-    bounds.getCenter(center);
-    const s = spec.targetHeight / Math.max(0.01, size.y);
-    model.scale.setScalar(s);
-    model.position.set(-center.x * s, -bounds.min.y * s, -center.z * s);
+    const placement = heroModelPlacement(model, spec.targetHeight);
+    model.scale.setScalar(placement.scale);
+    model.position.set(placement.x, placement.y, placement.z);
     model.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
