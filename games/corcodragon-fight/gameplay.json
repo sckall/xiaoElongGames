@@ -155,7 +155,10 @@
       "falloffStart": 18,
       "falloffEnd": 45,
       "minDmgMult": 0.55,
-      "desc": "均衡的自动步枪，右键开镜"
+      "desc": "均衡的自动步枪，右键开镜",
+      "bloomPerShot": 0.003,
+      "bloomMax": 0.06,
+      "bloomRecoveryPerSec": 0.015
     },
     "sniper": {
       "name": "狙击枪",
@@ -174,7 +177,10 @@
       "falloffStart": 60,
       "falloffEnd": 90,
       "minDmgMult": 0.8,
-      "desc": "高伤害、慢射速，爆头 250"
+      "desc": "高伤害、慢射速，爆头 250",
+      "bloomPerShot": 0.02,
+      "bloomMax": 0.05,
+      "bloomRecoveryPerSec": 0.01
     },
     "pistol": {
       "name": "手枪",
@@ -193,7 +199,10 @@
       "falloffStart": 12,
       "falloffEnd": 30,
       "minDmgMult": 0.5,
-      "desc": "无限备弹的可靠副武器"
+      "desc": "无限备弹的可靠副武器",
+      "bloomPerShot": 0.006,
+      "bloomMax": 0.07,
+      "bloomRecoveryPerSec": 0.02
     },
     "dagger": {
       "name": "匕首",
@@ -213,7 +222,10 @@
       "falloffEnd": 2.9,
       "minDmgMult": 1,
       "melee": true,
-      "desc": "近战挥砍，不消耗弹药"
+      "desc": "近战挥砍，不消耗弹药",
+      "bloomPerShot": 0,
+      "bloomMax": 0,
+      "bloomRecoveryPerSec": 1
     }
   },
   "ai": {

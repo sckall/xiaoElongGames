@@ -105,10 +105,13 @@ export class SfxPlayer {
   hit(headshot = false): void {
     if (!this.ready()) return;
     if (headshot) {
-      this.osc('sine', 1320, 1760, 0.16, 0.06);
-      this.osc('sine', 1980, 1980, 0.1, 0.05, 0.03);
+      this.osc('sine', 1320, 1760, 0.34, 0.07);
+      this.osc('sine', 1980, 1980, 0.22, 0.06, 0.03);
     } else {
-      this.osc('sine', 980, 760, 0.12, 0.045);
+      // 身体命中：明显的“哒”声（高频短促 + 低音底）
+      this.osc('square', 1400, 900, 0.3, 0.05);
+      this.osc('sine', 180, 120, 0.2, 0.06);
+      this.burst(0.16, 0.04, 2200, 1400);
     }
   }
 

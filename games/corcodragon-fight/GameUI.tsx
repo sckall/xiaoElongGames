@@ -197,10 +197,17 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const prevReloadingRef = useRef(false);
   const sparksRef = useRef<{ mesh: THREE.Mesh; vel: THREE.Vector3; born: number; life: number }[]>([]);
   const dustRef = useRef<THREE.Points | null>(null);
+  const crosshairRef = useRef<HTMLDivElement | null>(null);
   const colliderGroupRef = useRef<THREE.Group | null>(null);
   const playerCollidersRef = useRef(new Map<string, THREE.Mesh>());
   const colliderShapeRef = useRef('');
   const [killFlash, setKillFlash] = useState<{ text: string; at: number } | null>(null);
+  const [hitFlash, setHitFlash] = useState<{
+    amount: number;
+    kind: 'dealt' | 'taken';
+    headshot: boolean;
+    at: number;
+  } | null>(null);
 
   const getSfx = useCallback(() => {
     if (!sfxRef.current) sfxRef.current = new SfxPlayer();
@@ -572,6 +579,18 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         dustRef.current.rotation.y += dt * 0.02;
       }
 
+      // 动态准星：随散布膨胀/移动/开火节奏扩张
+      if (crosshairRef.current) {
+        const k = keysRef.current;
+        const moving = k.KeyW || k.KeyA || k.KeyS || k.KeyD;
+        const gap =
+          6 +
+          (me?.spreadBloom ?? 0) * 320 +
+          (moving ? 3 : 0) +
+          ((me?.fireCd ?? 0) > 0 ? 4 : 0);
+        crosshairRef.current.style.setProperty('--gap', `${gap.toFixed(1)}px`);
+      }
+
       renderer.render(scene, cam);
     };
     raf = requestAnimationFrame(loop);
@@ -835,10 +854,22 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       if (ev.kind === 'hit') {
         if (ev.targetId === driver.myId) {
           setHitAt(performance.now());
+          setHitFlash({
+            amount: ev.amount ?? 0,
+            kind: 'taken',
+            headshot: ev.text === '爆头！',
+            at: performance.now(),
+          });
           if (driver.sound !== false) getSfx().hurt();
         }
         if (mine) {
           if (driver.sound !== false) getSfx().hit(ev.text === '爆头！');
+          setHitFlash({
+            amount: ev.amount ?? 0,
+            kind: 'dealt',
+            headshot: ev.text === '爆头！',
+            at: performance.now(),
+          });
           if (ev.pos && fxOn) spawnSparks(ev.pos, 0xff7050, 8);
         }
       }
@@ -1099,7 +1130,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       )}
       {me && me.alive && snap?.phase === 'playing' && (
         <>
-          <div className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`}>
+          <div
+            ref={crosshairRef}
+            className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`}
+          >
             <i className="c-top" />
             <i className="c-bottom" />
             <i className="c-left" />
@@ -1114,6 +1148,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
                 <div className="ccf-killflash">{killFlash.text}</div>
               )}
             </>
+          )}
+          {hitFlash && performance.now() - hitFlash.at < 600 && (
+            <div className={`ccf-hitflash ${hitFlash.kind} ${hitFlash.headshot ? 'head' : ''}`}>
+              {hitFlash.kind === 'taken' ? '-' : '+'}
+              {hitFlash.amount}
+              {hitFlash.headshot ? ' 爆头' : ''}
+            </div>
           )}
           <Hud snap={snap} me={me} killFeed={killFeed} />
         </>
@@ -1375,6 +1416,9 @@ function TuningPanel({
           bind(f, w, 'headshot', { min: 0.5, max: 5, step: 0.1, label: '爆头倍率' });
           bind(f, w, 'reloadMs', { min: 0, max: 5000, step: 50, label: '换弹(ms)' });
           bind(f, w, 'recoil', { min: 0, max: 0.1, step: 0.001, label: '后坐上跳' });
+          bind(f, w, 'bloomPerShot', { min: 0, max: 0.03, step: 0.0005, label: '散布膨胀/发' });
+          bind(f, w, 'bloomMax', { min: 0, max: 0.1, step: 0.001, label: '散布上限' });
+          bind(f, w, 'bloomRecoveryPerSec', { min: 0, max: 1, step: 0.01, label: '散布恢复/秒' });
         }
 
         const skill = pane.addFolder({ title: '技能与终极技' });

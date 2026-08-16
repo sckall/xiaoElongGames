@@ -71,6 +71,11 @@ export interface EnginePlayerState {
   skillCd: number;
   ultCharge: number;
   ads: boolean;
+  spreadBloom: number;
+  shots: number;
+  hits: number;
+  headshots: number;
+  damageDealt: number;
   stealthT: number;
   fortifyT: number;
   slowT: number;
@@ -324,6 +329,11 @@ export class CorcodragonFightEngine {
         skillCd: 0,
         ultCharge: 0,
         ads: false,
+        spreadBloom: 0,
+        shots: 0,
+        hits: 0,
+        headshots: 0,
+        damageDealt: 0,
         stealthT: 0,
         fortifyT: 0,
         slowT: 0,
@@ -493,6 +503,7 @@ export class CorcodragonFightEngine {
           p.reloading = false;
           p.reloadT = 0;
           p.ads = false;
+          p.spreadBloom = 0;
           p.fireCd = Math.max(p.fireCd, 0.25);
           const def = WEAPON_DEFS[w];
           p.ammo = def.magSize;
@@ -579,6 +590,10 @@ export class CorcodragonFightEngine {
       }
       p.fireCd = Math.max(0, p.fireCd - dt);
       p.skillCd = Math.max(0, p.skillCd - dt);
+      p.spreadBloom = Math.max(
+        0,
+        p.spreadBloom - WEAPON_DEFS[p.weapon].bloomRecoveryPerSec * dt,
+      );
       p.shieldT = Math.max(0, p.shieldT - dt);
       if (p.shieldT <= 0) p.shield = 0;
       p.stealthT = Math.max(0, p.stealthT - dt);
@@ -721,7 +736,9 @@ export class CorcodragonFightEngine {
   private fire(p: EnginePlayerState): void {
     const def = WEAPON_DEFS[p.weapon];
     const eye: Vec3 = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
-    const spread = p.ads ? def.adsSpread : def.spread;
+    // 散布 = 基础散布 + 连续射击膨胀（开镜时膨胀衰减到 30%）
+    const spread =
+      (p.ads ? def.adsSpread : def.spread) + p.spreadBloom * (p.ads ? 0.3 : 1);
     const yaw = p.yaw + (this.rng() * 2 - 1) * spread;
     const pitch = Math.max(
       -BALANCE.arena.pitchClamp,
@@ -744,6 +761,8 @@ export class CorcodragonFightEngine {
       return;
     }
     p.ammo -= 1;
+    p.shots += 1;
+    p.spreadBloom = Math.min(def.bloomMax, p.spreadBloom + def.bloomPerShot);
 
     const worldHit = rayWorld(eye.x, eye.y, eye.z, dir, def.range);
     let bestT = worldHit.t;
@@ -804,6 +823,7 @@ export class CorcodragonFightEngine {
   }
 
   private meleeStrike(p: EnginePlayerState, eye: Vec3, dir: Vec3): void {
+    p.shots += 1;
     let best: EnginePlayerState | null = null;
     let bestScore = Infinity;
     for (const q of this.players) {
@@ -860,6 +880,9 @@ export class CorcodragonFightEngine {
       target.hp -= amount;
     }
     if (attacker) {
+      attacker.hits += 1;
+      attacker.damageDealt += rawAmount;
+      if (headshot) attacker.headshots += 1;
       attacker.ultCharge = Math.min(
         BALANCE.combat.ultChargeMax,
         attacker.ultCharge + rawAmount * BALANCE.combat.ultPerDamage,
@@ -955,6 +978,7 @@ export class CorcodragonFightEngine {
     p.reloadT = 0;
     p.fireCd = 0;
     p.skillCd = 0;
+    p.spreadBloom = 0;
     this.pushEvent('respawn', `${p.name} 重返战场`, { ...p.pos }, true, [], p.id);
   }
 
@@ -1390,6 +1414,11 @@ export class CorcodragonFightEngine {
         kills: visible ? p.kills : 0,
         deaths: visible ? p.deaths : 0,
         score: visible ? p.score : 0,
+        shots: p.id === you.id ? p.shots : 0,
+        hits: p.id === you.id ? p.hits : 0,
+        headshots: p.id === you.id ? p.headshots : 0,
+        damageDealt: p.id === you.id ? p.damageDealt : 0,
+        spreadBloom: p.id === you.id ? p.spreadBloom : 0,
         visible,
         lastInputSeq: p.id === you.id ? (this.lastInputSeq.get(p.id) ?? -1) : -1,
       };

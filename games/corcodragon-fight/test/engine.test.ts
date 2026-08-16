@@ -244,6 +244,24 @@ describe('射击与伤害', () => {
     expect(t.player(teammate)!.hp).toBe(t.player(teammate)!.maxHp);
   });
 
+  it('射击统计与散布膨胀/恢复', () => {
+    const { e, a, b } = facingPair();
+    const p = e.player(a)!;
+    e.applyInput(a, { type: 'fire', pressed: true });
+    for (let i = 0; i < 3; i++) {
+      tick(e, 100);
+      e.applyInput(a, { type: 'fire', pressed: true });
+    }
+    const me = e.getSnapshot(a).players.find((x) => x.id === a)!;
+    expect(me.shots).toBeGreaterThanOrEqual(3);
+    expect(me.hits).toBeGreaterThanOrEqual(3);
+    expect(me.damageDealt).toBeGreaterThanOrEqual(60);
+    expect(p.spreadBloom).toBeGreaterThan(0);
+    e.applyInput(a, { type: 'fire', pressed: false });
+    for (let i = 0; i < 120; i++) tick(e, 50);
+    expect(p.spreadBloom).toBe(0);
+  });
+
   it('弹药消耗与换弹', () => {
     const { e, a } = facingPair();
     const p = e.player(a)!;

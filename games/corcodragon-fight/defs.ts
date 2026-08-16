@@ -72,6 +72,10 @@ export interface WeaponDef {
   adsFov: number;
   /** 单发视角上跳（弧度，客户端后坐表现） */
   recoil: number;
+  /** 每发散布膨胀 / 上限 / 恢复（弧度） */
+  bloomPerShot: number;
+  bloomMax: number;
+  bloomRecoveryPerSec: number;
   /** 腰射散布（弧度，±） */
   spread: number;
   /** 开镜散布（弧度，±） */
@@ -118,6 +122,9 @@ function weaponDefOf(key: WeaponId): WeaponDef {
     range: w.range,
     adsFov: w.adsFov,
     recoil: w.recoil,
+    bloomPerShot: w.bloomPerShot,
+    bloomMax: w.bloomMax,
+    bloomRecoveryPerSec: w.bloomRecoveryPerSec,
     spread: w.spread,
     adsSpread: w.adsSpread,
     headshot: w.headshot,
@@ -300,6 +307,13 @@ export interface SnapshotPlayer {
   kills: number;
   deaths: number;
   score: number;
+  /** 射击统计（仅本人快照；训练场/手感验证用） */
+  shots: number;
+  hits: number;
+  headshots: number;
+  damageDealt: number;
+  /** 当前散布膨胀（弧度，仅本人；客户端动态准星用） */
+  spreadBloom: number;
   /** 该玩家是否对当前视图者可见（隐身投影） */
   visible: boolean;
   /** 服务端已确认的该玩家最后输入序号（仅本人快照有意义，用于客户端回滚） */

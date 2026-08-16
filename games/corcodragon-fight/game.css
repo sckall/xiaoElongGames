@@ -42,24 +42,24 @@
   width: 2px;
   height: 9px;
   left: -1px;
-  top: -15px;
+  top: calc(-12px - var(--gap, 0px));
 }
 .ccf-crosshair .c-bottom {
   width: 2px;
   height: 9px;
   left: -1px;
-  top: 6px;
+  top: calc(6px + var(--gap, 0px));
 }
 .ccf-crosshair .c-left {
   width: 9px;
   height: 2px;
-  left: -15px;
+  left: calc(-12px - var(--gap, 0px));
   top: -1px;
 }
 .ccf-crosshair .c-right {
   width: 9px;
   height: 2px;
-  left: 6px;
+  left: calc(6px + var(--gap, 0px));
   top: -1px;
 }
 .ccf-crosshair.hit i {
@@ -374,6 +374,34 @@
   height: 1px;
   transform: translate(-50%, -50%);
   background: rgba(0, 0, 0, 0.85);
+}
+
+.ccf-hitflash {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  font-weight: 900;
+  pointer-events: none;
+  z-index: 6;
+  animation: ccf-hit-rise 0.55s ease-out forwards;
+}
+.ccf-hitflash.dealt {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(120, 220, 255, 0.9);
+}
+.ccf-hitflash.dealt.head {
+  color: #ffd166;
+  text-shadow: 0 0 10px rgba(255, 190, 60, 1);
+}
+.ccf-hitflash.taken {
+  color: #ff5a4a;
+  text-shadow: 0 0 8px rgba(255, 40, 20, 0.9);
+}
+@keyframes ccf-hit-rise {
+  from { transform: translate(-50%, 0); opacity: 1; }
+  to { transform: translate(-50%, -34px); opacity: 0; }
 }
 
 .ccf-killflash {

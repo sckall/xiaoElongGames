@@ -112,6 +112,12 @@ export interface WeaponBalance {
   adsFov: number;
   /** 单发视角上跳（弧度，客户端后坐表现） */
   recoil: number;
+  /** 每发增加的散布膨胀（弧度） */
+  bloomPerShot: number;
+  /** 散布膨胀上限（弧度） */
+  bloomMax: number;
+  /** 散布恢复速度（弧度/秒） */
+  bloomRecoveryPerSec: number;
   spread: number;
   adsSpread: number;
   headshot: number;
@@ -343,6 +349,9 @@ export function validateBalance(data: unknown): BalanceData {
       range: num(w.range, `weapons.${key}.range`, 0.1, 300),
       adsFov: num(w.adsFov, `weapons.${key}.adsFov`, 10, 120),
       recoil: num(w.recoil, `weapons.${key}.recoil`, 0, 0.2),
+      bloomPerShot: num(w.bloomPerShot, `weapons.${key}.bloomPerShot`, 0, 0.2),
+      bloomMax: num(w.bloomMax, `weapons.${key}.bloomMax`, 0, 0.5),
+      bloomRecoveryPerSec: num(w.bloomRecoveryPerSec, `weapons.${key}.bloomRecoveryPerSec`, 0, 2),
       spread: num(w.spread, `weapons.${key}.spread`, 0, 0.5),
       adsSpread: num(w.adsSpread, `weapons.${key}.adsSpread`, 0, 0.5),
       headshot: num(w.headshot, `weapons.${key}.headshot`, 0.1, 10),
