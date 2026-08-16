@@ -16,6 +16,8 @@ export interface AiOptions {
   risk?: number;
   /** 结果抖动，避免每局完全相同 */
   jitter?: number;
+  /** 可注入随机数（测试/回放） */
+  rng?: () => number;
 }
 
 /** 超几何推理：某魔法至少一张在自己手牌中的概率 */
@@ -59,6 +61,7 @@ export function probMagicInHand(view: PlayerView, magic: Magic): number {
 export function chooseAiAction(view: PlayerView, opts: AiOptions = {}): AiAction {
   const risk = opts.risk ?? 0.25;
   const jitter = opts.jitter ?? 0.12;
+  const rng = opts.rng ?? Math.random;
   const you = view.seats.find((s) => s.id === view.youId);
   if (!you || you.handCount === 0) return { type: 'end' };
 
@@ -120,7 +123,7 @@ export function chooseAiAction(view: PlayerView, opts: AiOptions = {}): AiAction
   let bestEv = -Infinity;
   for (const d of legal) {
     const p = probMagicInHand(view, d.key);
-    const ev = p * gainOf(d.key) - (1 - p) * failCostOf(d.key) + (Math.random() - 0.5) * jitter;
+    const ev = p * gainOf(d.key) - (1 - p) * failCostOf(d.key) + (rng() - 0.5) * jitter;
     if (ev > bestEv) {
       bestEv = ev;
       best = d.key;

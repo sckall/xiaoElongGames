@@ -156,6 +156,7 @@ export class RealtimeRoom {
 
   emitSnapshotTo(socketId: string, playerId: string): void {
     if (!this.engine) return;
+    this.engine.resetArenaFor(playerId);
     this.io.to(socketId).emit('rtSnapshot', this.engine.getSnapshot(playerId));
   }
 
@@ -186,6 +187,7 @@ export class RealtimeRoom {
         if (!existing.isBot) existing.name = name;
         existing.socketId = socketId;
         this.engine?.setAutopilot(token, false);
+        this.engine?.resetArenaFor(token);
         this.broadcastSnapshots();
         this.broadcastLobby();
         return { ok: true, playerId: token, rejoin: true };
@@ -247,7 +249,7 @@ export class RealtimeRoom {
       this.config,
     );
     this.status = 'playing';
-    this.engine.log('🎮 联机对局开始（服务端权威 20Hz）');
+    this.engine.log(`🎮 联机对局开始（同步 ${Math.round(1000 / this.engine.tickStepMs)}Hz）`);
     this.broadcastSnapshots();
     this.broadcastLobby();
     this.startTick();
@@ -255,16 +257,17 @@ export class RealtimeRoom {
 
   private startTick(): void {
     this.stopTick();
+    const step = this.engine?.tickStepMs ?? RT_TICK_MS;
     this.tickTimer = setInterval(() => {
       if (!this.engine) return;
       try {
-        this.engine.tick(RT_TICK_MS);
+        this.engine.tick(step);
         this.broadcastSnapshots();
         if (this.engine.phase === 'gameOver') this.stopTick();
       } catch (err) {
         console.error('[realtime-room] tick error:', err);
       }
-    }, RT_TICK_MS);
+    }, step);
   }
 
   private stopTick(): void {

@@ -102,8 +102,8 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
     me.pos.z,
     target.pos.x,
     target.pos.z,
-    view.arena.obstacles,
-    view.arena.half,
+    view.arena?.obstacles,
+    view.arena?.half,
   );
 
   // 武器选择：近身用匕首，远处用步枪/狙击（按英雄习惯）

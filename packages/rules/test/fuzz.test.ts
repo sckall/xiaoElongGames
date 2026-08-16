@@ -47,7 +47,7 @@ it('60 局随机 AI 对局：能结束、卡牌守恒、数值合法', () => {
       }
       const p = game.current;
       const view = game.getView(p.id);
-      const a = chooseAiAction(view, { risk: 0.15 });
+      const a = chooseAiAction(view, { risk: 0.15, rng: mulberry32(2000 + gi) });
       if (a.type === 'declare') game.declareSpell(p.id, a.magic);
       else game.endTurn(p.id);
     }

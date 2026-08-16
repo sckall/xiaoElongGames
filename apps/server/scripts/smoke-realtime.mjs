@@ -41,7 +41,7 @@ const created = await new Promise((resolve) =>
       name: '鳄龙A',
       botCount: 3,
       gameId: 'corcodragon-fight',
-      config: { mode: 'ffa', scoreLimit: 2, heroSelectMs: 8000, aiLevel: 'hard' },
+      config: { mode: 'ffa', scoreLimit: 2, heroSelectMs: 8000, aiLevel: 'hard', tickHz: 60 },
     },
     resolve,
   ),

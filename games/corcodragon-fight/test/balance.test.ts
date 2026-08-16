@@ -23,7 +23,7 @@ describe('gameplay.json 配置层', () => {
     expect(BALANCE.heroes.yanren.hp).toBe(150);
     expect(BALANCE.weapons.rifle.damage).toBe(20);
     const text = balanceToJson();
-    expect(JSON.parse(text).tick.stepMs).toBe(50);
+    expect(JSON.parse(text).tick.stepMs).toBeCloseTo(100 / 3, 3); // 默认 30Hz
   });
 
   it('defs 代理对象随 BALANCE 热更新', () => {
@@ -62,7 +62,7 @@ describe('引擎实时读配置（热更新生效）', () => {
         { id: 'a', name: 'A' },
         { id: 'b', name: 'B' },
       ],
-      { mode: 'ffa', scoreLimit: 10, rng: mulberry32(5) },
+      { mode: 'ffa', scoreLimit: 10, tickStepMs: 50, rng: mulberry32(5) },
     );
     for (const p of e.players) {
       if (!p.isBot) e.applyInput(p.id, { type: 'selectHero', hero: 'yanren' });

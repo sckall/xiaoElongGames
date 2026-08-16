@@ -35,6 +35,7 @@ function mkEngine(n = 2, opts: EngineOptions = {}): CorcodragonFightEngine {
     heroSelectMs: 10_000,
     matchTimeMs: 60_000,
     respawnMs: 1_000,
+    tickStepMs: 50, // 固定旧步长，保持时序断言确定性
     rng: mulberry32(42),
     ...opts,
   });
@@ -69,10 +70,18 @@ describe('构造与选项校验', () => {
     ).toThrow(/重复/);
   });
 
+  it('默认 30Hz 步长且可自定义（20/30/60Hz 选项）', () => {
+    const def = new CorcodragonFightEngine(mkPlayers(2), { rng: mulberry32(5) });
+    expect(def.tickStepMs).toBeCloseTo(100 / 3, 3);
+    expect(new CorcodragonFightEngine(mkPlayers(2), { tickStepMs: 50, rng: mulberry32(5) }).tickStepMs).toBe(50);
+    expect(new CorcodragonFightEngine(mkPlayers(2), { tickStepMs: 16.67, rng: mulberry32(5) }).tickStepMs).toBeCloseTo(16.67);
+  });
+
   it('选项白名单钳制', () => {
     const e = new CorcodragonFightEngine(mkPlayers(2), {
       mode: 'nuke' as never,
       scoreLimit: NaN,
+      tickStepMs: 50,
       matchTimeMs: Infinity,
       heroSelectMs: -5,
     });
@@ -255,6 +264,7 @@ describe('射击与伤害', () => {
     const t = new CorcodragonFightEngine(mkPlayers(4), {
       mode: 'tdm',
       scoreLimit: 10,
+      tickStepMs: 50,
       rng: mulberry32(7),
     });
     for (const p of t.players) {
@@ -308,6 +318,7 @@ describe('射击与伤害', () => {
     const e = new CorcodragonFightEngine(mkPlayers(2), {
       mode: 'ffa',
       scoreLimit: 1,
+      tickStepMs: 50,
       rng: mulberry32(3),
     });
     start(e);
@@ -484,6 +495,7 @@ describe('英雄技能与终极技', () => {
   it('影枭：死亡标记优先锁定视野内血量最低的敌人', () => {
     const e = new CorcodragonFightEngine(mkPlayers(3), {
       scoreLimit: 10,
+      tickStepMs: 50,
       rng: mulberry32(11),
     });
     start(e, 'yingxiao');
@@ -546,6 +558,7 @@ describe('英雄技能与终极技', () => {
     const e = new CorcodragonFightEngine(mkPlayers(6), {
       mode: 'tdm',
       scoreLimit: 10,
+      tickStepMs: 50,
       rng: mulberry32(21),
     });
     start(e, 'lingyin');
@@ -690,8 +703,25 @@ describe('快照投影', () => {
   it('快照 arena 含掩体与半场尺寸，供客户端渲染', () => {
     const e = mkEngine();
     const view = e.getSnapshot(e.players[0].id);
-    expect(view.arena.half).toBe(BALANCE.arena.half);
-    expect(view.arena.obstacles.length).toBeGreaterThan(0);
+    expect(view.arena?.half).toBe(BALANCE.arena.half);
+    expect(view.arena?.obstacles.length).toBeGreaterThan(0);
+  });
+
+  it('带宽优化：arena 只发一次，私有统计字段仅本人可见', () => {
+    const e = mkEngine();
+    start(e);
+    const a = e.players[0].id;
+    const b = e.players[1].id;
+    const first = e.getSnapshot(a);
+    expect(first.arena).toBeDefined();
+    const second = e.getSnapshot(a);
+    expect(second.arena).toBeUndefined();
+    // 他人快照不含我的私有统计字段
+    const other = e.getSnapshot(b);
+    expect(other.players.find((p) => p.id === a)?.shots).toBeUndefined();
+    expect(other.players.find((p) => p.id === b)?.shots).toBe(0);
+    e.resetArenaFor(a);
+    expect(e.getSnapshot(a).arena).toBeDefined();
   });
 });
 
@@ -749,6 +779,7 @@ describe('训练场模式', () => {
   function trainingEngine(): CorcodragonFightEngine {
     return new CorcodragonFightEngine([{ id: 'you', name: '你' }], {
       mode: 'training',
+      tickStepMs: 50,
       rng: mulberry32(31),
       trainingTargetRespawnMs: 1200,
       trainingTargets: [
@@ -812,6 +843,7 @@ describe('移动测试 AI（只走位不攻击）', () => {
     const e = new CorcodragonFightEngine(mkPlayers(4, true), {
       mode: 'ffa',
       scoreLimit: 5,
+      tickStepMs: 50,
       matchTimeMs: 60_000,
       aiStyle: 'movement',
       rng: mulberry32(77),
@@ -833,6 +865,7 @@ describe('AI bot 与模糊测试', () => {
     const e = new CorcodragonFightEngine(mkPlayers(4, true), {
       mode: 'ffa',
       scoreLimit: 5,
+      tickStepMs: 50,
       matchTimeMs: 120_000,
       rng: mulberry32(99),
     });

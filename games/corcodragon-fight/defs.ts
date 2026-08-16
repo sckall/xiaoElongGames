@@ -242,6 +242,8 @@ export interface EngineOptions {
   heroSelectMs?: number;
   /** 阵亡后复活时长（毫秒，默认取 gameplay.json combat.respawnMs） */
   respawnMs?: number;
+  /** 服务端模拟步长（毫秒；20Hz=50 / 30Hz≈33.33 / 60Hz≈16.67） */
+  tickStepMs?: number;
   /**
    * bot 行为风格：
    * - combat：实战 AI（索敌/射击/技能）
@@ -369,13 +371,13 @@ export interface SnapshotPlayer {
   kills: number;
   deaths: number;
   score: number;
-  /** 射击统计（仅本人快照；训练场/手感验证用） */
-  shots: number;
-  hits: number;
-  headshots: number;
-  damageDealt: number;
+  /** 射击统计（仅本人快照；他人为 undefined，JSON 序列化时省略） */
+  shots?: number;
+  hits?: number;
+  headshots?: number;
+  damageDealt?: number;
   /** 当前散布膨胀（弧度，仅本人；客户端动态准星用） */
-  spreadBloom: number;
+  spreadBloom?: number;
   /** 训练场靶子类型（普通玩家为 null） */
   targetKind: TrainingTargetKind | null;
   /** 命中半径（米；普通玩家=玩家胶囊半径，圆靶可自定义） */
@@ -433,7 +435,11 @@ export interface Snapshot {
   winnerId: string | null;
   winnerTeam: TeamId | null;
   teamScores: Record<TeamId, number>;
-  arena: { half: number; obstacles: AABB[] };
+  /**
+   * 竞技场布局：每个玩家只下发一次（首次快照），之后省略以省带宽；
+   * 客户端需缓存，缺失时用缓存值。
+   */
+  arena?: { half: number; obstacles: AABB[] };
 }
 
 // ---------------- 纯几何工具（引擎与 AI 共用） ----------------

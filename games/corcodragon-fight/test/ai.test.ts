@@ -69,6 +69,7 @@ describe('TDM AI 队伍判别', () => {
       youId: 'me',
       mode: 'tdm',
       scoreLimit: 15,
+      tickStepMs: 50,
       timeLeft: 500_000,
       heroSelectLeft: 0,
       players: [
@@ -109,6 +110,7 @@ describe('TDM AI 队伍判别', () => {
       youId: 'me',
       mode: 'ffa',
       scoreLimit: 15,
+      tickStepMs: 50,
       timeLeft: 500_000,
       heroSelectLeft: 0,
       players: [
@@ -135,6 +137,7 @@ describe('TDM AI 队伍判别', () => {
       youId: 'me',
       mode: 'ffa',
       scoreLimit: 15,
+      tickStepMs: 50,
       timeLeft: 500_000,
       heroSelectLeft: 0,
       players: [
@@ -161,7 +164,7 @@ describe('TDM bot 对局伤害归属', () => {
   it('整局 bot 击杀事件中，击杀者与目标永远不同队', () => {
     const e = new CorcodragonFightEngine(
       Array.from({ length: 6 }, (_, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true })),
-      { mode: 'tdm', scoreLimit: 5, matchTimeMs: 120_000, rng: mulberry32(2024) },
+      { mode: 'tdm', scoreLimit: 5, tickStepMs: 50, matchTimeMs: 120_000, rng: mulberry32(2024) },
     );
     let guard = 0;
     while (e.phase !== 'gameOver' && guard++ < 20_000) e.tick(50);

@@ -26,6 +26,7 @@ import {
   viewRelativeMove,
 } from './defs';
 import type {
+  AABB,
   AIStyle,
   AILevel,
   GameModeKind,
@@ -227,6 +228,8 @@ export interface FpsDriver {
 export interface FightConfig {
   mode: GameModeKind;
   scoreLimit: number;
+  /** 服务端同步频率（Hz）：20/30/60 */
+  tickHz: number;
   /** 复活时长（毫秒） */
   respawnMs: number;
   /** bot 行为：combat=实战 AI；movement=移动测试 AI（只走位不攻击） */
@@ -282,6 +285,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const worldBuiltRef = useRef(false);
+  const arenaRef = useRef<{ half: number; obstacles: AABB[] } | null>(null);
   const playerRendersRef = useRef(new Map<string, PlayerRender>());
   const effectMeshesRef = useRef(new Map<number, THREE.Object3D>());
   const tracerRef = useRef<Tracer[]>([]);
@@ -354,6 +358,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const scene = sceneRef.current;
     const renderer = rendererRef.current;
     if (!host || !scene || !renderer) return;
+    // 竞技场只在首次快照下发：缺失时用缓存
+    const arena = snap.arena ?? arenaRef.current;
+    if (!arena) return;
+    arenaRef.current = arena;
     const hostRect = host.getBoundingClientRect();
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -397,7 +405,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const boxMat = new THREE.MeshStandardMaterial({ color: 0xa5805e, roughness: 0.9 });
     const crateVariants = ['small', 'small', 'medium', 'medium', 'medium', 'wide', 'wide'];
     const gltfLoader = new GLTFLoader();
-    snap.arena.obstacles.forEach((b, idx) => {
+    arena.obstacles.forEach((b, idx) => {
       const w = b.maxX - b.minX;
       const d = b.maxZ - b.minZ;
       const cx = (b.minX + b.maxX) / 2;
@@ -1281,16 +1289,18 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     }
     const snap = driver.snapshot;
     if (!snap) return;
+    const arena = snap.arena ?? arenaRef.current;
+    if (!arena) return;
     const r = BALANCE.arena.playerRadius;
     const bottom = BALANCE.arena.capsuleBottomY;
     const top = BALANCE.arena.capsuleTopY;
-    const shapeKey = `${r}|${bottom}|${top}|${snap.arena.obstacles.length}`;
+    const shapeKey = `${r}|${bottom}|${top}|${arena.obstacles.length}`;
     if (!colliderGroupRef.current || colliderShapeRef.current !== shapeKey || playerCollidersRef.current.size !== snap.players.length) {
       removeGroup();
       const group = new THREE.Group();
       group.name = 'debug-colliders';
       // 掩体碰撞盒（绿色线框，与引擎 AABB 完全一致）
-      for (const b of snap.arena.obstacles) {
+      for (const b of arena.obstacles) {
         const geo = new THREE.BoxGeometry(b.maxX - b.minX, b.height, b.maxZ - b.minZ);
         const line = new THREE.LineSegments(
           new THREE.EdgesGeometry(geo),
@@ -2052,15 +2062,15 @@ function Hud({ snap, me, killFeed }: { snap: Snapshot; me: SnapshotPlayer; killF
           {snap.mode === 'training' ? (
             <>
               <span className="ccf-chip">
-                🎯 命中率 {me.shots > 0 ? Math.round((me.hits / me.shots) * 100) : 0}%
+                🎯 命中率 {(me.shots ?? 0) > 0 ? Math.round(((me.hits ?? 0) / (me.shots ?? 1)) * 100) : 0}%
               </span>
               <span className="ccf-chip">
-                ✅ 命中 {me.hits}/{me.shots} 发
+                ✅ 命中 {me.hits ?? 0}/{me.shots ?? 0} 发
               </span>
               <span className="ccf-chip">
-                💥 爆头率 {me.hits > 0 ? Math.round((me.headshots / me.hits) * 100) : 0}%
+                💥 爆头率 {(me.hits ?? 0) > 0 ? Math.round(((me.headshots ?? 0) / (me.hits ?? 1)) * 100) : 0}%
               </span>
-              <span className="ccf-chip">📊 伤害 {me.damageDealt} · 击碎 {me.kills}</span>
+              <span className="ccf-chip">📊 伤害 {me.damageDealt ?? 0} · 击碎 {me.kills}</span>
             </>
           ) : (
             <>
@@ -2249,6 +2259,7 @@ export function CorcodragonFightLocalScreen({
     const engine = new CorcodragonFightEngine(players, {
       mode: config.mode,
       scoreLimit: config.scoreLimit,
+      tickStepMs: 1000 / (config.tickHz ?? 30),
       respawnMs: config.respawnMs ?? 15_000,
       aiStyle: config.aiStyle ?? 'combat',
       aiLevel: config.aiLevel ?? 'normal',
@@ -2322,10 +2333,11 @@ export function CorcodragonFightDetailScreen({
 }) {
   const [mode, setMode] = useState<GameModeKind>('ffa');
   const [scoreLimit, setScoreLimit] = useState(15);
+  const [tickHz, setTickHz] = useState(30);
   const [respawnMs, setRespawnMs] = useState(15_000);
   const [aiStyle, setAiStyle] = useState<AIStyle>('combat');
   const [aiLevel, setAiLevel] = useState<AILevel>('normal');
-  const config = { mode, scoreLimit, respawnMs, aiStyle, aiLevel };
+  const config = { mode, scoreLimit, tickHz, respawnMs, aiStyle, aiLevel };
   return (
     <div className="page detail-page">
       <div className="panel detail-panel ccf-detail-panel">
@@ -2364,6 +2376,18 @@ export function CorcodragonFightDetailScreen({
                 {[10, 15, 25].map((n) => (
                   <option key={n} value={n}>{n} 杀</option>
                 ))}
+              </select>
+            </div>
+            <div className="field">
+              <span>服务端同步频率</span>
+              <select
+                className="bot-select"
+                value={tickHz}
+                onChange={(e) => setTickHz(Number(e.target.value))}
+              >
+                <option value={20}>20Hz（省资源）</option>
+                <option value={30}>30Hz（推荐）</option>
+                <option value={60}>60Hz（最顺滑）</option>
               </select>
             </div>
             <div className="field">

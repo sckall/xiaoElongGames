@@ -1,6 +1,6 @@
 {
   "tick": {
-    "stepMs": 50,
+    "stepMs": 33.333333333333336,
     "maxAccumulatedMs": 250,
     "botThinkMs": 200,
     "effectChunkMs": 250

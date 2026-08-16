@@ -32,7 +32,7 @@ open 'http://127.0.0.1:5173/?debug=1'
 
 | 分组 | 关键字段 | 单位/说明 | 热更新 |
 |------|----------|-----------|--------|
-| `tick` | `stepMs` / `maxAccumulatedMs` / `botThinkMs` / `effectChunkMs` | 服务端步长/追帧上限/bot 决策周期/持续伤害结算粒度（毫秒） | ✅ |
+| `tick` | `stepMs` / `maxAccumulatedMs` / `botThinkMs` / `effectChunkMs` | 默认服务端步长(30Hz≈33.33ms)；每房间可覆盖为 20/30/60Hz | ✅ |
 | `arena` | `half` / `wallHeight` / `playerRadius` / `eyeY` / `chestY` / `capsuleTopY` / `headshotMinY` / `pitchClamp` | 场地与命中盒（米）；`?debug=1` 面板可实时调并勾选显示玩家胶囊+掩体 AABB | ⚠️ 部分生效（掩体/渲染为模块加载快照，建议改后刷新页面） |
 | `movement` | `gravity` / `jumpVelocity` / `adsSpeedMult` | 重力(m/s²)/跳跃初速/开镜移速倍率 | ✅ |
 | `combat` | `ultChargeMax` / `ultPerDamage` / `ultPerKill` / `ultPerSecond` / `respawnMs` / `explosionFalloff` / 默认局参数 | 充能与重生 | ✅ |

@@ -76,6 +76,7 @@ export default function App() {
   const [fightConfig, setFightConfig] = useState<FightConfig>({
     mode: 'ffa',
     scoreLimit: 15,
+    tickHz: 30,
     respawnMs: 15_000,
     aiStyle: 'combat',
     aiLevel: 'normal',

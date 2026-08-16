@@ -63,9 +63,11 @@ export default function RealtimeLobbyScreen({
     typeof roomConfig?.scoreLimit === 'number' ? roomConfig.scoreLimit : config.scoreLimit;
   const effectiveRespawn =
     typeof roomConfig?.respawnMs === 'number' ? roomConfig.respawnMs : config.respawnMs ?? 15_000;
+  const effectiveTickHz =
+    typeof roomConfig?.tickHz === 'number' ? roomConfig.tickHz : config.tickHz ?? 30;
   const effectiveAiStyle = roomConfig?.aiStyle ?? config.aiStyle;
   const effectiveAiLevel = roomConfig?.aiLevel ?? config.aiLevel ?? 'normal';
-  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀 · 复活 ${Math.round(effectiveRespawn / 1000)}s · ${
+  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀 · ${effectiveTickHz}Hz · 复活 ${Math.round(effectiveRespawn / 1000)}s · ${
     effectiveAiStyle === 'movement' ? '🧪 陪练' : '⚔️ 实战 AI'
   } · ${
     effectiveAiLevel === 'easy' ? '🐣 简单' : effectiveAiLevel === 'hard' ? '🔥 困难' : '⚖️ 普通'
@@ -260,6 +262,7 @@ export default function RealtimeLobbyScreen({
                   remote.create(defaultName, 0, createPw, {
                     mode: config.mode,
                     scoreLimit: config.scoreLimit,
+                    tickHz: config.tickHz ?? 30,
                     respawnMs: config.respawnMs ?? 15_000,
                     aiStyle: config.aiStyle ?? 'combat',
                     aiLevel: config.aiLevel ?? 'normal',

@@ -6,7 +6,7 @@
 ## 1. 目标
 
 在不动出包魔法师（turn-based）大厅/房间/连接逻辑的前提下，新增一条平行 realtime
-通道，支持 **服务端权威 20Hz tick + 客户端输入流 + 按玩家视角快照**。
+通道，支持 **服务端权威可配置频率 tick（20/30/60Hz，默认 30Hz）+ 客户端输入流 + 按玩家视角快照**。
 
 ## 2. 契约扩展（games/types.ts）
 
@@ -20,7 +20,7 @@
 | 方向 | 事件 | 载荷 | 频率 |
 |------|------|------|------|
 | C→S | `rtInput` | `{ input: unknown }`（引擎白名单校验） | 事件驱动（键鼠边沿 + 移动/视角变化），可靠有序 |
-| S→C | `rtSnapshot` | `getSnapshot(playerId)` 投影快照 | 每房间 20Hz 全量（2-7 人规模足够，差量见 §6） |
+| S→C | `rtSnapshot` | `getSnapshot(playerId)` 投影快照 | 每房间按房主选择 20/30/60Hz（默认 30Hz）；arena 只发一次、他人私有统计字段省略 |
 | 双向 | 既有 `lobby/state/error` | `lobby` 增加 `gameId` 字段 | 复用大厅生命周期 |
 
 房间码全局唯一（跨游戏共用 `rooms` Map），`createRoom` 载荷增加可选 `gameId`
@@ -29,8 +29,8 @@
 
 ## 4. 服务端权威模型
 
-- 每个进行中的 realtime 房间一个 `CorcodragonFightEngine` 实例 + 50ms `setInterval`；
-- `tick` 内部按固定步长（50ms）推进，累计上限 250ms，防止事件循环卡顿后追帧雪崩；
+- 每个进行中的 realtime 房间一个 `CorcodragonFightEngine` 实例 + 按引擎 `tickStepMs` 的 `setInterval`；
+- `tick` 内部按该房间步长（20Hz=50ms / 30Hz≈33.33ms / 60Hz≈16.67ms）推进，累计上限 250ms，防止事件循环卡顿后追帧雪崩；
 - 射击/技能/伤害/重生/胜负全部在引擎内结算：射线-掩体、射线-胶囊、爆头判定、
   距离衰减、冷却与充能；
 - 每 tick 后对每个在线真人 `emit('rtSnapshot', engine.getSnapshot(id))`，
@@ -46,13 +46,14 @@
 - **网络观测**：客户端 2s 一次 `rtPing` 估算单程延迟，`?debug=1` 显示
   ping / 漂移 / 待确认输入数 / 渲染 fps；
 - **他人渲染**：快照速度外推 + `client.interpolationBufferMs`（默认 90ms）插值缓冲，
-  消除 20Hz 快照的“跳格感”；渲染帧率与服务端模拟频率相互独立；
+  消除快照“跳格感”；渲染帧率与服务端模拟频率相互独立；
 - **投影**：隐身敌人快照中 `visible=false` 且位置置空，客户端直接不渲染；
   私有伤害事件只发给双方；弹道/击杀等公开事件按可见性过滤。
 
 ## 6. 已知取舍与演进
 
-1. 当前为**全量快照**（约几 KB/帧），2-7 人局域网完全够用；多人公网再升级为
+1. 当前为**全量快照**，已做两项带宽优化：竞技场布局每玩家只发一次、他人私有统计
+   字段 JSON 省略；30Hz 下 2-7 人局域网/普通公网足够，更大规模再升级
    `getDelta(lastSeq)` 差量快照（契约已预留 `seq` 字段）。
 2. 当前断线语义：realtime 房间断线即由引擎 bot 接管（AI 只用该座位视角），
    重连恢复真人输入；如需“站桩/移除”语义只需在 RealtimeRoom 关掉 AI 接管开关。
@@ -65,7 +66,7 @@
 
 - [x] 契约：`games/types.ts` `RealtimeGameEngine` + `createRealtimeEngine`
 - [x] 协议：`rtInput` / `rtSnapshot` / `createRoom.gameId+config`（旧事件全保留）
-- [x] 服务端：`apps/server/src/realtime-room.ts`（50ms tick、视角快照、断线 AI 接管/重连）
+- [x] 服务端：`apps/server/src/realtime-room.ts`（可配置 tick、视角快照、断线 AI 接管/重连）
 - [x] 引擎：移动/碰撞/弹道/爆头/技能/效果/重生/胜负，全动作白名单校验（34 单测）
 - [x] 数据化：gameplay.json + balance.ts 校验/热更新；`?debug=1` tweakpane 调参面板
 - [x] 同步调试：输入 seq/回执、rtPing、漂移统计与软校正

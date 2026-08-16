@@ -268,6 +268,8 @@ export class CorcodragonFightEngine {
   readonly matchTimeMs: number;
   readonly heroSelectMs: number;
   readonly respawnMs: number;
+  /** 服务端模拟步长（毫秒）：20Hz=50 / 30Hz=33.33 / 60Hz=16.67 */
+  readonly tickStepMs: number;
   readonly aiStyle: AIStyle;
   readonly aiLevel: AILevel;
   phase: 'heroSelect' | 'playing' | 'gameOver' = 'heroSelect';
@@ -291,6 +293,7 @@ export class CorcodragonFightEngine {
   readonly killLog: { at: number; shooterId: string | null; targetId: string }[] = [];
   private lastSentSeq = new Map<string, number>();
   private lastInputSeq = new Map<string, number>();
+  private arenaSent = new Set<string>();
   private botNextThink = new Map<string, number>();
   private effects: EngineEffect[] = [];
 
@@ -312,6 +315,7 @@ export class CorcodragonFightEngine {
       120_000,
       BALANCE.combat.respawnMs,
     );
+    const tickStepMs = optNum(options.tickStepMs, 10, 100, BALANCE.tick.stepMs);
     const rng = typeof options.rng === 'function' ? options.rng : Math.random;
 
     this.mode = mode;
@@ -319,6 +323,7 @@ export class CorcodragonFightEngine {
     this.matchTimeMs = matchTimeMs;
     this.heroSelectMs = heroSelectMs;
     this.respawnMs = respawnMs;
+    this.tickStepMs = tickStepMs;
     this.aiStyle = aiStyle;
     this.aiLevel = aiLevel;
     this.timeLeft = matchTimeMs;
@@ -520,6 +525,11 @@ export class CorcodragonFightEngine {
     if (seq > prev) this.lastInputSeq.set(playerId, Math.floor(seq));
   }
 
+  /** 强制向该玩家重新下发 arena（重连/新客户端接入时调用） */
+  resetArenaFor(playerId: string): void {
+    this.arenaSent.delete(playerId);
+  }
+
   /**
    * 平台断线托管开关：真人断线 → 引擎按 bot 接管（AI 只用该座位视角）；
    * 真人重连 → 关闭托管并清空其输入。站桩/移除语义可在此扩展。
@@ -702,18 +712,18 @@ export class CorcodragonFightEngine {
   tick(dtMs: number): void {
     if (typeof dtMs !== 'number' || !Number.isFinite(dtMs) || dtMs < 0) return;
     this.acc += Math.min(dtMs, 250);
-    while (this.acc >= BALANCE.tick.stepMs) {
-      this.acc -= BALANCE.tick.stepMs;
+    while (this.acc >= this.tickStepMs) {
+      this.acc -= this.tickStepMs;
       this.step();
     }
   }
 
   private step(): void {
-    this.t += BALANCE.tick.stepMs;
-    const dt = BALANCE.tick.stepMs / 1000;
+    this.t += this.tickStepMs;
+    const dt = this.tickStepMs / 1000;
 
     if (this.phase === 'heroSelect') {
-      this.heroSelectLeft = Math.max(0, this.heroSelectLeft - BALANCE.tick.stepMs);
+      this.heroSelectLeft = Math.max(0, this.heroSelectLeft - this.tickStepMs);
       for (const p of this.players) {
         if (!p.hero) {
           if (p.isBot) {
@@ -746,7 +756,7 @@ export class CorcodragonFightEngine {
     if (this.phase === 'gameOver') return;
 
     if (this.mode !== 'training') {
-      this.timeLeft = Math.max(0, this.timeLeft - BALANCE.tick.stepMs);
+      this.timeLeft = Math.max(0, this.timeLeft - this.tickStepMs);
     }
 
     // 1. 冷却与状态推进
@@ -772,7 +782,7 @@ export class CorcodragonFightEngine {
         p.ultCharge + BALANCE.combat.ultPerSecond * dt,
       );
       if (p.reloading) {
-        p.reloadT = Math.max(0, p.reloadT - BALANCE.tick.stepMs);
+        p.reloadT = Math.max(0, p.reloadT - this.tickStepMs);
         if (p.reloadT <= 0) {
           p.reloading = false;
           const def = WEAPON_DEFS[p.weapon];
@@ -1632,7 +1642,7 @@ export class CorcodragonFightEngine {
   }
 
   private stepEffects(): void {
-    const dt = BALANCE.tick.stepMs / 1000;
+    const dt = this.tickStepMs / 1000;
     const chunkSec = BALANCE.tick.effectChunkMs / 1000;
     const keep: EngineEffect[] = [];
     for (const e of this.effects) {
@@ -1895,11 +1905,11 @@ export class CorcodragonFightEngine {
         kills: visible ? p.kills : 0,
         deaths: visible ? p.deaths : 0,
         score: visible ? p.score : 0,
-        shots: p.id === you.id ? p.shots : 0,
-        hits: p.id === you.id ? p.hits : 0,
-        headshots: p.id === you.id ? p.headshots : 0,
-        damageDealt: p.id === you.id ? p.damageDealt : 0,
-        spreadBloom: p.id === you.id ? p.spreadBloom : 0,
+        shots: p.id === you.id ? p.shots : undefined,
+        hits: p.id === you.id ? p.hits : undefined,
+        headshots: p.id === you.id ? p.headshots : undefined,
+        damageDealt: p.id === you.id ? p.damageDealt : undefined,
+        spreadBloom: p.id === you.id ? p.spreadBloom : undefined,
         targetKind: p.targetKind,
         hitRadius: p.hitRadius,
         visible,
@@ -1920,8 +1930,17 @@ export class CorcodragonFightEngine {
       amount: e.amount,
     }));
 
+    // 竞技场布局只在该玩家首次快照下发，之后省略（客户端缓存）
+    const arenaForViewer = !this.arenaSent.has(playerId)
+      ? {
+          half: BALANCE.arena.half,
+          obstacles: OBSTACLES.map((b) => ({ ...b })),
+        }
+      : undefined;
+    this.arenaSent.add(playerId);
+
     return {
-      seq: Math.round(this.t / BALANCE.tick.stepMs),
+      seq: Math.round(this.t / this.tickStepMs),
       t: this.t,
       phase: this.phase,
       youId: playerId,
@@ -1948,7 +1967,7 @@ export class CorcodragonFightEngine {
       winnerId: this.winnerId,
       winnerTeam: this.winnerTeam,
       teamScores: { ...this.teamScores },
-      arena: { half: BALANCE.arena.half, obstacles: OBSTACLES.map((b) => ({ ...b })) },
+      ...(arenaForViewer ? { arena: arenaForViewer } : {}),
     };
   }
 
@@ -2002,6 +2021,12 @@ export function createEngine(
         matchTimeMs: typeof options.matchTimeMs === 'number' ? options.matchTimeMs : undefined,
         heroSelectMs: typeof options.heroSelectMs === 'number' ? options.heroSelectMs : undefined,
         respawnMs: typeof options.respawnMs === 'number' ? options.respawnMs : undefined,
+        tickStepMs:
+          typeof options.tickHz === 'number'
+            ? 1000 / options.tickHz
+            : typeof options.tickStepMs === 'number'
+              ? options.tickStepMs
+              : undefined,
         aiStyle: options.aiStyle === 'movement' ? 'movement' : options.aiStyle === 'combat' ? 'combat' : undefined,
         aiLevel:
           options.aiLevel === 'easy' || options.aiLevel === 'normal' || options.aiLevel === 'hard'
