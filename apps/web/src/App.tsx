@@ -77,6 +77,7 @@ export default function App() {
     mode: 'ffa',
     scoreLimit: 15,
     aiStyle: 'combat',
+    aiLevel: 'normal',
   });
   const [fightPrefs, setFightPrefs] = useState<FightPrefs>(loadFightPrefs);
 

@@ -47,6 +47,14 @@ open 'http://127.0.0.1:5173/?debug=1'
 - 所有数值都会被 `validateBalance` 做范围校验；**非法补丁整体拒绝**，绝不让半坏配置进入游戏；
 - `defs.ts` 里的 `HERO_DEFS` / `WEAPON_DEFS` 是 Proxy：每次访问实时读 BALANCE，
   所以 HUD 文字、引擎伤害都随滑杆同步变化。
+- **地图布局**：掩体坐标与重生点硬编码在 `defs.ts` 的 `OBSTACLES` / `SPAWN_POINTS`
+  （v0.2 起半场 26m、13 组掩体）。`arena.half` 请保持 26，若想改尺寸需同步调整
+  `OBSTACLES` 坐标；客户端渲染读取快照中的 `arena.obstacles`，改完刷新页面即可。
+- v0.2 技能参数速查：`tiebi.ability.shieldValue/shieldDuration/shieldDistance/
+  shieldWidth/shieldHeight/shieldCenterY`（方向能量墙）、
+  `lingyin.ability.waveRange/waveAngleDeg`（扇形治愈波）、
+  `yanren.ability.ultRadius/trailDps`、`guilei.ability.bombSpeed/bombGravity/
+  bombRadius`（抛物线炸弹）、`combat.respawnInvulnMs`（重生无敌毫秒）。
 
 ## 3. 推荐的调参流程（配合移动测试 AI）
 

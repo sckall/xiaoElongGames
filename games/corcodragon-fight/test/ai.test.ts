@@ -37,7 +37,11 @@ function p(partial: Partial<SnapshotPlayer> & { id: string }): SnapshotPlayer {
     ultCharge: 0,
     ads: false,
     stealthT: 0,
+    stealthStrikeReady: false,
+    skillAim: false,
+    ultAim: false,
     fortifyT: 0,
+    invulnT: 0,
     onGround: true,
     respawnIn: 0,
     kills: 0,
@@ -79,7 +83,7 @@ describe('TDM AI 队伍判别', () => {
       teamScores: { A: 0, B: 0 },
       arena: { half: 20, obstacles: [] },
     } as unknown as Snapshot;
-    const actions = chooseAIInputs(view, { rng: mulberry32(9) });
+    const actions = chooseAIInputs(view, { rng: mulberry32(9), level: 'hard' });
     // 目标必须是 +z 方向的敌人：视线 yaw≈0（队友在 +x 方向）
     const look = actions.find((a) => a.type === 'look');
     expect(look?.type).toBe('look');
@@ -118,9 +122,38 @@ describe('TDM AI 队伍判别', () => {
       teamScores: { A: 0, B: 0 },
       arena: { half: 20, obstacles: [] },
     } as unknown as Snapshot;
-    const actions = chooseAIInputs(view, { rng: mulberry32(9) });
+    const actions = chooseAIInputs(view, { rng: mulberry32(9), level: 'hard' });
     const fire = actions.find((a) => a.type === 'fire');
     expect(fire && fire.type === 'fire' && fire.pressed).toBe(true);
+  });
+
+  it('AI 难度分级：easy 放水概率高、hard 必定开火', () => {
+    const view = {
+      seq: 1,
+      t: 1000,
+      phase: 'playing',
+      youId: 'me',
+      mode: 'ffa',
+      scoreLimit: 15,
+      timeLeft: 500_000,
+      heroSelectLeft: 0,
+      players: [
+        p({ id: 'me', team: 'A', pos: { x: -11, y: 0, z: 0 }, yaw: 0 }),
+        p({ id: 'enemy', team: 'A', pos: { x: -11, y: 0, z: 8 }, yaw: Math.PI }),
+      ],
+      effects: [],
+      events: [],
+      winnerId: null,
+      winnerTeam: null,
+      teamScores: { A: 0, B: 0 },
+      arena: { half: 20, obstacles: [] },
+    } as unknown as Snapshot;
+    // rng=0.9 > easy.fireChance(0.45) → easy 不扣扳机
+    const easy = chooseAIInputs(view, { rng: () => 0.9, level: 'easy' }).find((a) => a.type === 'fire');
+    expect(easy && easy.type === 'fire' && easy.pressed).toBe(false);
+    // rng=0 < hard.fireChance(1) → hard 必开火
+    const hard = chooseAIInputs(view, { rng: () => 0, level: 'hard' }).find((a) => a.type === 'fire');
+    expect(hard && hard.type === 'fire' && hard.pressed).toBe(true);
   });
 });
 

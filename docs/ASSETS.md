@@ -10,6 +10,7 @@
 |------|------|--------|------|------|
 | `crate-small/medium/wide.glb` + `Textures/colormap.png` | [Kenney · Blaster Kit 2.1](https://kenney.nl/assets/blaster-kit)（直链 zip 已归档 `tools/assets-archive/`，1.6MB） | **CC0**（公有领域，可商用，署名非必须） | 竞技场掩体木箱替换占位盒 | `games/corcodragon-fight/assets/models/` |
 | `blaster-a.glb`（步枪）/ `blaster-e.glb`（狙击）/ `blaster-h.glb`（手枪） | 同上 | **CC0** | 第一人称枪模（GLTFLoader 加载，失败回退程序化枪模） | `games/corcodragon-fight/assets/models/` |
+| `characters/hero-{barbarian,rogue-hooded,knight,mage,rogue}.glb` | [KayKit · Character Pack Adventures 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) | **CC0**（包内 `LICENSE-KayKit.txt` 已随资产保存） | 5 位英雄的低多边形角色模型（替换胶囊人视觉；引擎碰撞箱不变） | `games/corcodragon-fight/assets/models/characters/` |
 | 程序化音效（射击/命中/爆头/击杀/换弹/技能/终极技/跳跃/治疗/重生） | 自研 WebAudio（`fx.ts`） | 自有 | 全部音效 | `games/corcodragon-fight/fx.ts` |
 | 程序化匕首模型 + 挥砍动画 | 自研 Three.js 几何体 | 自有 | 近战武器 | `GameUI.tsx` |
 

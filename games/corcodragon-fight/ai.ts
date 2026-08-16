@@ -6,6 +6,7 @@ import { HERO_IDS, SPAWN_POINTS, segmentBlocked, wrapAngle } from './defs';
 import { BALANCE } from './balance';
 import type {
   AIStyle,
+  AILevel,
   HeroId,
   RealtimeInputAction,
   Snapshot,
@@ -16,6 +17,8 @@ export interface AIOptions {
   rng?: () => number;
   /** combat=实战；movement=只走位不攻击（手感/碰撞测试用） */
   style?: AIStyle;
+  /** 难度分级：影响决策周期（引擎负责）、瞄准容差与开火概率 */
+  level?: AILevel;
 }
 
 function hash(s: string): number {
@@ -26,6 +29,7 @@ function hash(s: string): number {
 
 export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): RealtimeInputAction[] {
   const rng = options.rng ?? Math.random;
+  const level = BALANCE.ai.levels[options.level ?? 'normal'] ?? BALANCE.ai.levels.normal;
   const me = view.players.find((p) => p.id === view.youId);
   if (!me) return [];
 
@@ -93,7 +97,14 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
   const dist = Math.hypot(dx, dz) || 1;
   const desiredYaw = Math.atan2(dx, dz);
   const aimYawDiff = Math.abs(wrapAngle(desiredYaw - me.yaw));
-  const canSee = !segmentBlocked(me.pos.x, me.pos.z, target.pos.x, target.pos.z);
+  const canSee = !segmentBlocked(
+    me.pos.x,
+    me.pos.z,
+    target.pos.x,
+    target.pos.z,
+    view.arena.obstacles,
+    view.arena.half,
+  );
 
   // 武器选择：近身用匕首，远处用步枪/狙击（按英雄习惯）
   const meleeRange = BALANCE.ai.meleeRange;
@@ -133,13 +144,13 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
     actions.push({ type: 'ads', pressed: false });
   }
 
-  // 开火
+  // 开火：难度决定瞄准容差与开火概率（easy 会经常“故意放水”）
   const aimOk =
     me.weapon === 'dagger'
       ? aimYawDiff < BALANCE.ai.meleeAimTolerance && dist < meleeRange
-      : aimYawDiff < BALANCE.ai.aimTolerance;
+      : aimYawDiff < level.aimTolerance;
   const canFire = me.fireCd <= 0.03 && me.ammo > 0 && !me.reloading;
-  if (canSee && aimOk && canFire) {
+  if (canSee && aimOk && canFire && rng() < level.fireChance) {
     actions.push({ type: 'fire', pressed: true });
   } else {
     actions.push({ type: 'fire', pressed: false });
@@ -159,8 +170,8 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
     actions.push({ type: 'reload' });
   }
 
-  // 主动技能：按英雄与局势
-  if (me.skillCd <= 0.03 && canSee) {
+  // 主动技能：按英雄与局势（低难度 AI 使用技能的概率更低）
+  if (me.skillCd <= 0.03 && canSee && rng() < level.fireChance) {
     switch (me.hero) {
       case 'yanren':
         if (dist < 12) actions.push({ type: 'skill' });
@@ -175,17 +186,22 @@ export function chooseAIInputs(view: Snapshot, options: AIOptions = {}): Realtim
         if (me.hp / me.maxHp < 0.8) actions.push({ type: 'skill' });
         break;
       case 'guilei':
-        if (dist < 22) actions.push({ type: 'skill' });
+        if (dist < 22) {
+          actions.push(me.skillAim ? { type: 'skillFire' } : { type: 'skill' });
+        }
         break;
     }
   }
 
   // 终极技能
-  if (me.ultCharge >= 99) {
+  if (me.ultCharge >= 99 && rng() < level.fireChance) {
     switch (me.hero) {
       case 'yanren':
-      case 'guilei':
       case 'yingxiao':
+        if (dist < 15 && canSee) actions.push({ type: 'ult' });
+        break;
+      case 'guilei':
+        // 雷暴云已改为以自身为中心：直接释放
         if (dist < 15 && canSee) actions.push({ type: 'ult' });
         break;
       case 'tiebi':

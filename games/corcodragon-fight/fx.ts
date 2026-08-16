@@ -146,6 +146,13 @@ export class SfxPlayer {
     this.osc('sine', 160, 110, 0.2, 0.09);
   }
 
+  /** 子弹被铁壁能量护盾吸收的钝响 */
+  shieldBlock(): void {
+    if (!this.ready()) return;
+    this.osc('sine', 240, 160, 0.18, 0.08);
+    this.burst(0.1, 0.05, 1200, 500);
+  }
+
   kill(): void {
     this.osc('sine', 130, 45, 0.34, 0.22);
     this.osc('sine', 660, 880, 0.12, 0.16, 0.04);

@@ -6,7 +6,7 @@
     "effectChunkMs": 250
   },
   "arena": {
-    "half": 20,
+    "half": 26,
     "wallHeight": 3.2,
     "playerRadius": 0.55,
     "eyeY": 1.62,
@@ -27,6 +27,7 @@
     "ultPerKill": 40,
     "ultPerSecond": 2,
     "respawnMs": 3000,
+    "respawnInvulnMs": 1500,
     "explosionFalloff": 0.5,
     "scoreLimitDefault": 15,
     "matchTimeMsDefault": 600000,
@@ -40,16 +41,16 @@
       "hp": 150,
       "speed": 5.4,
       "skillName": "烈焰冲刺",
-      "skillDesc": "向前突进 10 米并留下火焰路径，灼烧敌人（25/秒）",
+      "skillDesc": "向前突进 10 米并留下火焰路径，灼烧敌人（14/秒）",
       "skillCd": 8,
       "ultName": "焚天烈焰",
-      "ultDesc": "以自身为中心半径 9 米爆炸，造成 80 伤害",
+      "ultDesc": "以自身为中心半径 12 米爆炸，造成 80 伤害",
       "ability": {
         "dashDistance": 10,
         "trailRadius": 1.1,
         "trailDuration": 2.5,
-        "trailDps": 25,
-        "ultRadius": 9,
+        "trailDps": 14,
+        "ultRadius": 12,
         "ultDamage": 80
       }
     },
@@ -60,14 +61,13 @@
       "hp": 120,
       "speed": 5.9,
       "skillName": "暗影潜行",
-      "skillDesc": "隐身 4 秒并提速；隐身中首次命中伤害翻倍并显形",
+      "skillDesc": "隐身 6 秒并提速；隐身中命中敌人会压至 1 血、立即充满终极技并显形；被命中也会显形",
       "skillCd": 10,
       "ultName": "死亡标记",
-      "ultDesc": "标记 20 米内一名可见敌人，2.5 秒后造成 90 伤害",
+      "ultDesc": "标记 20 米内一名可见敌人，2.5 秒后造成 90 伤害；以此击杀立即刷新主动技能",
       "ability": {
-        "stealthDuration": 4,
+        "stealthDuration": 6,
         "stealthSpeedMult": 1.25,
-        "stealthDamageMult": 2,
         "markRange": 20,
         "markDelay": 2.5,
         "markDamage": 90
@@ -80,13 +80,17 @@
       "hp": 250,
       "speed": 4.5,
       "skillName": "能量护盾",
-      "skillDesc": "获得 80 点临时护盾，持续 5 秒",
+      "skillDesc": "在视角正前方展开 4.8 米宽护盾（300 生命，持续 6 秒），吸收敌方子弹并保护队友",
       "skillCd": 12,
       "ultName": "堡垒模式",
       "ultDesc": "6 秒内受伤 -50%，射速 +40%",
       "ability": {
-        "shieldValue": 80,
-        "shieldDuration": 5,
+        "shieldValue": 300,
+        "shieldDuration": 6,
+        "shieldDistance": 1.8,
+        "shieldWidth": 4.8,
+        "shieldHeight": 3.0,
+        "shieldCenterY": 1.2,
         "fortifyDuration": 6,
         "fortifyDamageMult": 0.5,
         "fortifyFireRateMult": 0.6
@@ -99,14 +103,15 @@
       "hp": 175,
       "speed": 5.0,
       "skillName": "治愈波",
-      "skillDesc": "治疗自己 45（团队模式同时治疗 8 米内队友 30）",
+      "skillDesc": "向视角方向发射扇形治愈波：自己恢复 45，14 米内 60° 扇形内队友恢复 30",
       "skillCd": 8,
       "ultName": "音障领域",
       "ultDesc": "脚下创造持续 5 秒治疗领域（半径 7，25/秒）",
       "ability": {
         "selfHeal": 45,
         "allyHeal": 30,
-        "allyRadius": 8,
+        "waveRange": 14,
+        "waveAngleDeg": 60,
         "zoneRadius": 7,
         "zoneDuration": 5,
         "zoneHealPerSec": 25
@@ -119,19 +124,21 @@
       "hp": 150,
       "speed": 5.1,
       "skillName": "粘性炸弹",
-      "skillDesc": "投掷粘性炸弹，1.2 秒后爆炸（半径 5，35 伤害）",
+      "skillDesc": "准备投掷粘性炸弹，点击左键向视角方向抛出抛物线炸弹，落地 1.2 秒后爆炸（半径 5，35 伤害）",
       "skillCd": 6,
       "ultName": "雷暴云",
-      "ultDesc": "目标区域召唤雷暴 4 秒（半径 7，25/秒并减速 50%）",
+      "ultDesc": "以自身为中心召唤雷暴 4 秒（半径 7，18/秒并减速 50%，控制为主）",
       "ability": {
         "bombThrowRange": 30,
+        "bombSpeed": 16,
+        "bombGravity": 12,
         "bombFuse": 1.2,
         "bombRadius": 5,
         "bombDamage": 35,
         "stormRange": 25,
         "stormRadius": 7,
         "stormDuration": 4,
-        "stormDps": 25,
+        "stormDps": 18,
         "slowDuration": 0.4,
         "slowMult": 0.5
       }
@@ -232,7 +239,12 @@
     "preferredRange": 9,
     "meleeRange": 3.4,
     "aimTolerance": 0.12,
-    "meleeAimTolerance": 0.5
+    "meleeAimTolerance": 0.5,
+    "levels": {
+      "easy": { "thinkMs": 900, "aimTolerance": 0.32, "fireChance": 0.45 },
+      "normal": { "thinkMs": 350, "aimTolerance": 0.14, "fireChance": 0.85 },
+      "hard": { "thinkMs": 220, "aimTolerance": 0.07, "fireChance": 1 }
+    }
   },
   "client": {
     "mouseSensitivity": 0.0022,

@@ -170,26 +170,39 @@ export const WEAPON_DEFS = new Proxy({} as Record<WeaponId, WeaponDef>, {
 export const HERO_LIST: HeroDef[] = HERO_IDS.map((k) => HERO_DEFS[k]);
 export const WEAPON_LIST: WeaponDef[] = WEAPON_IDS.map((k) => WEAPON_DEFS[k]);
 
-/** 竞技场掩体（不可通行、阻挡视线与弹道）。单位：米，Y=0 为地面。 */
+/** 竞技场掩体（不可通行、阻挡视线与弹道）。单位：米，Y=0 为地面。
+ *  v0.2 地图：半场 26 米，参考经典 FPS 的三线布局——
+ *  四角高箱 + 中央高台 + 四边低位横梁 + 四组侧翼短墙，形成中/边三条进攻走廊。 */
 export const OBSTACLES: AABB[] = [
-  { minX: -9, maxX: -4, minZ: -9, maxZ: -4, height: 2.6 },
-  { minX: 4, maxX: 9, minZ: -9, maxZ: -4, height: 2.6 },
-  { minX: -9, maxX: -4, minZ: 4, maxZ: 9, height: 2.6 },
-  { minX: 4, maxX: 9, minZ: 4, maxZ: 9, height: 2.6 },
+  // 四角高箱（2.6m，配合跳跃/掩体）
+  { minX: -11, maxX: -6, minZ: -11, maxZ: -6, height: 2.6 },
+  { minX: 6, maxX: 11, minZ: -11, maxZ: -6, height: 2.6 },
+  { minX: -11, maxX: -6, minZ: 6, maxZ: 11, height: 2.6 },
+  { minX: 6, maxX: 11, minZ: 6, maxZ: 11, height: 2.6 },
+  // 中央高台（地图争夺核心）
   { minX: -2.5, maxX: 2.5, minZ: -2.5, maxZ: 2.5, height: 2.6 },
-  { minX: -1.5, maxX: 1.5, minZ: -14, maxZ: -11, height: 1.2 },
-  { minX: -1.5, maxX: 1.5, minZ: 11, maxZ: 14, height: 1.2 },
+  // 南北低位横梁（中路上下半区）
+  { minX: -3, maxX: 3, minZ: -17, maxZ: -14, height: 1.2 },
+  { minX: -3, maxX: 3, minZ: 14, maxZ: 17, height: 1.2 },
+  // 东西低位横梁（左右半区）
+  { minX: -17, maxX: -14, minZ: -3, maxZ: 3, height: 1.2 },
+  { minX: 14, maxX: 17, minZ: -3, maxZ: 3, height: 1.2 },
+  // 四组侧翼短墙（划分三线走廊，1.8m 掩体）
+  { minX: -13, maxX: -9, minZ: -20, maxZ: -13, height: 1.8 },
+  { minX: 9, maxX: 13, minZ: -20, maxZ: -13, height: 1.8 },
+  { minX: -13, maxX: -9, minZ: 13, maxZ: 20, height: 1.8 },
+  { minX: 9, maxX: 13, minZ: 13, maxZ: 20, height: 1.8 },
 ];
 
 export const SPAWN_POINTS: Vec3[] = [
-  { x: -16, y: 0, z: -16 },
-  { x: 16, y: 0, z: -16 },
-  { x: -16, y: 0, z: 16 },
-  { x: 16, y: 0, z: 16 },
-  { x: 0, y: 0, z: -17 },
-  { x: 0, y: 0, z: 17 },
-  { x: -17, y: 0, z: 0 },
-  { x: 17, y: 0, z: 0 },
+  { x: 0, y: 0, z: -23 },
+  { x: 0, y: 0, z: 23 },
+  { x: -23, y: 0, z: 0 },
+  { x: 23, y: 0, z: 0 },
+  { x: -23, y: 0, z: -23 },
+  { x: 23, y: 0, z: -23 },
+  { x: -23, y: 0, z: 23 },
+  { x: 23, y: 0, z: 23 },
 ];
 
 /** 玩家碰撞半径（米） */
@@ -216,6 +229,9 @@ export interface PlayerConfig {
 export const AI_STYLES = ['combat', 'movement'] as const;
 export type AIStyle = (typeof AI_STYLES)[number];
 
+export const AI_LEVELS = ['easy', 'normal', 'hard'] as const;
+export type AILevel = (typeof AI_LEVELS)[number];
+
 export interface EngineOptions {
   mode?: GameModeKind;
   /** 自由混战=个人击杀线；团队死斗=队伍击杀线 */
@@ -230,6 +246,8 @@ export interface EngineOptions {
    * - movement：移动测试 AI（只走位不攻击，用于验证手感/碰撞）
    */
   aiStyle?: AIStyle;
+  /** bot 难度：easy 低命中率/慢反应；normal；hard 高命中 */
+  aiLevel?: AILevel;
   /** 训练场靶子配置（mode='training' 时生效） */
   trainingTargets?: TrainingTargetConfig[];
   /** 训练场靶子被击倒后的重生时间（毫秒） */
@@ -257,7 +275,11 @@ export type RealtimeInputAction =
   | { type: 'reload' }
   | { type: 'switchWeapon'; weapon: WeaponId }
   | { type: 'skill' }
+  | { type: 'skillFire' }
+  | { type: 'skillCancel' }
   | { type: 'ult' }
+  | { type: 'ultFire' }
+  | { type: 'ultCancel' }
   | { type: 'spawn' };
 
 export const INPUT_TYPES = new Set<string>([
@@ -270,7 +292,11 @@ export const INPUT_TYPES = new Set<string>([
   'reload',
   'switchWeapon',
   'skill',
+  'skillFire',
+  'skillCancel',
   'ult',
+  'ultFire',
+  'ultCancel',
   'spawn',
 ]);
 
@@ -279,15 +305,18 @@ export const INPUT_TYPES = new Set<string>([
 export type EffectKind =
   | 'fireTrail'
   | 'healZone'
+  | 'healWave'
   | 'stormZone'
   | 'bomb'
   | 'explosion'
+  | 'ultRing'
   | 'shieldAura';
 
 export type EventKind =
   | 'info'
   | 'shot'
   | 'hit'
+  | 'blocked'
   | 'heal'
   | 'skill'
   | 'ult'
@@ -322,8 +351,16 @@ export interface SnapshotPlayer {
   ads: boolean;
   /** 隐身剩余（秒）；对不可见玩家恒为 0 */
   stealthT: number;
+  /** 隐身破隐一击是否可用（仅本人快照有意义） */
+  stealthStrikeReady: boolean;
+  /** 技能二段瞄准：已按下待释放（诡雷炸弹等） */
+  skillAim: boolean;
+  /** 终极技二段瞄准：已按下待释放（雷暴云等） */
+  ultAim: boolean;
   /** 堡垒模式剩余（秒） */
   fortifyT: number;
+  /** 重生无敌剩余（秒）；0=可被伤害 */
+  invulnT: number;
   onGround: boolean;
   /** 死亡后距离重生（秒）；存活=0 */
   respawnIn: number;
@@ -356,6 +393,14 @@ export interface SnapshotEffect {
   t: number;
   duration: number;
   ownerId: string;
+  /** 扇形治愈波/方向特效：朝向（yaw/pitch，弧度） */
+  yaw?: number;
+  pitch?: number;
+  /** 扇形半角（弧度，healWave 用） */
+  arc?: number;
+  /** 矩形特效宽度/高度（米） */
+  width?: number;
+  height?: number;
 }
 
 export interface SnapshotEvent {
@@ -390,6 +435,16 @@ export interface Snapshot {
 }
 
 // ---------------- 纯几何工具（引擎与 AI 共用） ----------------
+
+/** 视角 yaw/pitch → 单位方向向量（yaw=0 朝 +z；pitch 向上为正） */
+export function dirFromYawPitch(yaw: number, pitch: number): Vec3 {
+  const cp = Math.cos(pitch);
+  return {
+    x: Math.sin(yaw) * cp,
+    y: Math.sin(pitch),
+    z: Math.cos(yaw) * cp,
+  };
+}
 
 /** 二维线段是否被掩体/围墙阻挡（用于视线判断） */
 export function segmentBlocked(

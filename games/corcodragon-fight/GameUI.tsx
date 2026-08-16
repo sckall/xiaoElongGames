@@ -27,6 +27,7 @@ import {
 } from './defs';
 import type {
   AIStyle,
+  AILevel,
   GameModeKind,
   HeroId,
   RealtimeInputAction,
@@ -48,12 +49,12 @@ const HERO_COLORS: Record<HeroId, number> = {
 };
 const TEAM_COLORS = { A: 0xff7a45, B: 0x4da3ff };
 
-/** 训练场默认靶位：固定圆靶 / 移动圆靶 / 固定人靶 / 移动人靶 */
+/** 训练场默认靶位：固定圆靶 / 移动圆靶 / 固定人靶 / 移动人靶（放在无掩体走廊内） */
 const TRAINING_TARGETS = [
-  { id: 'round-fixed', kind: 'round', pattern: 'fixed', pos: { x: -11, y: 0, z: -4 }, hp: 1, radius: 0.8 },
-  { id: 'round-moving', kind: 'round', pattern: 'osc', pos: { x: -11, y: 0, z: -4 }, hp: 1, radius: 0.8, range: 7, speed: 1.1 },
-  { id: 'human-fixed', kind: 'human', pattern: 'fixed', pos: { x: 11, y: 0, z: -4 }, hp: 100, range: 0, speed: 0.7 },
-  { id: 'human-moving', kind: 'human', pattern: 'patrol', pos: { x: 11, y: 0, z: -4 }, hp: 100, range: 7, speed: 0.7 },
+  { id: 'round-fixed', kind: 'round', pattern: 'fixed', pos: { x: -5, y: 0, z: -4 }, hp: 1, radius: 0.8 },
+  { id: 'round-moving', kind: 'round', pattern: 'osc', pos: { x: -5, y: 0, z: -4 }, hp: 1, radius: 0.8, range: 7, speed: 1.1 },
+  { id: 'human-fixed', kind: 'human', pattern: 'fixed', pos: { x: 15, y: 0, z: -12 }, hp: 100, range: 0, speed: 0.7 },
+  { id: 'human-moving', kind: 'human', pattern: 'patrol', pos: { x: 15, y: 0, z: -12 }, hp: 100, range: 7, speed: 0.7 },
 ] as const;
 
 function heroColor(hero: HeroId | null, team: string): number {
@@ -69,11 +70,65 @@ const GUN_GLB: Partial<Record<WeaponId, { file: string; muzzle: THREE.Vector3 }>
   dagger: { file: '', muzzle: new THREE.Vector3(0.22, -0.14, -0.6) },
 };
 
+/** KayKit Adventurers（CC0）英雄视觉模型：只换外观，引擎胶囊碰撞箱不变 */
+const HERO_GLB: Record<HeroId, { file: string; targetHeight: number }> = {
+  yanren: { file: 'hero-barbarian.glb', targetHeight: 1.85 },
+  yingxiao: { file: 'hero-rogue-hooded.glb', targetHeight: 1.85 },
+  tiebi: { file: 'hero-knight.glb', targetHeight: 1.85 },
+  lingyin: { file: 'hero-mage.glb', targetHeight: 1.85 },
+  guilei: { file: 'hero-rogue.glb', targetHeight: 1.85 },
+};
+
+const characterModelCache = new Map<string, Promise<THREE.Group>>();
+
+function loadHeroCharacter(hero: HeroId): Promise<THREE.Group> {
+  const spec = HERO_GLB[hero];
+  const cached = characterModelCache.get(spec.file);
+  if (cached) return cached;
+  const url = new URL(`./assets/models/characters/${spec.file}`, import.meta.url).href;
+  const promise = new GLTFLoader().loadAsync(url).then((gltf) => gltf.scene);
+  characterModelCache.set(spec.file, promise);
+  return promise;
+}
+
+async function attachHeroModel(holder: THREE.Group, hero: HeroId): Promise<void> {
+  const spec = HERO_GLB[hero];
+  if (!spec) return;
+  try {
+    const source = await loadHeroCharacter(hero);
+    // 共享材质，克隆节点树；按 1.85m 高度归一，底部贴地、中心对齐
+    const model = source.clone();
+    const bounds = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    bounds.getSize(size);
+    const center = new THREE.Vector3();
+    bounds.getCenter(center);
+    const s = spec.targetHeight / Math.max(0.01, size.y);
+    model.scale.setScalar(s);
+    model.position.set(-center.x * s, -bounds.min.y * s, -center.z * s);
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      }
+    });
+    for (const child of [...holder.children]) {
+      holder.remove(child);
+      disposeObject(child);
+    }
+    holder.add(model);
+  } catch {
+    // 加载失败保留程序化胶囊人
+  }
+}
+
 function loadWeaponGltf(group: THREE.Group, weapon: WeaponId, muzzle: THREE.Mesh): void {
   const spec = GUN_GLB[weapon];
   if (!spec?.file) return;
   const url = new URL(`./assets/models/${spec.file}`, import.meta.url).href;
-  const targetLen = weapon === 'sniper' ? 0.95 : weapon === 'rifle' ? 0.72 : 0.45;
+  // 镜头内枪模：更近、稍放大（v0.2 反馈步枪偏大，步枪下调一档）
+  const targetLen = weapon === 'sniper' ? 1.12 : weapon === 'rifle' ? 0.78 : 0.62;
   new GLTFLoader().load(
     url,
     (gltf) => {
@@ -85,8 +140,9 @@ function loadWeaponGltf(group: THREE.Group, weapon: WeaponId, muzzle: THREE.Mesh
       model.scale.setScalar(s);
       const center = new THREE.Vector3();
       bounds.getCenter(center);
-      // 模型长轴沿 +z，相机朝 -z：枪口自然指向屏幕深处
-      model.position.set(0.22 - center.x * s, -0.22 - bounds.min.y * s, -0.55 - center.z * s);
+      // 只做一次 z 定位：模型中心放在枪组原点，root 统一控制镜头内位置，
+      // 避免 loadWeaponGltf 的 -0.55 与渲染循环的 -0.55 双重偏移。
+      model.position.set(-center.x * s, -0.24 - bounds.min.y * s, -center.z * s);
       model.traverse((o) => {
         const m = o as THREE.Mesh;
         if (m.isMesh) m.castShadow = false;
@@ -97,9 +153,14 @@ function loadWeaponGltf(group: THREE.Group, weapon: WeaponId, muzzle: THREE.Mesh
         disposeObject(child);
       }
       group.add(model);
-      muzzle.position.copy(spec.muzzle);
+      // 枪口火光对准模型最远端的枪口（Kenney Blaster 模型长轴 +z，枪口在 -z 端）
+      muzzle.position.set(
+        center.x * s + model.position.x,
+        center.y * s + model.position.y,
+        bounds.min.z * s + model.position.z - 0.02,
+      );
       group.userData.gltfReady = true;
-      group.userData.muzzlePos = spec.muzzle;
+      group.userData.muzzlePos = muzzle.position.clone();
     },
     undefined,
     () => {
@@ -112,12 +173,14 @@ interface PlayerRender {
   group: THREE.Group;
   label: THREE.Sprite;
   shield: THREE.Mesh;
+  wall: THREE.Mesh;
   ring?: THREE.Mesh;
   target: THREE.Vector3;
   yaw: number;
   alive: boolean;
   visible: boolean;
   shieldVal: number;
+  hero: HeroId | null;
 }
 
 interface Tracer {
@@ -148,6 +211,8 @@ export interface FightConfig {
   scoreLimit: number;
   /** bot 行为：combat=实战 AI；movement=移动测试 AI（只走位不攻击） */
   aiStyle: AIStyle;
+  /** bot 难度：easy 低命中/慢反应；normal；hard 高命中 */
+  aiLevel: AILevel;
 }
 
 /** 鳄龙咆哮专属偏好（与出包魔法师 tm-settings 分离存储） */
@@ -193,8 +258,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const playerRendersRef = useRef(new Map<string, PlayerRender>());
   const effectMeshesRef = useRef(new Map<number, THREE.Object3D>());
   const tracerRef = useRef<Tracer[]>([]);
+  const bombTrailsRef = useRef(
+    new Map<number, { line: THREE.Line; dots: THREE.Mesh[]; pts: THREE.Vector3[]; last: number }>(),
+  );
   const gunRef = useRef<THREE.Group | null>(null);
   const muzzleRef = useRef<THREE.Mesh | null>(null);
+  const selfWallRef = useRef<THREE.Mesh | null>(null);
   const muzzleBornRef = useRef(-1);
   const clockRef = useRef(new THREE.Clock());
   const sfxRef = useRef<SfxPlayer | null>(null);
@@ -208,6 +277,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const dustRef = useRef<THREE.Points | null>(null);
   const crosshairRef = useRef<HTMLDivElement | null>(null);
   const colliderGroupRef = useRef<THREE.Group | null>(null);
+  const pendingAimRef = useRef<'skill' | 'ult' | null>(null);
   const playerCollidersRef = useRef(new Map<string, THREE.Mesh>());
   const colliderShapeRef = useRef('');
   const [killFlash, setKillFlash] = useState<{ text: string; at: number } | null>(null);
@@ -267,7 +337,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     camera.rotation.order = 'YXZ';
     cameraRef.current = camera;
     const muzzleLight = new THREE.PointLight(0xffc36b, 0, 7);
-    muzzleLight.position.set(0.22, -0.16, -1.1);
+    muzzleLight.position.set(0.24, -0.2, -0.9);
     camera.add(muzzleLight);
     muzzleLightRef.current = muzzleLight;
     scene.add(camera);
@@ -487,6 +557,36 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         }
       }
 
+      // 自己的铁壁能量墙：与第一人称视角每帧实时同步（视线转动即转动）
+      if (scene) {
+        const wallOn = me?.hero === 'tiebi' && me.alive && me.shield > 0;
+        if (wallOn) {
+          if (!selfWallRef.current) {
+            selfWallRef.current = makeShieldWallMesh();
+            scene.add(selfWallRef.current);
+          }
+          const wall = selfWallRef.current;
+          const yaw = viewRef.current.init ? viewRef.current.yaw : me.yaw;
+          const fw = { x: Math.sin(yaw), z: Math.cos(yaw) };
+          const dist = BALANCE.heroes.tiebi.ability.shieldDistance ?? 1.8;
+          const centerY = (BALANCE.heroes.tiebi.ability.shieldCenterY ?? 1.2) + localPosRef.current.y;
+          const width = BALANCE.heroes.tiebi.ability.shieldWidth ?? 4.8;
+          const height = BALANCE.heroes.tiebi.ability.shieldHeight ?? 3;
+          wall.position.set(
+            localPosRef.current.x + fw.x * dist,
+            centerY,
+            localPosRef.current.z + fw.z * dist,
+          );
+          wall.rotation.y = yaw;
+          wall.scale.set(width, height, 1);
+          wall.visible = true;
+          const mat = wall.material as THREE.MeshBasicMaterial;
+          mat.opacity = 0.28 + Math.sin(performance.now() / 180) * 0.05;
+        } else if (selfWallRef.current) {
+          selfWallRef.current.visible = false;
+        }
+      }
+
       // 其他玩家平滑插值
       for (const [id, pr] of playerRendersRef.current) {
         if (id === driverRef.current.myId) continue;
@@ -494,7 +594,16 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         if (!pr.visible || !pr.alive) continue;
         pr.group.position.lerp(pr.target, Math.min(1, BALANCE.client.interpolationRate * dt));
         pr.group.rotation.y += (pr.yaw - pr.group.rotation.y) * Math.min(1, 10 * dt);
-        pr.shield.visible = pr.shieldVal > 0;
+        const wallOn = pr.shieldVal > 0 && pr.hero === 'tiebi';
+        pr.wall.visible = wallOn;
+        pr.shield.visible = pr.shieldVal > 0 && pr.hero !== 'tiebi';
+        if (wallOn) {
+          const width = BALANCE.heroes.tiebi.ability.shieldWidth ?? 4.8;
+          const height = BALANCE.heroes.tiebi.ability.shieldHeight ?? 3;
+          pr.wall.scale.set(width, height, 1);
+          const mat = pr.wall.material as THREE.MeshBasicMaterial;
+          mat.opacity = 0.3 + Math.sin(performance.now() / 180) * 0.05;
+        }
         if (pr.shield.visible) {
           const s = 1.1 + Math.sin(performance.now() / 180) * 0.04;
           pr.shield.scale.setScalar(s);
@@ -507,20 +616,98 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         const eff = snap?.effects.find((e) => e.id === id);
         if (!eff) continue;
         const frac = Math.max(0, Math.min(1, eff.t / Math.max(0.001, eff.duration)));
-        mesh.position.set(eff.pos.x, Math.max(0.03, eff.pos.y), eff.pos.z);
+        const targetPos = new THREE.Vector3(eff.pos.x, Math.max(0.03, eff.pos.y), eff.pos.z);
+        // 炸弹抛体：插值平滑，呈现连续抛物线
+        if (eff.kind === 'bomb') {
+          mesh.position.lerp(targetPos, Math.min(1, BALANCE.client.interpolationRate * dt));
+        } else {
+          mesh.position.copy(targetPos);
+        }
         const mat = (mesh as THREE.Mesh).material as THREE.MeshBasicMaterial;
         if (mat && 'opacity' in mat) {
           if (eff.kind === 'explosion') {
             mesh.scale.setScalar(0.6 + (1 - frac) * eff.radius * 0.9);
             mat.opacity = Math.max(0, frac) * 0.9;
+          } else if (eff.kind === 'ultRing') {
+            const pulse = 1 + Math.sin(now / 90) * 0.04;
+            mesh.scale.setScalar(pulse);
+            mat.opacity = Math.max(0, frac) * 0.85;
           } else if (eff.kind === 'fireTrail' || eff.kind === 'stormZone') {
             mat.opacity = Math.max(0, frac) * 0.55;
             mesh.rotation.z = now / 500;
           } else if (eff.kind === 'healZone') {
             mat.opacity = Math.max(0, frac) * 0.35 + Math.sin(now / 150) * 0.06;
+          } else if (eff.kind === 'healWave') {
+            mat.opacity = Math.max(0, frac) * 0.5;
           } else {
             mat.opacity = Math.max(0, frac);
           }
+        }
+      }
+
+      // 炸弹抛物线轨迹：保留最近 14 个插值点，形成可见弧线 + 渐隐光点
+      const bombIds = new Set<number>();
+      for (const eff of snap?.effects ?? []) if (eff.kind === 'bomb') bombIds.add(eff.id);
+      for (const [id, tr] of bombTrailsRef.current) {
+        if (bombIds.has(id)) continue;
+        scene.remove(tr.line);
+        tr.line.geometry.dispose();
+        (tr.line.material as THREE.Material).dispose();
+        for (const dot of tr.dots) {
+          scene.remove(dot);
+          dot.geometry.dispose();
+          (dot.material as THREE.Material).dispose();
+        }
+        bombTrailsRef.current.delete(id);
+      }
+      for (const eff of snap?.effects ?? []) {
+        if (eff.kind !== 'bomb') continue;
+        const mesh = effectMeshesRef.current.get(eff.id);
+        if (!mesh) continue;
+        let tr = bombTrailsRef.current.get(eff.id);
+        if (!tr) {
+          const geo = new THREE.BufferGeometry().setFromPoints([mesh.position.clone()]);
+          const line = new THREE.Line(
+            geo,
+            new THREE.LineBasicMaterial({
+              color: 0xffb45a,
+              transparent: true,
+              opacity: 0.95,
+              depthWrite: false,
+            }),
+          );
+          line.frustumCulled = false;
+          scene.add(line);
+          tr = { line, dots: [], pts: [mesh.position.clone()], last: now };
+          bombTrailsRef.current.set(eff.id, tr);
+        }
+        if (now - tr.last >= 40) {
+          tr.last = now;
+          tr.pts.push(mesh.position.clone());
+          if (tr.pts.length > 14) tr.pts.shift();
+          tr.line.geometry.dispose();
+          tr.line.geometry = new THREE.BufferGeometry().setFromPoints(tr.pts);
+          // 历史点渲染为渐隐光球，让抛物线在远处也清晰可辨
+          for (const dot of tr.dots) {
+            scene.remove(dot);
+            dot.geometry.dispose();
+            (dot.material as THREE.Material).dispose();
+          }
+          tr.dots = tr.pts.slice(0, -1).map((p, i) => {
+            const frac = (i + 1) / Math.max(1, tr.pts.length);
+            const dot = new THREE.Mesh(
+              new THREE.SphereGeometry(0.12, 8, 6),
+              new THREE.MeshBasicMaterial({
+                color: 0xffb45a,
+                transparent: true,
+                opacity: 0.25 + frac * 0.6,
+                depthWrite: false,
+              }),
+            );
+            dot.position.copy(p);
+            scene.add(dot);
+            return dot;
+          });
         }
       }
 
@@ -550,13 +737,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       if (gunRef.current) {
         gunRecoilRef.current = Math.max(0, gunRecoilRef.current - dt * 4.5);
         const sway = Math.sin(now / 700) * 0.006;
-        gunRef.current.position.set(0.22, -0.2 + sway, -0.55 - gunRecoilRef.current * 0.16);
+        gunRef.current.position.set(0.24, -0.22 + sway, -0.36 - gunRecoilRef.current * 0.12);
         gunRef.current.rotation.x = gunRecoilRef.current * 0.55;
         const swingAge = (now - meleeSwingRef.current) / 1000;
         if (swingAge >= 0 && swingAge < 0.24) {
           const t = swingAge / 0.24;
           gunRef.current.rotation.y = Math.sin(t * Math.PI) * -1.1;
-          gunRef.current.position.x = 0.22 - Math.sin(t * Math.PI) * 0.28;
+          gunRef.current.position.x = 0.24 - Math.sin(t * Math.PI) * 0.28;
         } else {
           gunRef.current.rotation.y = 0;
         }
@@ -646,6 +833,18 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     }
     if (me) lastAliveRef.current = me.alive;
 
+    // 二段瞄准状态同步：服务器确认后清掉本地 pending；被拒绝/阵亡也清掉
+    if (me) {
+      const pending = pendingAimRef.current;
+      if (pending === 'skill') {
+        if (me.skillAim) pendingAimRef.current = null;
+        else if (!me.alive || me.skillCd > 0) pendingAimRef.current = null;
+      } else if (pending === 'ult') {
+        if (me.ultAim) pendingAimRef.current = null;
+        else if (!me.alive || me.ultCharge < 99) pendingAimRef.current = null;
+      }
+    }
+
     // 联机软校正：统计预测漂移；超过阈值立即吸附到服务端（回滚）
     if (driver.online && me) {
       const drift = Math.hypot(
@@ -708,6 +907,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           bull.position.set(0, 1.3, 0.36);
           group.add(body, head, bull);
         } else {
+          // 英雄玩家：先放程序化胶囊人作占位，异步替换为 KayKit CC0 角色模型
+          const visual = new THREE.Group();
           const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 1.35, 12), mat);
           body.position.y = 0.78;
           body.castShadow = true;
@@ -734,7 +935,9 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
             new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.4 }),
           );
           handGun.position.set(0.42, 1.15, 0.32);
-          group.add(body, head, visor, stripe, handGun);
+          visual.add(body, head, visor, stripe, handGun);
+          group.add(visual);
+          if (p.hero) void attachHeroModel(visual, p.hero);
         }
         const shield = new THREE.Mesh(
           new THREE.SphereGeometry(1, 16, 12),
@@ -746,10 +949,21 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           }),
         );
         shield.position.y = 1.0;
+        shield.visible = false;
         group.add(shield);
+        // 铁壁重做：视角正前方的大块能量墙（随 yaw 实时同步，替队友挡子弹）
+        const wall = makeShieldWallMesh();
+        wall.position.set(
+          0,
+          BALANCE.heroes.tiebi.ability.shieldCenterY ?? 1.2,
+          BALANCE.heroes.tiebi.ability.shieldDistance ?? 1.8,
+        );
+        group.add(wall);
         const isAlly = snap.mode === 'tdm' && p.team === myTeam;
         const labelColor = snap.mode === 'tdm' ? (isAlly ? 0x5cffa0 : 0xff7a6b) : color;
         const label = makeNameSprite(`${isAlly ? '◈ ' : ''}${p.name}`, labelColor);
+        // 关闭敌人 ID 视野：只显示训练场靶名与队友名字，敌人不显示 ID
+        label.visible = snap.mode === 'training' || isAlly;
         group.add(label);
         const ring = new THREE.Mesh(
           new THREE.TorusGeometry(0.64, 0.06, 8, 24),
@@ -769,12 +983,14 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           group,
           label,
           shield,
+          wall,
           ring,
           target: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
           yaw: p.yaw,
           alive: p.alive,
           visible: p.visible,
           shieldVal: p.shield,
+          hero: p.hero,
         };
         playerRendersRef.current.set(p.id, pr);
       }
@@ -784,10 +1000,17 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         pr.alive = p.alive;
         pr.visible = p.visible;
         pr.shieldVal = p.shield;
+        pr.hero = p.hero;
+        pr.wall.position.set(
+          0,
+          BALANCE.heroes.tiebi.ability.shieldCenterY ?? 1.2,
+          BALANCE.heroes.tiebi.ability.shieldDistance ?? 1.8,
+        );
         if (pr.ring) {
           const isAlly = snap.mode === 'tdm' && p.team === myTeam;
           pr.ring.visible = snap.mode === 'tdm' && p.visible && p.alive;
           (pr.ring.material as THREE.MeshBasicMaterial).color.set(isAlly ? 0x5cffa0 : 0xff6b5e);
+          pr.label.visible = snap.mode === 'training' || isAlly;
         }
       }
     }
@@ -909,6 +1132,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           scene.add(line);
           tracerRef.current.push({ line, born: performance.now() });
           if (ev.shooterId === driver.myId) spawnSparks(ev.pos, 0xffd27a, 6);
+        }
+      }
+      if (ev.kind === 'blocked') {
+        if (ev.pos && fxOn) spawnSparks(ev.pos, 0x4da3ff, 7);
+        if ((ev.shooterId === driver.myId || ev.targetId === driver.myId) && driver.sound !== false) {
+          getSfx().shieldBlock();
         }
       }
       if (ev.kind === 'hit') {
@@ -1058,6 +1287,14 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       }
     };
 
+    /** 当前是否处于二段技能瞄准（服务器快照 + 本地未确认的 pending） */
+    const armedKind = (): 'skill' | 'ult' | null => {
+      const m = snapRef.current?.players.find((p) => p.id === driverRef.current.myId);
+      if (m?.skillAim || pendingAimRef.current === 'skill') return 'skill';
+      if (m?.ultAim || pendingAimRef.current === 'ult') return 'ult';
+      return null;
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Tab') {
         e.preventDefault();
@@ -1096,12 +1333,38 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           send({ type: 'switchWeapon', weapon: 'dagger' });
           if (driverRef.current.sound !== false) getSfx().switchWeapon();
           break;
-        case 'KeyQ':
-          send({ type: 'skill' });
+        case 'KeyQ': {
+          // 二段瞄准：Q 按下进入准备，再次按 Q 取消
+          if (armedKind() === 'skill') {
+            pendingAimRef.current = null;
+            send({ type: 'skillCancel' });
+          } else {
+            pendingAimRef.current = 'skill';
+            send({ type: 'skill' });
+          }
           break;
-        case 'KeyE':
-          send({ type: 'ult' });
+        }
+        case 'KeyE': {
+          if (armedKind() === 'ult') {
+            pendingAimRef.current = null;
+            send({ type: 'ultCancel' });
+          } else {
+            pendingAimRef.current = 'ult';
+            send({ type: 'ult' });
+          }
           break;
+        }
+        case 'Escape': {
+          const armed = armedKind();
+          if (armed === 'skill') {
+            pendingAimRef.current = null;
+            send({ type: 'skillCancel' });
+          } else if (armed === 'ult') {
+            pendingAimRef.current = null;
+            send({ type: 'ultCancel' });
+          }
+          break;
+        }
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -1123,13 +1386,31 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       syncMove();
     };
     const onMouseDown = (e: MouseEvent) => {
-      if (document.pointerLockElement !== canvas) return;
-      if (e.button === 0) send({ type: 'fire', pressed: true });
-      if (e.button === 2) send({ type: 'ads', pressed: true });
+      const lockHeld = document.pointerLockElement === canvas;
+      const armed = armedKind();
+      if (e.button === 0) {
+        // 二段瞄准中：左键=向当前视角方向确认释放技能，而不是开枪。
+        // 未锁鼠标时点击画布也应能确认（随后 onClick 立即请求锁定）。
+        if (armed === 'skill') {
+          pendingAimRef.current = null;
+          send({ type: 'skillFire' });
+        } else if (armed === 'ult') {
+          pendingAimRef.current = null;
+          send({ type: 'ultFire' });
+        } else if (lockHeld) {
+          send({ type: 'fire', pressed: true });
+        }
+      }
+      if (e.button === 2) {
+        // 二段瞄准中：右键=取消；否则保持开镜
+        if (armed === 'skill') send({ type: 'skillCancel' });
+        else if (armed === 'ult') send({ type: 'ultCancel' });
+        else if (lockHeld) send({ type: 'ads', pressed: true });
+      }
     };
     const onMouseUp = (e: MouseEvent) => {
-      if (e.button === 0) send({ type: 'fire', pressed: false });
-      if (e.button === 2) send({ type: 'ads', pressed: false });
+      if (e.button === 0 && armedKind() === null) send({ type: 'fire', pressed: false });
+      if (e.button === 2 && armedKind() === null) send({ type: 'ads', pressed: false });
     };
     const onLockChange = () => setLocked(document.pointerLockElement === canvas);
     const onContext = (e: Event) => e.preventDefault();
@@ -1192,18 +1473,30 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         <>
           <div
             ref={crosshairRef}
-            className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''}`}
+            className={`ccf-crosshair ${performance.now() - hitAt < 150 ? 'hit' : ''} ${
+              me.skillAim || me.ultAim ? 'aiming' : ''
+            }`}
           >
             <i className="c-top" />
             <i className="c-bottom" />
             <i className="c-left" />
             <i className="c-right" />
           </div>
+          {(me.skillAim || me.ultAim) && (
+            <div className="ccf-aim-banner">
+              {me.skillAim ? '💣 左键投掷炸弹' : '⛈️ 左键释放雷暴云'}
+              <span>右键 / Q / E 取消</span>
+            </div>
+          )}
           {me.ads && me.weapon === 'sniper' && <div className="ccf-scope" />}
           {driver.fx !== false && (
             <>
               <div className={`ccf-damage-vignette ${performance.now() - hitAt < 180 ? 'on' : ''}`} />
-              {me.hp / me.maxHp < 0.3 && <div className="ccf-lowhp" />}
+              {me.hp / me.maxHp < 0.5 && (
+                <div className={`ccf-lowhp ${me.hp / me.maxHp < 0.3 ? 'danger' : 'warn'}`} />
+              )}
+              {me.stealthT > 0 && <div className="ccf-stealth" />}
+              {me.invulnT > 0 && <div className="ccf-invuln" />}
               {killFlash && performance.now() - killFlash.at < 1200 && (
                 <div className="ccf-killflash">{killFlash.text}</div>
               )}
@@ -1289,6 +1582,26 @@ function makeNameSprite(name: string, color: number): THREE.Sprite {
   return sprite;
 }
 
+function makeShieldWallMesh(): THREE.Mesh {
+  const wall = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x3d9bff,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  const border = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)),
+    new THREE.LineBasicMaterial({ color: 0x9fd4ff, transparent: true, opacity: 0.85 }),
+  );
+  border.position.z = 0.01;
+  wall.add(border);
+  return wall;
+}
+
 function makeGun(weapon: WeaponId): THREE.Group {
   const g = new THREE.Group();
   const mat = (color: number, rough = 0.4) =>
@@ -1354,10 +1667,41 @@ function makeGun(weapon: WeaponId): THREE.Group {
 
 function makeEffectMesh(eff: SnapshotEffect): THREE.Object3D {
   if (eff.kind === 'bomb') {
-    return new THREE.Mesh(
-      new THREE.SphereGeometry(0.35, 12, 10),
-      new THREE.MeshBasicMaterial({ color: 0x111111 }),
+    // 抛体炸弹：亮色弹体 + 半透明光晕，配合轨迹线形成可见抛物线
+    const group = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffb45a, transparent: true, opacity: 0.95 }),
     );
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.55, 12, 10),
+      new THREE.MeshBasicMaterial({
+        color: 0xff8c2a,
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    group.add(core, halo);
+    return group;
+  }
+  if (eff.kind === 'ultRing') {
+    // 炎刃大招范围火环：半径即判定范围，落地平面清晰可见
+    const mesh = new THREE.Mesh(
+      new THREE.RingGeometry(Math.max(0.5, eff.radius * 0.78), eff.radius, 72),
+      new THREE.MeshBasicMaterial({
+        color: 0xff6a2a,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.08;
+    return mesh;
   }
   if (eff.kind === 'explosion') {
     return new THREE.Mesh(
@@ -1370,6 +1714,21 @@ function makeEffectMesh(eff: SnapshotEffect): THREE.Object3D {
         depthWrite: false,
       }),
     );
+  }
+  if (eff.kind === 'healWave') {
+    // 灵音扇形治愈波：朝视角方向展开的扇形，视觉与判定同为“视角前方扇区”
+    const mesh = new THREE.Mesh(
+      makeFanGeometry(eff.radius, eff.yaw ?? 0, eff.arc ?? Math.PI / 3),
+      new THREE.MeshBasicMaterial({
+        color: 0x2fd06a,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.position.y = 0.08;
+    return mesh;
   }
   const colors = {
     fireTrail: 0xff6a2a,
@@ -1390,6 +1749,23 @@ function makeEffectMesh(eff: SnapshotEffect): THREE.Object3D {
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.05;
   return mesh;
+}
+
+/** 扇形地面几何（XZ 平面，开口朝向 yaw，半角 arc） */
+function makeFanGeometry(radius: number, yaw: number, arc: number): THREE.BufferGeometry {
+  const segments = 24;
+  const positions: number[] = [0, 0, 0];
+  for (let i = 0; i <= segments; i++) {
+    const a = yaw - arc + (arc * 2 * i) / segments;
+    positions.push(Math.sin(a) * radius, 0, Math.cos(a) * radius);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const indices: number[] = [];
+  for (let i = 0; i < segments; i++) indices.push(0, i + 1, i + 2);
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
 }
 
 function disposeObject(obj: THREE.Object3D): void {
@@ -1484,10 +1860,18 @@ function TuningPanel({
         const skill = pane.addFolder({ title: '技能与终极技' });
         bind(skill, BALANCE.heroes.yanren.ability, 'dashDistance', { min: 1, max: 30, step: 0.5, label: '炎刃冲刺距离' });
         bind(skill, BALANCE.heroes.yanren.ability, 'trailDps', { min: 0, max: 100, step: 1, label: '火焰路径DPS' });
+        bind(skill, BALANCE.heroes.yanren.ability, 'ultRadius', { min: 1, max: 30, step: 0.5, label: '炎刃大招半径' });
         bind(skill, BALANCE.heroes.yingxiao.ability, 'stealthDuration', { min: 0.5, max: 15, step: 0.5, label: '影枭隐身(秒)' });
-        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldValue', { min: 0, max: 300, step: 5, label: '铁壁护盾值' });
+        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldValue', { min: 0, max: 1000, step: 10, label: '铁壁护盾生命' });
+        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldDuration', { min: 0.5, max: 30, step: 0.5, label: '铁壁护盾持续(秒)' });
+        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldWidth', { min: 0.5, max: 20, step: 0.1, label: '铁壁护盾宽度' });
+        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldHeight', { min: 0.5, max: 8, step: 0.1, label: '铁壁护盾高度' });
+        bind(skill, BALANCE.heroes.tiebi.ability, 'shieldDistance', { min: 0.2, max: 6, step: 0.1, label: '铁壁护盾距离' });
         bind(skill, BALANCE.heroes.lingyin.ability, 'selfHeal', { min: 0, max: 300, step: 5, label: '灵音自疗' });
+        bind(skill, BALANCE.heroes.lingyin.ability, 'waveRange', { min: 1, max: 40, step: 1, label: '治愈波距离' });
+        bind(skill, BALANCE.heroes.lingyin.ability, 'waveAngleDeg', { min: 5, max: 180, step: 5, label: '治愈波扇角(度)' });
         bind(skill, BALANCE.heroes.guilei.ability, 'bombDamage', { min: 0, max: 200, step: 1, label: '诡雷炸弹伤害' });
+        bind(skill, BALANCE.heroes.guilei.ability, 'bombRadius', { min: 0.5, max: 20, step: 0.5, label: '诡雷爆炸半径' });
         bind(skill, BALANCE.heroes.guilei.ability, 'stormDps', { min: 0, max: 100, step: 1, label: '雷暴DPS' });
 
         const combat = pane.addFolder({ title: '战斗' });
@@ -1542,7 +1926,11 @@ function Hud({ snap, me, killFeed }: { snap: Snapshot; me: SnapshotPlayer; killF
   const hero = me.hero ? HERO_DEFS[me.hero] : null;
   const wd = WEAPON_DEFS[me.weapon];
   const hpPct = Math.max(0, Math.min(100, (me.hp / me.maxHp) * 100));
-  const shieldPct = Math.max(0, Math.min(100, (me.shield / 80) * 100));
+  const shieldMax =
+    me.hero === 'tiebi'
+      ? BALANCE.heroes.tiebi.ability.shieldValue ?? 300
+      : 80;
+  const shieldPct = Math.max(0, Math.min(100, (me.shield / shieldMax) * 100));
   const ads = me.ads;
   return (
     <div className="ccf-hud">
@@ -1566,6 +1954,8 @@ function Hud({ snap, me, killFeed }: { snap: Snapshot; me: SnapshotPlayer; killF
               <span className="ccf-chip">🎯 {snap.mode === 'tdm' ? `团队死斗 ${snap.teamScores.A}:${snap.teamScores.B}/${snap.scoreLimit}` : `自由混战 ${me.kills}/${snap.scoreLimit}`}</span>
               <span className="ccf-chip">⏱ {Math.max(0, Math.ceil(snap.timeLeft / 1000))}s</span>
               <span className="ccf-chip">🏆 {me.score} 分 · {me.kills} 杀 {me.deaths} 死</span>
+              {me.stealthT > 0 && <span className="ccf-chip ccf-stealth-chip">🦉 隐身 {me.stealthT.toFixed(1)}s</span>}
+              {me.invulnT > 0 && <span className="ccf-chip ccf-invuln-chip">✨ 无敌 {me.invulnT.toFixed(1)}s</span>}
             </>
           )}
         </div>
@@ -1587,7 +1977,7 @@ function Hud({ snap, me, killFeed }: { snap: Snapshot; me: SnapshotPlayer; killF
           <div className="ccf-hp-bar"><div className="ccf-hp-fill" style={{ width: `${hpPct}%` }} /></div>
         </div>
         <div className="ccf-hp-row">
-          <span className="ccf-hp-label">🛡️ {Math.ceil(me.shield)}</span>
+          <span className="ccf-hp-label">{me.hero === 'tiebi' ? '🧱' : '🛡️'} {Math.ceil(me.shield)}</span>
           <div className="ccf-shield-bar"><div className="ccf-shield-fill" style={{ width: `${shieldPct}%` }} /></div>
         </div>
         <div className="ccf-ammo">
@@ -1601,17 +1991,27 @@ function Hud({ snap, me, killFeed }: { snap: Snapshot; me: SnapshotPlayer; killF
       </div>
 
       <div className="ccf-hud-bottom-right">
-        <div className={`ccf-skill ccf-skill-box ${me.skillCd <= 0 ? 'ready' : ''}`}>
+        <div className={`ccf-skill ccf-skill-box ${me.skillAim ? 'aiming' : me.skillCd <= 0 ? 'ready' : ''}`}>
           <span className="ccf-skill-key">Q</span>
-          <span className="ccf-skill-name">{hero ? hero.skillName : '技能'}</span>
-          {me.skillCd > 0 && <span className="ccf-cd">{me.skillCd.toFixed(1)}</span>}
+          <span className="ccf-skill-name">
+            {me.skillAim
+              ? hero?.key === 'guilei'
+                ? '左键投掷 · 右键取消'
+                : hero?.skillName ?? '技能'
+              : hero?.skillName ?? '技能'}
+          </span>
+          {me.skillAim && <span className="ccf-aiming-dot" />}
+          {!me.skillAim && me.skillCd > 0 && <span className="ccf-cd">{me.skillCd.toFixed(1)}</span>}
         </div>
-        <div className={`ccf-skill ccf-skill-box ${me.ultCharge >= 100 ? 'ready' : ''}`}>
+        <div className={`ccf-skill ccf-skill-box ${me.ultAim ? 'aiming' : me.ultCharge >= 100 ? 'ready' : ''}`}>
           <span className="ccf-skill-key">E</span>
           <span className={`ccf-skill-name ${me.ultCharge >= 100 ? 'ccf-ult-ready' : ''}`}>
-            {hero ? hero.ultName : '终极技'} · {Math.floor(me.ultCharge)}%
+            {me.ultAim
+              ? '左键释放 · 右键取消'
+              : `${hero ? hero.ultName : '终极技'} · ${Math.floor(me.ultCharge)}%`}
           </span>
-          {me.ultCharge < 100 && (
+          {me.ultAim && <span className="ccf-aiming-dot" />}
+          {!me.ultAim && me.ultCharge < 100 && (
             <div className="ccf-shield-bar" style={{ width: 90, flex: 'none' }}>
               <div className="ccf-ult-ready" style={{ width: `${me.ultCharge}%`, height: '100%', background: '#ffd166' }} />
             </div>
@@ -1737,6 +2137,7 @@ export function CorcodragonFightLocalScreen({
       mode: config.mode,
       scoreLimit: config.scoreLimit,
       aiStyle: config.aiStyle ?? 'combat',
+      aiLevel: config.aiLevel ?? 'normal',
       trainingTargets: training ? TRAINING_TARGETS.map((t) => ({ ...t })) : undefined,
       matchTimeMs: config.mode === 'ffa' ? 10 * 60_000 : 8 * 60_000,
     });
@@ -1759,7 +2160,7 @@ export function CorcodragonFightLocalScreen({
       cancelAnimationFrame(raf);
       engineRef.current = null;
     };
-  }, [round, playerCount, myName, config.mode, config.scoreLimit, config.aiStyle]);
+  }, [round, playerCount, myName, config.mode, config.scoreLimit, config.aiStyle, config.aiLevel]);
 
   const send = useCallback((input: RealtimeInputAction) => {
     engineRef.current?.applyInput('you', input);
@@ -1808,7 +2209,8 @@ export function CorcodragonFightDetailScreen({
   const [mode, setMode] = useState<GameModeKind>('ffa');
   const [scoreLimit, setScoreLimit] = useState(15);
   const [aiStyle, setAiStyle] = useState<AIStyle>('combat');
-  const config = { mode, scoreLimit, aiStyle };
+  const [aiLevel, setAiLevel] = useState<AILevel>('normal');
+  const config = { mode, scoreLimit, aiStyle, aiLevel };
   return (
     <div className="page detail-page">
       <div className="panel detail-panel ccf-detail-panel">
@@ -1854,6 +2256,14 @@ export function CorcodragonFightDetailScreen({
               <select className="bot-select" value={aiStyle} onChange={(e) => setAiStyle(e.target.value as AIStyle)}>
                 <option value="combat">⚔️ 实战 AI（索敌/射击/技能）</option>
                 <option value="movement">🧪 移动测试 AI（只走位不攻击）</option>
+              </select>
+            </div>
+            <div className="field">
+              <span>AI 难度</span>
+              <select className="bot-select" value={aiLevel} onChange={(e) => setAiLevel(e.target.value as AILevel)}>
+                <option value="easy">🐣 简单（低命中率/慢反应）</option>
+                <option value="normal">⚖️ 普通（中等命中率）</option>
+                <option value="hard">🔥 困难（高命中率/快反应）</option>
               </select>
             </div>
           </section>

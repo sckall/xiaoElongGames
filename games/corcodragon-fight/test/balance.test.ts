@@ -69,8 +69,8 @@ describe('引擎实时读配置（热更新生效）', () => {
     }
     while (e.phase === 'heroSelect') e.tick(50);
     const [a, b] = [e.players[0].id, e.players[1].id];
-    e.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     return { e, a, b };
   }
 
@@ -82,8 +82,8 @@ describe('引擎实时读配置（热更新生效）', () => {
     expect(bp.hp).toBe(bp.maxHp - 20);
 
     applyBalancePatch({ weapons: { rifle: { damage: 55 } } });
-    e.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     e.applyInput(a, { type: 'fire', pressed: true });
     e.tick(100);
     expect(bp.hp).toBe(bp.maxHp - 20 - 55);

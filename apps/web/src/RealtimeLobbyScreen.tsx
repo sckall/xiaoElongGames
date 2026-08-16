@@ -62,8 +62,11 @@ export default function RealtimeLobbyScreen({
   const effectiveLimit =
     typeof roomConfig?.scoreLimit === 'number' ? roomConfig.scoreLimit : config.scoreLimit;
   const effectiveAiStyle = roomConfig?.aiStyle ?? config.aiStyle;
+  const effectiveAiLevel = roomConfig?.aiLevel ?? config.aiLevel ?? 'normal';
   const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀 · ${
     effectiveAiStyle === 'movement' ? '🧪 移动测试 AI' : '⚔️ 实战 AI'
+  } · ${
+    effectiveAiLevel === 'easy' ? '🐣 简单' : effectiveAiLevel === 'hard' ? '🔥 困难' : '⚖️ 普通'
   }`;
 
   if (remote.lobby) {
@@ -256,6 +259,7 @@ export default function RealtimeLobbyScreen({
                     mode: config.mode,
                     scoreLimit: config.scoreLimit,
                     aiStyle: config.aiStyle ?? 'combat',
+                    aiLevel: config.aiLevel ?? 'normal',
                   });
                   setCreatePw('');
                 }}

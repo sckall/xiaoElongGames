@@ -18,6 +18,7 @@ import {
   WEAPON_DEFS,
   WEAPON_IDS,
   clampNum,
+  dirFromYawPitch,
   pickSpawn,
   rayAabbXZ,
   segmentBlocked,
@@ -27,6 +28,7 @@ import { BALANCE, abilityNum } from './balance';
 import type {
   AABB,
   AIStyle,
+  AILevel,
   EffectKind,
   EngineOptions,
   EventKind,
@@ -82,7 +84,11 @@ export interface EnginePlayerState {
   headshots: number;
   damageDealt: number;
   stealthT: number;
+  stealthStrikeUsed: boolean;
+  skillAim: boolean;
+  ultAim: boolean;
   fortifyT: number;
+  invulnT: number;
   slowT: number;
   slowMult: number;
   respawnAt: number;
@@ -111,6 +117,18 @@ interface EngineEffect {
   targetId?: string;
   damage: number;
   accumulate: number;
+  /** 持续伤害/治疗的结算节拍计时（每 effectChunkMs 结算一次） */
+  chunkT?: number;
+  yaw?: number;
+  pitch?: number;
+  arc?: number;
+  width?: number;
+  height?: number;
+  /** 抛体（粘性炸弹）速度与飞行状态 */
+  vx?: number;
+  vy?: number;
+  vz?: number;
+  flying?: boolean;
 }
 
 interface EngineEvent {
@@ -158,15 +176,6 @@ function safeName(raw: unknown): string {
 
 function heroForPlayer(idx: number, rng: () => number): HeroId {
   return HERO_IDS[Math.floor(rng() * HERO_IDS.length) % HERO_IDS.length];
-}
-
-function dirFromYawPitch(yaw: number, pitch: number): Vec3 {
-  const cp = Math.cos(pitch);
-  return {
-    x: Math.sin(yaw) * cp,
-    y: Math.sin(pitch),
-    z: Math.cos(yaw) * cp,
-  };
 }
 
 /** 射线 vs 世界（掩体 + 围墙，含高度）。命中 y 由障碍高度决定（墙高取 WALL_HEIGHT）。 */
@@ -232,7 +241,9 @@ function rayCapsule(
       if (d2 <= r * r) tHit = t;
     }
   }
-  // 端点球（线段两端）
+  // 端点球（线段两端）。注意：端点球未命中返回 Infinity，
+  // 不能用返回值直接覆盖 tHit——否则会把上面“柱身”命中的结果冲掉，
+  // 导致向下/向上瞄准躯干时只有头部球能命中（历史 bug：身体判定看似失效）。
   const sphereHit = (cx: number, cy: number, cz: number) => {
     const mx = ox - cx;
     const my = oy - cy;
@@ -244,11 +255,9 @@ function rayCapsule(
     const sq = Math.sqrt(disc);
     const t1 = (-b - sq) / dd;
     const t2 = (-b + sq) / dd;
-    const t = t1 >= 0 ? t1 : t2 >= 0 ? t2 : Infinity;
-    return t < tHit ? t : tHit;
+    return t1 >= 0 ? t1 : t2 >= 0 ? t2 : Infinity;
   };
-  tHit = sphereHit(ax, ay, az);
-  tHit = sphereHit(bx, by, bz);
+  tHit = Math.min(tHit, sphereHit(ax, ay, az), sphereHit(bx, by, bz));
   return tHit;
 }
 
@@ -259,6 +268,7 @@ export class CorcodragonFightEngine {
   readonly matchTimeMs: number;
   readonly heroSelectMs: number;
   readonly aiStyle: AIStyle;
+  readonly aiLevel: AILevel;
   phase: 'heroSelect' | 'playing' | 'gameOver' = 'heroSelect';
   t = 0;
   timeLeft: number;
@@ -293,6 +303,8 @@ export class CorcodragonFightEngine {
     const matchTimeMs = optNum(options.matchTimeMs, 30_000, 3_600_000, BALANCE.combat.matchTimeMsDefault);
     const heroSelectMs = optNum(options.heroSelectMs, 5_000, 120_000, BALANCE.combat.heroSelectMsDefault);
     const aiStyle: AIStyle = options.aiStyle === 'movement' ? 'movement' : 'combat';
+    const aiLevel: AILevel =
+      options.aiLevel === 'easy' || options.aiLevel === 'hard' ? options.aiLevel : 'normal';
     const rng = typeof options.rng === 'function' ? options.rng : Math.random;
 
     this.mode = mode;
@@ -300,6 +312,7 @@ export class CorcodragonFightEngine {
     this.matchTimeMs = matchTimeMs;
     this.heroSelectMs = heroSelectMs;
     this.aiStyle = aiStyle;
+    this.aiLevel = aiLevel;
     this.timeLeft = matchTimeMs;
     this.heroSelectLeft = heroSelectMs;
     this.rng = rng;
@@ -346,7 +359,11 @@ export class CorcodragonFightEngine {
         headshots: 0,
         damageDealt: 0,
         stealthT: 0,
+        stealthStrikeUsed: false,
+        skillAim: false,
+        ultAim: false,
         fortifyT: 0,
+        invulnT: 0,
         slowT: 0,
         slowMult: 0.5,
         respawnAt: 0,
@@ -426,7 +443,11 @@ export class CorcodragonFightEngine {
           headshots: 0,
           damageDealt: 0,
           stealthT: 0,
+          stealthStrikeUsed: false,
+          skillAim: false,
+          ultAim: false,
           fortifyT: 0,
+          invulnT: 0,
           slowT: 0,
           slowMult: 0.5,
           respawnAt: 0,
@@ -506,6 +527,8 @@ export class CorcodragonFightEngine {
       p.fireHeld = false;
       p.adsHeld = false;
       p.ads = false;
+      p.skillAim = false;
+      p.ultAim = false;
       this.botNextThink.set(p.id, this.t + 200);
       this.log(`${p.name} 断线，由 AI 接管 🤖`);
     } else {
@@ -513,6 +536,8 @@ export class CorcodragonFightEngine {
       p.moveX = 0;
       p.moveZ = 0;
       p.fireHeld = false;
+      p.skillAim = false;
+      p.ultAim = false;
       this.log(`${p.name} 重新上线，恢复操作 ✅`);
     }
     return { ok: true };
@@ -580,6 +605,7 @@ export class CorcodragonFightEngine {
       }
       case 'ads': {
         if (typeof raw.pressed !== 'boolean') return { ok: false, error: 'ads.pressed 必须为布尔值' };
+        if (p.skillAim || p.ultAim) return { ok: false, error: '瞄准状态不能开镜' };
         if (this.phase === 'playing' && p.alive && !WEAPON_DEFS[p.weapon].melee) {
           p.adsHeld = raw.pressed;
           p.ads = raw.pressed;
@@ -601,6 +627,8 @@ export class CorcodragonFightEngine {
           p.reloading = false;
           p.reloadT = 0;
           p.ads = false;
+          p.skillAim = false;
+          p.ultAim = false;
           p.spreadBloom = 0;
           p.fireCd = Math.max(p.fireCd, 0.25);
           const def = WEAPON_DEFS[w];
@@ -614,9 +642,23 @@ export class CorcodragonFightEngine {
         if (this.phase !== 'playing' || !p.alive) return { ok: false, error: '当前状态不能释放技能' };
         return this.useSkill(p);
       }
+      case 'skillFire': {
+        if (this.phase !== 'playing' || !p.alive) return { ok: false, error: '当前状态不能确认技能' };
+        return this.confirmSkill(p);
+      }
+      case 'skillCancel': {
+        return this.cancelSkill(p);
+      }
       case 'ult': {
         if (this.phase !== 'playing' || !p.alive) return { ok: false, error: '当前状态不能释放终极技能' };
         return this.useUlt(p);
+      }
+      case 'ultFire': {
+        if (this.phase !== 'playing' || !p.alive) return { ok: false, error: '当前状态不能确认终极技能' };
+        return this.confirmUlt(p);
+      }
+      case 'ultCancel': {
+        return this.cancelUlt(p);
       }
       case 'spawn': {
         if (this.phase !== 'playing') return { ok: false, error: '当前阶段不能重生' };
@@ -698,6 +740,7 @@ export class CorcodragonFightEngine {
       if (p.shieldT <= 0) p.shield = 0;
       p.stealthT = Math.max(0, p.stealthT - dt);
       p.fortifyT = Math.max(0, p.fortifyT - dt);
+      p.invulnT = Math.max(0, p.invulnT - dt);
       p.slowT = Math.max(0, p.slowT - dt);
       p.ultCharge = Math.min(
         BALANCE.combat.ultChargeMax,
@@ -729,10 +772,12 @@ export class CorcodragonFightEngine {
     // 2.5 训练场靶子移动
     if (this.mode === 'training') this.stepTrainingTargets();
 
-    // 3. 射击（长按 + 近战）
+    // 3. 射击（长按 + 近战）；二段瞄准中不射普通子弹（左键用于确认技能）
     for (const p of this.players) {
       if (!p.alive) continue;
-      if (p.fireHeld && p.fireCd <= 0 && !p.reloading) this.fire(p);
+      if (p.fireHeld && p.fireCd <= 0 && !p.reloading && !p.skillAim && !p.ultAim) {
+        this.fire(p);
+      }
     }
 
     // 4. 效果结算
@@ -743,12 +788,17 @@ export class CorcodragonFightEngine {
       if (!p.isBot) continue;
       const next = this.botNextThink.get(p.id) ?? 0;
       if (this.t >= next) {
+        const level = BALANCE.ai.levels[this.aiLevel] ?? BALANCE.ai.levels.normal;
         this.botNextThink.set(
           p.id,
-          this.t + BALANCE.tick.botThinkMs + Math.floor(this.rng() * 120),
+          this.t + level.thinkMs + Math.floor(this.rng() * 120),
         );
         const view = this.getSnapshot(p.id);
-        const actions = chooseAIInputs(view, { rng: this.rng, style: this.aiStyle });
+        const actions = chooseAIInputs(view, {
+          rng: this.rng,
+          style: this.aiStyle,
+          level: this.aiLevel,
+        });
         for (const a of actions) this.applyInput(p.id, a);
       }
     }
@@ -869,6 +919,14 @@ export class CorcodragonFightEngine {
 
     const worldHit = rayWorld(eye.x, eye.y, eye.z, dir, def.range);
     let bestT = worldHit.t;
+
+    // 铁壁方向护盾：与当前视角实时同步的能量墙，吸收敌方子弹；
+    // 站在墙后的队友同样被保护（按几何拦截，不区分目标）。
+    const shieldHit = this.rayShields(p, eye, dir, bestT);
+    if (shieldHit && shieldHit.t < bestT) {
+      bestT = shieldHit.t;
+    }
+
     let bestTarget: EnginePlayerState | null = null;
     for (const q of this.players) {
       if (!q.alive || !this.isEnemy(p, q)) continue;
@@ -896,6 +954,30 @@ export class CorcodragonFightEngine {
         bestTarget = q;
       }
     }
+
+    // 子弹先撞上敌方护盾：能量墙吸收这一发，不继续穿透
+    if (shieldHit && shieldHit.t <= bestT && shieldHit.t < worldHit.t) {
+      const hitPoint = {
+        x: eye.x + dir.x * shieldHit.t,
+        y: eye.y + dir.y * shieldHit.t,
+        z: eye.z + dir.z * shieldHit.t,
+      };
+      const falloff =
+        shieldHit.t <= def.falloffStart
+          ? 1
+          : shieldHit.t >= def.falloffEnd
+            ? def.minDmgMult
+            : 1 -
+              ((shieldHit.t - def.falloffStart) /
+                Math.max(1e-6, def.falloffEnd - def.falloffStart)) *
+                (1 - def.minDmgMult);
+      const dmg = Math.max(1, Math.round(def.damage * falloff));
+      this.pushEvent('shot', '', { ...hitPoint }, true, [], p.id);
+      this.pushEvent('blocked', '🛡️ 护盾拦截', { ...hitPoint }, true, [], p.id, shieldHit.owner.id, dmg);
+      this.absorbShieldHit(shieldHit.owner, dmg);
+      return;
+    }
+
     if (bestTarget) {
       const hitY = eye.y + dir.y * bestT;
       const dist = bestT;
@@ -909,10 +991,10 @@ export class CorcodragonFightEngine {
                 (1 - def.minDmgMult);
       const headshot = hitY >= BALANCE.arena.headshotMinY && !def.melee;
       let dmg = def.damage * falloff * (headshot ? def.headshot : 1);
-      if (p.stealthT > 0) {
-        dmg *= p.hero ? abilityNum(p.hero, 'stealthDamageMult', 2) : 2;
-        p.stealthT = 0;
-        this.pushEvent('info', `${p.name} 破隐一击！`, undefined, true, []);
+      // 影枭重做：隐身中的首次命中直接把目标生命压到 1（不再只是翻倍）
+      const firstStealthStrike = p.stealthT > 0 && !p.stealthStrikeUsed;
+      if (firstStealthStrike) {
+        p.stealthStrikeUsed = true;
       }
       const hitPoint = { x: eye.x + dir.x * bestT, y: hitY, z: eye.z + dir.z * bestT };
       this.pushEvent(
@@ -924,10 +1006,64 @@ export class CorcodragonFightEngine {
         p.id,
         bestTarget.id,
       );
-      this.damagePlayer(bestTarget, dmg, p, hitPoint, headshot);
+      this.damagePlayer(bestTarget, dmg, p, hitPoint, headshot, firstStealthStrike);
+      // 影枭：任何武器命中都会退出隐身；若仍在隐身（首击）则立即充满终极技
+      if (p.stealthT > 0) {
+        p.stealthT = 0;
+        p.ultCharge = BALANCE.combat.ultChargeMax;
+        this.pushEvent('info', `${p.name} 破隐命中：终极技已充能完毕！`, { ...hitPoint }, true, []);
+      }
     } else {
       const end = { x: eye.x + dir.x * bestT, y: eye.y + dir.y * bestT, z: eye.z + dir.z * bestT };
       this.pushEvent('shot', '', end, true, [], p.id);
+    }
+  }
+
+  /**
+   * 射线 vs 所有“敌方铁壁能量墙”。返回最近命中；只拦截从墙正面飞来的子弹
+   * （墙是视角正前方的竖直矩形，随 owner 的 yaw 实时旋转）。
+   */
+  private rayShields(
+    shooter: EnginePlayerState,
+    eye: Vec3,
+    dir: Vec3,
+    maxT: number,
+  ): { t: number; owner: EnginePlayerState } | null {
+    let best: { t: number; owner: EnginePlayerState } | null = null;
+    for (const q of this.players) {
+      if (!q.alive || q.shield <= 0 || q.shieldT <= 0) continue;
+      if (!this.isEnemy(shooter, q)) continue;
+      const fw = { x: Math.sin(q.yaw), z: Math.cos(q.yaw) };
+      const denom = dir.x * fw.x + dir.z * fw.z;
+      if (denom >= -1e-6) continue; // 只拦正面入射（子弹朝墙飞来）
+      const distance = q.hero ? abilityNum(q.hero, 'shieldDistance', 1.8) : 1.8;
+      const width = q.hero ? abilityNum(q.hero, 'shieldWidth', 4.8) : 4.8;
+      const height = q.hero ? abilityNum(q.hero, 'shieldHeight', 3) : 3;
+      const centerY = q.pos.y + (q.hero ? abilityNum(q.hero, 'shieldCenterY', 1.2) : 1.2);
+      const cx = q.pos.x + fw.x * distance;
+      const cz = q.pos.z + fw.z * distance;
+      const num = (cx - eye.x) * fw.x + (cz - eye.z) * fw.z;
+      const t = num / denom; // denom < 0：正面入射；t>0 表示射线确实会到达墙面
+      if (t <= 0 || t >= maxT) continue;
+      const px = eye.x + dir.x * t;
+      const py = eye.y + dir.y * t;
+      const pz = eye.z + dir.z * t;
+      const right = { x: -fw.z, z: fw.x };
+      const off = (px - cx) * right.x + (pz - cz) * right.z;
+      if (Math.abs(off) > width / 2) continue;
+      if (py < centerY - height / 2 || py > centerY + height / 2) continue;
+      if (!best || t < best.t) best = { t, owner: q };
+    }
+    return best;
+  }
+
+  /** 子弹被铁壁护盾吸收：扣护盾生命，打空则提前破碎 */
+  private absorbShieldHit(owner: EnginePlayerState, amount: number): void {
+    if (owner.shield <= 0) return;
+    owner.shield = Math.max(0, owner.shield - amount);
+    if (owner.shield <= 0) {
+      owner.shieldT = 0;
+      this.pushEvent('skill', `🛡️ ${owner.name} 的能量护盾破碎！`, { ...owner.pos }, true, [], owner.id);
     }
   }
 
@@ -954,12 +1090,15 @@ export class CorcodragonFightEngine {
     if (best) {
       const hitPoint = { x: best.pos.x, y: best.pos.y + BALANCE.arena.chestY, z: best.pos.z };
       let dmg = WEAPON_DEFS.dagger.damage;
-      if (p.stealthT > 0) {
-        dmg *= p.hero ? abilityNum(p.hero, 'stealthDamageMult', 2) : 2;
-        p.stealthT = 0;
-      }
+      const firstStealthStrike = p.stealthT > 0 && !p.stealthStrikeUsed;
+      if (firstStealthStrike) p.stealthStrikeUsed = true;
       this.pushEvent('shot', '', hitPoint, true, [], p.id, best.id);
-      this.damagePlayer(best, dmg, p, hitPoint, false);
+      this.damagePlayer(best, dmg, p, hitPoint, false, firstStealthStrike);
+      if (p.stealthT > 0) {
+        p.stealthT = 0;
+        p.ultCharge = BALANCE.combat.ultChargeMax;
+        this.pushEvent('info', `${p.name} 破隐命中：终极技已充能完毕！`, { ...hitPoint }, true, []);
+      }
     } else {
       const end = { x: eye.x + dir.x * 2, y: eye.y + dir.y * 2, z: eye.z + dir.z * 2 };
       this.pushEvent('shot', '', end, true, [], p.id);
@@ -972,40 +1111,48 @@ export class CorcodragonFightEngine {
     attacker: EnginePlayerState | null,
     hitPoint?: Vec3,
     headshot = false,
+    firstStealthStrike = false,
   ): void {
     if (!target.alive || this.phase !== 'playing') return;
+    // 重生无敌：任何伤害来源（子弹/技能/爆炸）都不生效
+    if (target.invulnT > 0) return;
     let amount = rawAmount;
     if (target.fortifyT > 0) {
       amount *= target.hero ? abilityNum(target.hero, 'fortifyDamageMult', 0.5) : 0.5;
     }
     amount = Math.max(1, Math.round(amount));
-    let absorbed = 0;
-    if (target.shield > 0) {
-      absorbed = Math.min(target.shield, amount);
-      target.shield -= absorbed;
-      amount -= absorbed;
-      target.hp -= amount;
+    const hpBefore = target.hp;
+    // 影枭重做：隐身中的首次命中把目标生命直接压到 1（不再只翻倍）。
+    // 目标只有 1 血时不会被这次命中击杀（“降至 1”语义）。
+    if (firstStealthStrike) {
+      target.hp = hpBefore > 1 ? 1 : hpBefore;
+      amount = Math.max(0, hpBefore - target.hp);
     } else {
       target.hp -= amount;
     }
+    // 影枭被命中立即退出隐身（敌人恢复可见）
+    if (target.stealthT > 0) {
+      target.stealthT = 0;
+      this.pushEvent('info', `${target.name} 受击显形！`, { ...target.pos }, true, []);
+    }
     if (attacker) {
       attacker.hits += 1;
-      attacker.damageDealt += rawAmount;
+      attacker.damageDealt += amount;
       if (headshot) attacker.headshots += 1;
       attacker.ultCharge = Math.min(
         BALANCE.combat.ultChargeMax,
-        attacker.ultCharge + rawAmount * BALANCE.combat.ultPerDamage,
+        attacker.ultCharge + amount * BALANCE.combat.ultPerDamage,
       );
     }
     this.pushEvent(
       'hit',
-      headshot ? '爆头！' : '',
+      headshot ? '爆头！' : firstStealthStrike ? '破隐一击：生命降至 1' : '',
       hitPoint,
       false,
       attacker ? [attacker.id, target.id] : [target.id],
       attacker?.id,
       target.id,
-      rawAmount,
+      amount,
     );
     if (target.hp <= 0) {
       this.killPlayer(target, attacker);
@@ -1019,6 +1166,10 @@ export class CorcodragonFightEngine {
     victim.shield = 0;
     victim.shieldT = 0;
     victim.stealthT = 0;
+    victim.stealthStrikeUsed = false;
+    victim.skillAim = false;
+    victim.ultAim = false;
+    victim.invulnT = 0;
     victim.ads = false;
     victim.fireHeld = false;
     victim.moveX = 0;
@@ -1070,7 +1221,12 @@ export class CorcodragonFightEngine {
     p.shield = 0;
     p.shieldT = 0;
     p.stealthT = 0;
+    p.stealthStrikeUsed = false;
+    p.skillAim = false;
+    p.ultAim = false;
     p.fortifyT = 0;
+    // 训练场靶子不享受重生无敌（避免影响连续打靶统计）
+    p.invulnT = p.targetKind ? 0 : BALANCE.combat.respawnInvulnMs / 1000;
     p.slowT = 0;
     p.slowMult = 0.5;
     p.velY = 0;
@@ -1101,6 +1257,8 @@ export class CorcodragonFightEngine {
     p.reloading = true;
     p.reloadT = def.reloadMs;
     p.ads = false;
+    p.skillAim = false;
+    p.ultAim = false;
     return { ok: true };
   }
 
@@ -1117,7 +1275,7 @@ export class CorcodragonFightEngine {
         const dashDistance = abilityNum(p.hero, 'dashDistance', 10);
         const trailRadius = abilityNum(p.hero, 'trailRadius', 1.1);
         const trailDuration = abilityNum(p.hero, 'trailDuration', 2.5);
-        const trailDps = abilityNum(p.hero, 'trailDps', 25);
+        const trailDps = abilityNum(p.hero, 'trailDps', 14);
         for (let d = 0.5; d <= dashDistance; d += 0.5) {
           const x = start.x + dir.x * d;
           const z = start.z + dir.z * d;
@@ -1146,50 +1304,116 @@ export class CorcodragonFightEngine {
       }
       case 'yingxiao': {
         p.stealthT = abilityNum(p.hero, 'stealthDuration', 4);
+        p.stealthStrikeUsed = false;
         p.skillCd = def.skillCd;
         this.pushEvent('skill', `${p.name} 进入暗影潜行 🦉`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'tiebi': {
-        p.shield = abilityNum(p.hero, 'shieldValue', 80);
-        p.shieldT = abilityNum(p.hero, 'shieldDuration', 5);
+        // 重做：在视角正前方展开一面随视角实时旋转的能量墙（几何拦截子弹）
+        p.shield = abilityNum(p.hero, 'shieldValue', 300);
+        p.shieldT = abilityNum(p.hero, 'shieldDuration', 6);
         p.skillCd = def.skillCd;
         this.pushEvent('skill', `${p.name} 展开能量护盾 🛡️`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'lingyin': {
+        // 重做：向视角方向发射扇形治愈波（自己 + 扇形内队友）
         this.healPlayer(p, abilityNum(p.hero, 'selfHeal', 45), p);
-        const allyRadius = abilityNum(p.hero, 'allyRadius', 8);
+        const waveRange = abilityNum(p.hero, 'waveRange', 14);
+        const waveHalfAngle = (abilityNum(p.hero, 'waveAngleDeg', 60) * Math.PI) / 360;
         const allyHeal = abilityNum(p.hero, 'allyHeal', 30);
+        const fw = dirFromYawPitch(p.yaw, 0);
         for (const q of this.players) {
-          if (this.isAlly(p, q) && Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z) <= allyRadius) {
-            this.healPlayer(q, allyHeal, p);
-          }
+          if (!this.isAlly(p, q)) continue;
+          const dx = q.pos.x - p.pos.x;
+          const dz = q.pos.z - p.pos.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > waveRange) continue;
+          const dot = (dx * fw.x + dz * fw.z) / (dist || 1);
+          const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+          if (angle > waveHalfAngle) continue;
+          this.healPlayer(q, allyHeal, p);
         }
+        this.addEffect(
+          'healWave',
+          { ...p.pos },
+          waveRange,
+          0.6,
+          p.id,
+          0,
+          0,
+          0,
+          0,
+          undefined,
+          { yaw: p.yaw, arc: waveHalfAngle },
+        );
         p.skillCd = def.skillCd;
         this.pushEvent('skill', `${p.name} 释放治愈波 💚`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       case 'guilei': {
-        const dir = dirFromYawPitch(p.yaw, p.pitch);
-        const eye = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
-        const throwRange = abilityNum(p.hero, 'bombThrowRange', 30);
-        const bombFuse = abilityNum(p.hero, 'bombFuse', 1.2);
-        const bombDamage = abilityNum(p.hero, 'bombDamage', 35);
-        const hit = rayWorld(eye.x, eye.y, eye.z, dir, throwRange);
-        const at =
-          hit.kind !== 'none'
-            ? { x: hit.x, y: hit.y, z: hit.z }
-            : { x: eye.x + dir.x * throwRange, y: 0, z: eye.z + dir.z * throwRange };
-        at.y = Math.max(0, Math.min(at.y, 3));
-        this.addEffect('bomb', at, 0.5, bombFuse, p.id, 0, 0, bombFuse, bombDamage);
-        p.skillCd = def.skillCd;
-        this.pushEvent('skill', `${p.name} 投掷粘性炸弹 💣`, at, true, [], p.id);
+        // 二段瞄准：第一次按 Q 进入准备状态，左键（skillFire）向当前视角投掷；
+        // 再次按 Q 或 skillCancel 取消，冷却在真正投掷时才结算。
+        if (p.skillAim) {
+          p.skillAim = false;
+          this.pushEvent('info', `${p.name} 取消了炸弹投掷`, { ...p.pos }, true, []);
+          return { ok: true };
+        }
+        p.skillAim = true;
+        p.ads = false;
+        p.fireHeld = false;
+        this.pushEvent('info', `${p.name} 准备投掷粘性炸弹 💣（点击左键投掷 / 右键取消）`, { ...p.pos }, true, [], p.id);
         return { ok: true };
       }
       default:
         return { ok: false, error: '未知英雄' };
     }
+  }
+
+  /** 二段技能确认（当前仅诡雷炸弹使用） */
+  private confirmSkill(p: EnginePlayerState): { ok: boolean; error?: string } {
+    if (!p.hero) return { ok: false, error: '尚未选择英雄' };
+    if (!p.skillAim) return { ok: false, error: '尚未进入技能瞄准状态' };
+    const def = HERO_DEFS[p.hero];
+    if (p.skillCd > 0) return { ok: false, error: `${def.skillName} 冷却中` };
+    switch (p.hero) {
+      case 'guilei': {
+        const dir = dirFromYawPitch(p.yaw, p.pitch);
+        const eye = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
+        const speed = abilityNum(p.hero, 'bombSpeed', 16);
+        const bombDamage = abilityNum(p.hero, 'bombDamage', 35);
+        // 服务端权威抛体：初速度沿视角方向，tick 内受 bombGravity 下落，
+        // 落地/撞掩体后粘住并开始 1.2s 引信（客户端据此渲染可见抛物线）
+        this.addEffect(
+          'bomb',
+          { ...eye },
+          0.5,
+          10,
+          p.id,
+          0,
+          0,
+          0,
+          bombDamage,
+          undefined,
+          { vx: dir.x * speed, vy: dir.y * speed, vz: dir.z * speed, flying: true },
+        );
+        p.skillAim = false;
+        p.skillCd = def.skillCd;
+        this.pushEvent('skill', `${p.name} 抛出粘性炸弹 💣`, { ...eye }, true, [], p.id);
+        return { ok: true };
+      }
+      default:
+        return { ok: false, error: '该英雄技能无需确认' };
+    }
+  }
+
+  private cancelSkill(p: EnginePlayerState): { ok: boolean; error?: string } {
+    if (!p.skillAim) return { ok: false, error: '当前没有待确认的技能' };
+    p.skillAim = false;
+    p.ads = false;
+    this.pushEvent('info', `${p.name} 取消了技能瞄准`, { ...p.pos }, true, [], p.id);
+    return { ok: true };
   }
 
   private useUlt(p: EnginePlayerState): { ok: boolean; error?: string } {
@@ -1198,10 +1422,12 @@ export class CorcodragonFightEngine {
     const def = HERO_DEFS[p.hero];
     switch (p.hero) {
       case 'yanren': {
-        const radius = abilityNum(p.hero, 'ultRadius', 9);
+        const radius = abilityNum(p.hero, 'ultRadius', 12);
         const damage = abilityNum(p.hero, 'ultDamage', 80);
         this.explodeAt({ ...p.pos }, radius, damage, p);
         p.ultCharge = 0;
+        // 清晰范围提示：地面火环 + 爆炸火球
+        this.addEffect('ultRing', { ...p.pos }, radius, 0.9, p.id, 0, 0, 0, 0);
         this.addEffect('explosion', { ...p.pos }, radius, 0.5, p.id, 0, 0, 0, damage);
         this.pushEvent('ult', `${p.name} 释放 ${def.ultName} 💥`, { ...p.pos }, true, [], p.id);
         return { ok: true };
@@ -1210,14 +1436,17 @@ export class CorcodragonFightEngine {
         const markRange = abilityNum(p.hero, 'markRange', 20);
         const markDelay = abilityNum(p.hero, 'markDelay', 2.5);
         let target: EnginePlayerState | null = null;
-        let best = Infinity;
+        let bestHp = Infinity;
+        let bestDist = Infinity;
         for (const q of this.players) {
           if (!q.alive || !this.isEnemy(p, q)) continue;
           const dist = Math.hypot(q.pos.x - p.pos.x, q.pos.z - p.pos.z);
           if (dist > markRange) continue;
           if (!this.hasLOS(p.pos, q.pos)) continue;
-          if (dist < best) {
-            best = dist;
+          // 标记视野范围内“血量最低”的敌人；同血量时取最近
+          if (q.hp < bestHp || (q.hp === bestHp && dist < bestDist)) {
+            bestHp = q.hp;
+            bestDist = dist;
             target = q;
           }
         }
@@ -1250,6 +1479,29 @@ export class CorcodragonFightEngine {
         return { ok: true };
       }
       case 'guilei': {
+        // v0.2 调整：不再二段投掷，改为以自身为中心的圆形雷暴（控制为主、低伤害）
+        const stormRadius = abilityNum(p.hero, 'stormRadius', 7);
+        const stormDuration = abilityNum(p.hero, 'stormDuration', 4);
+        const stormDps = abilityNum(p.hero, 'stormDps', 8);
+        this.addEffect('stormZone', { ...p.pos }, stormRadius, stormDuration, p.id, stormDps, 0, 0, 0);
+        p.ultCharge = 0;
+        this.pushEvent('ult', `${p.name} 以自身为中心召唤雷暴云 ⛈️`, { ...p.pos }, true, [], p.id);
+        return { ok: true };
+      }
+      default:
+        return { ok: false, error: '未知英雄' };
+    }
+  }
+
+  /** 二段终极技确认（当前仅雷暴云使用） */
+  private confirmUlt(p: EnginePlayerState): { ok: boolean; error?: string } {
+    if (!p.hero) return { ok: false, error: '尚未选择英雄' };
+    if (!p.ultAim) return { ok: false, error: '尚未进入终极技引导状态' };
+    if (p.ultCharge < BALANCE.combat.ultChargeMax) {
+      return { ok: false, error: '终极技能未充能完毕' };
+    }
+    switch (p.hero) {
+      case 'guilei': {
         const dir = dirFromYawPitch(p.yaw, p.pitch);
         const eye = { x: p.pos.x, y: p.pos.y + BALANCE.arena.eyeY, z: p.pos.z };
         const stormRange = abilityNum(p.hero, 'stormRange', 25);
@@ -1262,13 +1514,22 @@ export class CorcodragonFightEngine {
             ? { x: hit.x, y: 0, z: hit.z }
             : { x: eye.x + dir.x * stormRange, y: 0, z: eye.z + dir.z * stormRange };
         this.addEffect('stormZone', at, stormRadius, stormDuration, p.id, stormDps, 0, 0, 0);
+        p.ultAim = false;
         p.ultCharge = 0;
         this.pushEvent('ult', `${p.name} 召唤雷暴云 ⛈️`, at, true, [], p.id);
         return { ok: true };
       }
       default:
-        return { ok: false, error: '未知英雄' };
+        return { ok: false, error: '该英雄终极技无需确认' };
     }
+  }
+
+  private cancelUlt(p: EnginePlayerState): { ok: boolean; error?: string } {
+    if (!p.ultAim) return { ok: false, error: '当前没有待确认的终极技' };
+    p.ultAim = false;
+    p.ads = false;
+    this.pushEvent('info', `${p.name} 取消了终极技引导`, { ...p.pos }, true, [], p.id);
+    return { ok: true };
   }
 
   private explodeAt(center: Vec3, radius: number, damage: number, owner: EnginePlayerState): void {
@@ -1293,6 +1554,17 @@ export class CorcodragonFightEngine {
     fuse: number,
     damage: number,
     targetId?: string,
+    shape?: {
+      yaw?: number;
+      pitch?: number;
+      arc?: number;
+      width?: number;
+      height?: number;
+      vx?: number;
+      vy?: number;
+      vz?: number;
+      flying?: boolean;
+    },
   ): void {
     this.effects.push({
       id: this.effectSeq++,
@@ -1308,6 +1580,7 @@ export class CorcodragonFightEngine {
       targetId,
       damage,
       accumulate: 0,
+      ...(shape ?? {}),
     });
   }
 
@@ -1339,10 +1612,49 @@ export class CorcodragonFightEngine {
     const keep: EngineEffect[] = [];
     for (const e of this.effects) {
       e.t = Math.max(0, e.t - dt);
-      e.fuse = Math.max(0, e.fuse - dt);
       const owner = this.player(e.ownerId);
 
-      if (e.kind === 'bomb' && e.fuse <= 0) {
+      // 粘性炸弹抛体飞行：服务端权威物理，客户端据此渲染可见抛物线
+      if (e.kind === 'bomb' && e.flying) {
+        const g = owner && owner.hero ? abilityNum(owner.hero, 'bombGravity', 12) : 12;
+        e.pos.x += (e.vx ?? 0) * dt;
+        e.pos.y += (e.vy ?? 0) * dt;
+        e.pos.z += (e.vz ?? 0) * dt;
+        e.vy = (e.vy ?? 0) - g * dt;
+        let landed = e.pos.y <= 0.05 && (e.vy ?? 0) <= 0;
+        // 飞出竞技场围墙：粘在外墙
+        const clamp = BALANCE.arena.half - 0.15;
+        if (Math.abs(e.pos.x) >= clamp || Math.abs(e.pos.z) >= clamp) {
+          e.pos.x = Math.max(-clamp, Math.min(clamp, e.pos.x));
+          e.pos.z = Math.max(-clamp, Math.min(clamp, e.pos.z));
+          landed = true;
+        }
+        // 落进掩体 AABB：粘在箱顶（从上方越过则继续飞行）
+        if (!landed) {
+          for (const b of OBSTACLES) {
+            const insideX = e.pos.x >= b.minX && e.pos.x <= b.maxX;
+            const insideZ = e.pos.z >= b.minZ && e.pos.z <= b.maxZ;
+            if (insideX && insideZ && e.pos.y <= b.height + 0.05) {
+              e.pos.y = b.height + 0.05;
+              landed = true;
+              break;
+            }
+          }
+        }
+        if (landed) {
+          e.flying = false;
+          e.vx = 0;
+          e.vy = 0;
+          e.vz = 0;
+          e.pos.y = Math.max(0.05, e.pos.y);
+          e.fuse = owner && owner.hero ? abilityNum(owner.hero, 'bombFuse', 1.2) : 1.2;
+        }
+      }
+      if (!(e.kind === 'bomb' && e.flying)) {
+        e.fuse = Math.max(0, e.fuse - dt);
+      }
+
+      if (e.kind === 'bomb' && !e.flying && e.fuse <= 0) {
         const bombRadius =
           owner && owner.hero ? abilityNum(owner.hero, 'bombRadius', 5) : 5;
         if (owner) this.explodeAt(e.pos, bombRadius, e.damage, owner);
@@ -1373,6 +1685,11 @@ export class CorcodragonFightEngine {
               owner,
               { ...target.pos },
             );
+            // 影枭大招新增：死亡标记击杀立即刷新主动技能 CD
+            if (!target.alive && owner.hero === 'yingxiao') {
+              owner.skillCd = 0;
+              this.pushEvent('ult', `☠️ ${owner.name} 的死亡标记完成击杀，暗影潜行已刷新！`, { ...target.pos }, true, []);
+            }
           }
           e.t = 0.4;
           e.targetId = undefined;
@@ -1382,18 +1699,21 @@ export class CorcodragonFightEngine {
       if (e.t <= 0) continue;
 
       if (e.kind === 'fireTrail' || e.kind === 'stormZone') {
+        e.chunkT = Math.max(0, (e.chunkT ?? 0) - dt);
         e.accumulate += e.dps * dt;
-        for (const q of this.players) {
-          if (!q.alive || (owner && !this.isEnemy(owner, q))) continue;
-          const d = Math.hypot(q.pos.x - e.pos.x, q.pos.z - e.pos.z);
-          if (d > e.radius) continue;
-          if (e.kind === 'stormZone' && owner?.hero) {
-            q.slowT = abilityNum(owner.hero, 'slowDuration', 0.4);
-            q.slowMult = abilityNum(owner.hero, 'slowMult', 0.5);
-          }
-          if (e.accumulate >= chunkSec) {
+        if (e.chunkT <= 0) {
+          for (const q of this.players) {
+            if (!q.alive || (owner && !this.isEnemy(owner, q))) continue;
+            const d = Math.hypot(q.pos.x - e.pos.x, q.pos.z - e.pos.z);
+            if (d > e.radius) continue;
+            if (e.kind === 'stormZone' && owner?.hero) {
+              q.slowT = abilityNum(owner.hero, 'slowDuration', 0.4);
+              q.slowMult = abilityNum(owner.hero, 'slowMult', 0.5);
+            }
             if (owner) this.damagePlayer(q, e.dps * chunkSec, owner, { ...q.pos });
           }
+          e.chunkT = chunkSec;
+          e.accumulate = 0;
         }
       }
       if (e.kind === 'healZone') {
@@ -1540,7 +1860,11 @@ export class CorcodragonFightEngine {
         ultCharge: visible ? p.ultCharge : 0,
         ads: visible && p.ads,
         stealthT: p.id === you.id ? p.stealthT : visible ? 0 : 0,
+        stealthStrikeReady: p.id === you.id ? p.stealthT > 0 && !p.stealthStrikeUsed : false,
+        skillAim: visible ? p.skillAim : false,
+        ultAim: visible ? p.ultAim : false,
         fortifyT: visible ? p.fortifyT : 0,
+        invulnT: visible ? p.invulnT : 0,
         onGround: visible && p.onGround,
         respawnIn: visible && !p.alive ? Math.max(0, p.respawnAt - this.t) / 1000 : 0,
         kills: visible ? p.kills : 0,
@@ -1589,6 +1913,11 @@ export class CorcodragonFightEngine {
         t: e.t,
         duration: e.duration,
         ownerId: e.ownerId,
+        ...(e.yaw !== undefined ? { yaw: e.yaw } : {}),
+        ...(e.pitch !== undefined ? { pitch: e.pitch } : {}),
+        ...(e.arc !== undefined ? { arc: e.arc } : {}),
+        ...(e.width !== undefined ? { width: e.width } : {}),
+        ...(e.height !== undefined ? { height: e.height } : {}),
       })),
       events,
       winnerId: this.winnerId,
@@ -1641,6 +1970,10 @@ export function createEngine(
         matchTimeMs: typeof options.matchTimeMs === 'number' ? options.matchTimeMs : undefined,
         heroSelectMs: typeof options.heroSelectMs === 'number' ? options.heroSelectMs : undefined,
         aiStyle: options.aiStyle === 'movement' ? 'movement' : options.aiStyle === 'combat' ? 'combat' : undefined,
+        aiLevel:
+          options.aiLevel === 'easy' || options.aiLevel === 'normal' || options.aiLevel === 'hard'
+            ? options.aiLevel
+            : undefined,
       }
     : {};
   return new CorcodragonFightEngine(players, { ...opts, rng });

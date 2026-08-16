@@ -78,6 +78,51 @@
 .ccf-crosshair.hit .c-right {
   transform: translate(-3px, 3px) rotate(-45deg);
 }
+/* 二段技能瞄准：准星变成橙色菱形，明确“下一发是技能不是子弹” */
+.ccf-crosshair.aiming i {
+  background: #ffb347;
+  box-shadow: 0 0 6px rgba(255, 150, 30, 0.85);
+}
+.ccf-crosshair.aiming .c-top {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-crosshair.aiming .c-bottom {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-crosshair.aiming .c-left {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-crosshair.aiming .c-right {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-aim-banner {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: rgba(20, 12, 2, 0.72);
+  border: 1px solid rgba(255, 179, 71, 0.75);
+  border-radius: 10px;
+  padding: 8px 18px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffd08a;
+  animation: ccf-aim-breathe 0.9s ease-in-out infinite;
+}
+.ccf-aim-banner span {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+@keyframes ccf-aim-breathe {
+  50% { box-shadow: 0 0 18px rgba(255, 160, 40, 0.55); }
+}
 
 /* ---- HUD ---- */
 .ccf-hud {
@@ -243,6 +288,44 @@
 }
 .ccf-skill.ready {
   border-color: rgba(120, 255, 160, 0.55);
+}
+.ccf-skill.aiming {
+  border-color: rgba(255, 179, 71, 0.9);
+  box-shadow: 0 0 14px rgba(255, 150, 30, 0.35);
+}
+.ccf-skill.aiming .ccf-skill-key {
+  background: rgba(255, 179, 71, 0.3);
+  color: #ffd08a;
+}
+.ccf-aiming-dot {
+  position: absolute;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffb347;
+  box-shadow: 0 0 8px rgba(255, 160, 40, 0.9);
+  animation: ccf-pulse 0.7s ease-in-out infinite;
+}
+.ccf-stealth-chip {
+  border-color: rgba(155, 92, 255, 0.65);
+  color: #d9bfff;
+}
+.ccf-invuln-chip {
+  border-color: rgba(255, 214, 120, 0.7);
+  color: #ffe6a8;
+}
+.ccf-invuln {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at center, rgba(255, 220, 130, 0.04) 0%, rgba(255, 200, 90, 0.14) 100%);
+  box-shadow: inset 0 0 80px rgba(255, 214, 120, 0.35);
+  animation: ccf-invuln-breathe 0.8s ease-in-out infinite;
+}
+@keyframes ccf-invuln-breathe {
+  50% { opacity: 0.45; }
 }
 .ccf-ult-ready {
   color: #ffd166;
@@ -425,6 +508,7 @@
   to { transform: translateX(-50%) scale(1); opacity: 1; }
 }
 
+/* 低血量红光：50% 轻微警示、30% 以下强烈闪烁（建议1：血量越低红光越明显） */
 .ccf-lowhp {
   position: absolute;
   inset: 0;
@@ -433,7 +517,29 @@
   box-shadow: inset 0 0 130px rgba(255, 20, 10, 0.4);
   animation: ccf-lowhp-pulse 0.9s ease-in-out infinite;
 }
+.ccf-lowhp.warn {
+  box-shadow: inset 0 0 110px rgba(255, 40, 20, 0.28);
+  animation-duration: 1.4s;
+}
+.ccf-lowhp.danger {
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0) 55%, rgba(255, 20, 0, 0.38) 100%);
+  box-shadow: inset 0 0 150px rgba(255, 20, 10, 0.62);
+  animation-duration: 0.55s;
+}
 @keyframes ccf-lowhp-pulse {
+  50% { opacity: 0.55; }
+}
+/* 影枭隐身：淡紫色潜行滤镜 + 边缘呼吸 */
+.ccf-stealth {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at center, rgba(120, 80, 255, 0.05) 0%, rgba(80, 40, 200, 0.22) 100%);
+  box-shadow: inset 0 0 90px rgba(155, 92, 255, 0.4);
+  animation: ccf-stealth-breathe 1.6s ease-in-out infinite;
+}
+@keyframes ccf-stealth-breathe {
   50% { opacity: 0.55; }
 }
 

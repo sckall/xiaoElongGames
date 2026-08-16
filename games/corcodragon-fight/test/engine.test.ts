@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CorcodragonFightEngine } from '../engine';
+import { BALANCE } from '../balance';
 import {
   HERO_IDS,
   PLAYER_RADIUS,
@@ -147,13 +148,15 @@ describe('移动物理', () => {
     start(e);
     const a = e.players[0].id;
     const p = e.players[0];
-    // 沿 z=-19 通道横穿，避开所有掩体，验证左右围墙
-    e.debug.place(a, { x: -19, y: 0, z: -19 }, 0, 0);
+    // 沿 z=-5 的开放走廊横穿（新地图侧翼墙 z∈[-20,-13]，角落箱 x∈[-11,-6]），
+    // 验证左右围墙限制
+    e.debug.place(a, { x: -19, y: 0, z: -5 }, 0, 0);
     e.applyInput(a, { type: 'move', x: 1, z: 0 });
-    for (let i = 0; i < 200; i++) tick(e, 50);
+    for (let i = 0; i < 400; i++) tick(e, 50);
+    const half = BALANCE.arena.half;
     expect(p.pos.x).toBeGreaterThan(0);
-    expect(p.pos.x).toBeLessThanOrEqual(20 - PLAYER_RADIUS + 1e-6);
-    expect(p.pos.x).toBeGreaterThanOrEqual(-20 + PLAYER_RADIUS - 1e-6);
+    expect(p.pos.x).toBeLessThanOrEqual(half - PLAYER_RADIUS + 1e-6);
+    expect(p.pos.x).toBeGreaterThanOrEqual(-half + PLAYER_RADIUS - 1e-6);
   });
 
   it('掩体碰撞不穿墙', () => {
@@ -187,9 +190,9 @@ describe('射击与伤害', () => {
     const e = mkEngine();
     start(e);
     const [a, b] = [e.players[0].id, e.players[1].id];
-    // 放在 x=-11 的空旷走廊上，A 朝 +z 面朝 B，弹道无遮挡
-    e.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    // 放在 x=-5 的空旷走廊上（新地图角落箱 x∈[-11,-6]，这里无遮挡）
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     return { e, a, b };
   }
 
@@ -208,6 +211,29 @@ describe('射击与伤害', () => {
     e.applyInput(a, { type: 'fire', pressed: true });
     tick(e, 50);
     expect(bp.hp).toBe(bp.maxHp - 40);
+  });
+
+  it('躯干/腹部命中回归：向下瞄准时胶囊柱身也必须命中（历史 bug）', () => {
+    // 回归：rayCapsule 旧实现会把“柱身命中”被端点球 Infinity 覆盖，
+    // 导致瞄准胸口/肚子时只有贴近头部的射线能命中，表现成“只有头能被打到”。
+    const { e, a, b } = facingPair();
+    const bp = e.player(b)!;
+    for (const [label, pitch, expectedHp] of [
+      ['胸口 1.15m', Math.atan2(-0.47, 5), bp.maxHp - 20],
+      ['腹部 0.80m', Math.atan2(-0.82, 5), bp.maxHp - 20],
+    ] as const) {
+      bp.hp = bp.maxHp;
+      e.players[0].fireCd = 0;
+      const before = e.events.length;
+      e.applyInput(a, { type: 'look', yaw: 0, pitch });
+      e.applyInput(a, { type: 'fire', pressed: true });
+      tick(e, 50);
+      e.applyInput(a, { type: 'fire', pressed: false });
+      const hit = e.events.slice(before).find((ev) => ev.kind === 'hit' && ev.targetId === b);
+      expect(hit, label).toBeTruthy();
+      expect(bp.hp, label).toBe(expectedHp);
+      expect(hit?.text, label).not.toBe('爆头！');
+    }
   });
 
   it('掩体阻挡弹道', () => {
@@ -237,8 +263,8 @@ describe('射击与伤害', () => {
     const a = t.players[0].id; // A 队
     const teammate = t.players[2].id; // A 队
     expect(t.players[0].team).toBe(t.players[2].team);
-    t.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    t.debug.place(teammate, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    t.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    t.debug.place(teammate, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     t.applyInput(a, { type: 'fire', pressed: true });
     t.tick(50);
     expect(t.player(teammate)!.hp).toBe(t.player(teammate)!.maxHp);
@@ -287,8 +313,8 @@ describe('射击与伤害', () => {
     const [a, b] = [e.players[0].id, e.players[1].id];
     const ap = e.player(a)!;
     const bp = e.player(b)!;
-    e.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     bp.hp = 1;
     e.applyInput(a, { type: 'fire', pressed: true });
     tick(e, 50);
@@ -306,8 +332,8 @@ describe('射击与伤害', () => {
     start(e);
     const [a, b] = [e.players[0].id, e.players[1].id];
     const bp = e.player(b)!;
-    e.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     bp.hp = 1;
     e.applyInput(a, { type: 'fire', pressed: true });
     tick(e, 50);
@@ -318,6 +344,40 @@ describe('射击与伤害', () => {
     const snapB = e.getSnapshot(b);
     expect(snapB.players.find((p) => p.id === b)?.respawnIn).toBe(0);
   });
+
+  it('重生后 1.5 秒无敌：期间不受伤，结束后恢复可伤害', () => {
+    const e = mkEngine();
+    start(e);
+    const [a, b] = [e.players[0].id, e.players[1].id];
+    const ap = e.player(a)!;
+    const bp = e.player(b)!;
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    bp.hp = 1;
+    e.applyInput(a, { type: 'fire', pressed: true });
+    tick(e, 50);
+    for (let i = 0; i < 70; i++) tick(e, 50);
+    expect(bp.alive).toBe(true);
+    expect(bp.invulnT).toBeGreaterThan(0);
+    // 无敌期间：打不进去
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    ap.fireCd = 0;
+    e.applyInput(a, { type: 'fire', pressed: true });
+    tick(e, 50);
+    e.applyInput(a, { type: 'fire', pressed: false });
+    expect(bp.hp).toBe(bp.maxHp);
+    // 无敌结束后：正常受伤
+    for (let i = 0; i < 30; i++) tick(e, 50); // 1.5s
+    expect(bp.invulnT).toBe(0);
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    ap.fireCd = 0;
+    e.applyInput(a, { type: 'fire', pressed: true });
+    tick(e, 50);
+    e.applyInput(a, { type: 'fire', pressed: false });
+    expect(bp.hp).toBe(bp.maxHp - 20);
+  });
 });
 
 describe('英雄技能与终极技', () => {
@@ -325,8 +385,8 @@ describe('英雄技能与终极技', () => {
     const e = mkEngine();
     start(e, heroA);
     const [a, b] = [e.players[0].id, e.players[1].id];
-    e.debug.place(a, { x: -11, y: 0, z: -6 }, 0, 0);
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
     return { e, a, b };
   }
 
@@ -342,7 +402,7 @@ describe('英雄技能与终极技', () => {
     expect(bp.hp).toBeLessThan(bp.maxHp);
   });
 
-  it('影枭：隐身对敌人不可见，破隐一击双倍伤害', () => {
+  it('影枭：隐身 6 秒；首击压至 1 血、攻击后显形并充满终极技', () => {
     const { e, a, b } = pair('yingxiao');
     e.applyInput(a, { type: 'skill' });
     tick(e, 50);
@@ -351,29 +411,94 @@ describe('英雄技能与终极技', () => {
     expect(hidden.visible).toBe(false);
     expect(hidden.pos.y).toBe(-100);
     const viewA = e.getSnapshot(a);
-    expect(viewA.players.find((p) => p.id === a)!.stealthT).toBeGreaterThan(0);
-    // 破隐一击：步枪 20 → 40（与命中前后血量差核对，避免英雄血量差异干扰）
+    const meA = viewA.players.find((p) => p.id === a)!;
+    expect(meA.stealthT).toBeGreaterThan(5.8); // 6 秒隐身
+    expect(meA.stealthStrikeReady).toBe(true);
+    const ap = e.player(a)!;
     const bp = e.player(b)!;
-    const hpBefore = bp.hp;
     e.applyInput(a, { type: 'fire', pressed: true });
     tick(e, 50);
-    expect(hpBefore - bp.hp).toBe(40);
-    const after = e.getSnapshot(b);
-    expect(after.players.find((p) => p.id === a)!.visible).toBe(true);
+    expect(bp.hp).toBe(1); // 首击压到 1
+    expect(ap.stealthT).toBe(0); // 攻击后退出隐身
+    expect(ap.ultCharge).toBeGreaterThanOrEqual(100); // 隐身命中 → 终极技充满
+    expect(e.getSnapshot(b).players.find((p) => p.id === a)!.visible).toBe(true);
   });
 
-  it('铁壁：护盾先吸收伤害', () => {
+  it('影枭：隐身期间被命中也会立即显形', () => {
+    const { e, a, b } = pair('yingxiao');
+    e.applyInput(a, { type: 'skill' });
+    tick(e, 50);
+    expect(e.getSnapshot(b).players.find((p) => p.id === a)!.visible).toBe(false);
+    e.applyInput(b, { type: 'fire', pressed: true });
+    tick(e, 50);
+    expect(e.player(a)!.stealthT).toBe(0);
+    expect(e.getSnapshot(b).players.find((p) => p.id === a)!.visible).toBe(true);
+  });
+
+  it('影枭：死亡标记击杀目标后立即刷新主动技能 CD', () => {
+    const { e, a, b } = pair('yingxiao');
+    const ap = e.player(a)!;
+    const bp = e.player(b)!;
+    ap.skillCd = 5; // 制造一个正在冷却的 Q
+    e.debug.setUltCharge(a, 100);
+    bp.hp = 50;
+    expect(e.applyInput(a, { type: 'ult' })).toEqual({ ok: true });
+    // 2.5 秒标记延迟
+    for (let i = 0; i < 55; i++) tick(e, 50);
+    expect(bp.alive).toBe(false);
+    expect(ap.skillCd).toBe(0); // 大招击杀 → Q 刷新
+  });
+
+  it('影枭：死亡标记优先锁定视野内血量最低的敌人', () => {
+    const e = new CorcodragonFightEngine(mkPlayers(3), {
+      scoreLimit: 10,
+      rng: mulberry32(11),
+    });
+    start(e, 'yingxiao');
+    const [a, near, far] = [e.players[0].id, e.players[1].id, e.players[2].id];
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(near, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    e.debug.place(far, { x: -5, y: 0, z: 6 }, Math.PI, 0);
+    e.player(near)!.hp = 120; // 近的敌人满血
+    e.player(far)!.hp = 30; // 远的敌人残血 → 应被标记
+    e.debug.setUltCharge(a, 100);
+    e.applyInput(a, { type: 'ult' });
+    tick(e, 50);
+    const mark = [...e.events].reverse().find((ev) => ev.kind === 'ult' && ev.shooterId === a);
+    expect(mark?.targetId).toBe(far);
+    for (let i = 0; i < 55; i++) tick(e, 50);
+    expect(e.player(far)!.alive).toBe(false);
+    expect(e.player(near)!.alive).toBe(true);
+  });
+
+  it('铁壁：视角正前方能量墙吸收敌方子弹（不再扣自身临时护盾）', () => {
     const { e, a, b } = pair('tiebi');
     e.applyInput(a, { type: 'skill' });
     tick(e, 50);
     const ap = e.player(a)!;
-    expect(ap.shield).toBe(80);
-    // 让 b 面朝 a 射击（a 在 -6，b 在 -1）
-    e.debug.place(b, { x: -11, y: 0, z: -1 }, Math.PI, 0);
+    expect(ap.shield).toBe(300);
+    // b 站在 +z 方向，面向 -z 朝 a 射击；子弹必须先穿过 a 前方 1.8m 的能量墙
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    const before = e.events.length;
     e.applyInput(b, { type: 'fire', pressed: true });
     tick(e, 50);
     expect(ap.hp).toBe(ap.maxHp);
-    expect(ap.shield).toBe(60);
+    expect(ap.shield).toBe(280); // 步枪 20 点伤害被护盾吸收
+    expect(e.events.slice(before).some((ev) => ev.kind === 'blocked')).toBe(true);
+  });
+
+  it('铁壁：能量墙实时随视角旋转，侧后方不遮挡', () => {
+    const { e, a, b } = pair('tiebi');
+    e.applyInput(a, { type: 'skill' });
+    tick(e, 50);
+    const ap = e.player(a)!;
+    // a 转向 +x（yaw=π/2）：墙改挡东侧，+z 方向的 b 不再被墙拦截
+    e.applyInput(a, { type: 'look', yaw: Math.PI / 2, pitch: 0 });
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    e.applyInput(b, { type: 'fire', pressed: true });
+    tick(e, 50);
+    expect(ap.hp).toBe(ap.maxHp - 20);
+    expect(ap.shield).toBe(300);
   });
 
   it('灵音：治愈波回血', () => {
@@ -385,29 +510,103 @@ describe('英雄技能与终极技', () => {
     expect(ap.hp).toBe(95);
   });
 
-  it('诡雷：粘性炸弹延迟爆炸伤害敌人', () => {
-    const { e, a, b } = pair('guilei');
-    // 把敌人移到炸弹落点（z=20 围墙）附近
-    e.debug.place(b, { x: -11, y: 0, z: 19 }, Math.PI, 0);
-    const bp = e.player(b)!;
+  it('灵音：治愈波只治疗视角前方扇形内队友', () => {
+    const e = new CorcodragonFightEngine(mkPlayers(6), {
+      mode: 'tdm',
+      scoreLimit: 10,
+      rng: mulberry32(21),
+    });
+    start(e, 'lingyin');
+    const a = e.players[0].id; // A 队
+    const front = e.players[2].id; // A 队（放在视角前方）
+    const back = e.players[4].id; // A 队（放在视角后方）
+    e.debug.place(a, { x: -8, y: 0, z: 0 }, Math.PI / 2, 0); // 面朝 +x
+    e.debug.place(front, { x: -3, y: 0, z: 0 }, Math.PI, 0);
+    e.debug.place(back, { x: -13, y: 0, z: 0 }, 0, 0);
+    e.player(front)!.hp = 50;
+    e.player(back)!.hp = 50;
     e.applyInput(a, { type: 'skill' });
     tick(e, 50);
-    expect(bp.hp).toBe(bp.maxHp); // 未爆炸
-    for (let i = 0; i < 40; i++) tick(e, 50);
+    expect(e.player(front)!.hp).toBe(80); // 扇形内队友 +30
+    expect(e.player(back)!.hp).toBe(50); // 身后队友不加
+    const eff = e.getSnapshot(a).effects.find((x) => x.kind === 'healWave');
+    expect(eff).toBeTruthy();
+    expect(eff?.arc).toBeGreaterThan(0);
+  });
+
+  it('诡雷：Q 准备后左键抛出可见抛物线炸弹，落地延迟爆炸', () => {
+    const { e, a, b } = pair('guilei');
+    const bp = e.player(b)!;
+    const ap = e.player(a)!;
+    expect(e.applyInput(a, { type: 'skill' })).toEqual({ ok: true });
+    tick(e, 50);
+    expect(ap.skillAim).toBe(true); // 只进入准备，不消耗冷却
+    expect(ap.skillCd).toBe(0);
+    expect(bp.hp).toBe(bp.maxHp);
+    expect(e.applyInput(a, { type: 'skillFire' })).toEqual({ ok: true });
+    tick(e, 50);
+    expect(ap.skillAim).toBe(false);
+    expect(ap.skillCd).toBeGreaterThan(0);
+    // 抛体存在并沿抛物线前进（pitch=0：初始 y 下降、z 前进）
+    const bomb0 = e.getSnapshot(a).effects.find((x) => x.kind === 'bomb');
+    expect(bomb0).toBeTruthy();
+    const y0 = bomb0!.pos.y;
+    const z0 = bomb0!.pos.z;
+    for (let i = 0; i < 4; i++) tick(e, 50);
+    const bomb1 = e.getSnapshot(a).effects.find((x) => x.kind === 'bomb');
+    expect(bomb1).toBeTruthy();
+    expect(bomb1!.pos.y).toBeLessThan(y0);
+    expect(bomb1!.pos.z).toBeGreaterThan(z0);
+    // 预计落地 z≈-6+8.3=2.3：把敌人放在落点附近，等引信结束被炸伤
+    e.debug.place(b, { x: -5, y: 0, z: 2.3 }, Math.PI, 0);
+    for (let i = 0; i < 50; i++) tick(e, 50);
     expect(bp.hp).toBeLessThan(bp.maxHp);
   });
 
-  it('终极技需要 100 充能；炎刃焚天烈焰范围伤害', () => {
+  it('诡雷：二段瞄准可取消；雷暴云改为以自身为中心的圆形控制技', () => {
+    const { e, a, b } = pair('guilei');
+    const ap = e.player(a)!;
+    const bp = e.player(b)!;
+    e.applyInput(a, { type: 'skill' });
+    tick(e, 50);
+    expect(e.applyInput(a, { type: 'skillCancel' })).toEqual({ ok: true });
+    expect(ap.skillAim).toBe(false);
+    expect(ap.skillCd).toBe(0);
+    expect(e.applyInput(a, { type: 'skillFire' }).ok).toBe(false); // 未准备不能确认
+
+    e.debug.setUltCharge(a, 100);
+    expect(e.applyInput(a, { type: 'ult' })).toEqual({ ok: true });
+    tick(e, 50);
+    expect(ap.ultAim).toBe(false); // 不再有二段引导
+    expect(ap.ultCharge).toBeLessThan(10);
+    const storm = e.getSnapshot(a).effects.find((x) => x.kind === 'stormZone');
+    expect(storm).toBeTruthy();
+    expect(storm!.pos.x).toBeCloseTo(ap.pos.x);
+    expect(storm!.pos.z).toBeCloseTo(ap.pos.z);
+    // 控制为主：低伤害但减速生效
+    const hpBefore = bp.hp;
+    for (let i = 0; i < 6; i++) tick(e, 50);
+    expect(bp.hp).toBeLessThan(hpBefore); // 每 250ms 造成 8×0.25=2 点
+    expect(bp.hp).toBeGreaterThan(hpBefore - 12);
+    expect(bp.slowT).toBeGreaterThan(0);
+  });
+
+  it('终极技需要 100 充能；炎刃焚天烈焰范围伤害与范围火环', () => {
     const { e, a, b } = pair('yanren');
     const bp = e.player(b)!;
     expect(e.applyInput(a, { type: 'ult' }).ok).toBe(false);
     e.debug.setUltCharge(a, 100);
     expect(e.applyInput(a, { type: 'ult' })).toEqual({ ok: true });
     tick(e, 50);
-    // 5 米距离上爆炸伤害按距离衰减（80 × (1-5/9×0.5) ≈ 58）
+    // 5 米距离上爆炸伤害按距离衰减（80 × (1-5/12×0.5) ≈ 63）
     expect(bp.hp).toBeLessThanOrEqual(bp.maxHp - 50);
+    expect(bp.hp).toBeGreaterThanOrEqual(bp.maxHp - 75);
     // 释放后立即清零；同一 tick 会自然回复 0.1 点充能
     expect(e.player(a)!.ultCharge).toBeLessThanOrEqual(0.11);
+    // 清晰范围提示火环与爆炸一起下发
+    const ring = e.getSnapshot(a).effects.find((x) => x.kind === 'ultRing');
+    expect(ring).toBeTruthy();
+    expect(ring!.radius).toBeCloseTo(12);
   });
 
   it('技能冷却未结束会被拒绝', () => {
@@ -459,7 +658,7 @@ describe('快照投影', () => {
   it('快照 arena 含掩体与半场尺寸，供客户端渲染', () => {
     const e = mkEngine();
     const view = e.getSnapshot(e.players[0].id);
-    expect(view.arena.half).toBe(20);
+    expect(view.arena.half).toBe(BALANCE.arena.half);
     expect(view.arena.obstacles.length).toBeGreaterThan(0);
   });
 });
@@ -521,10 +720,10 @@ describe('训练场模式', () => {
       rng: mulberry32(31),
       trainingTargetRespawnMs: 1200,
       trainingTargets: [
-        { id: 'roundFixed', kind: 'round', pattern: 'fixed', pos: { x: -11, y: 0, z: -2 }, hp: 1, radius: 0.8 },
-        { id: 'humanFixed', kind: 'human', pattern: 'fixed', pos: { x: 11, y: 0, z: -2 }, hp: 100 },
-        { id: 'roundMove', kind: 'round', pattern: 'osc', pos: { x: -11, y: 0, z: -2 }, hp: 1, radius: 0.8, range: 6, speed: 1 },
-        { id: 'humanMove', kind: 'human', pattern: 'patrol', pos: { x: 11, y: 0, z: -2 }, hp: 100, range: 6, speed: 0.5 },
+        { id: 'roundFixed', kind: 'round', pattern: 'fixed', pos: { x: -5, y: 0, z: -4 }, hp: 1, radius: 0.8 },
+        { id: 'humanFixed', kind: 'human', pattern: 'fixed', pos: { x: 15, y: 0, z: -12 }, hp: 100 },
+        { id: 'roundMove', kind: 'round', pattern: 'osc', pos: { x: -5, y: 0, z: -4 }, hp: 1, radius: 0.8, range: 6, speed: 1 },
+        { id: 'humanMove', kind: 'human', pattern: 'patrol', pos: { x: 15, y: 0, z: -12 }, hp: 100, range: 6, speed: 0.5 },
       ],
     });
   }
@@ -543,7 +742,7 @@ describe('训练场模式', () => {
     const me = e.players[0];
     const target = e.player('roundFixed')!;
     const zBefore = e.player('roundMove')!.pos.z;
-    e.debug.place(me.id, { x: -11, y: 0, z: -16 }, 0, 0);
+    e.debug.place(me.id, { x: -5, y: 0, z: -16 }, 0, 0);
     for (let i = 0; i < 10; i++) tick(e, 50); // 让移动靶动起来
     expect(e.player('roundMove')!.pos.z).not.toBeCloseTo(zBefore);
     e.applyInput(me.id, { type: 'fire', pressed: true });
@@ -566,6 +765,15 @@ describe('移动测试 AI（只走位不攻击）', () => {
       rng: mulberry32(1),
     });
     expect(e.aiStyle).toBe('combat');
+  });
+
+  it('aiLevel 白名单钳制：非法回退 normal', () => {
+    const easy = new CorcodragonFightEngine(mkPlayers(2), { aiLevel: 'easy' as never });
+    expect(easy.aiLevel).toBe('easy');
+    const hard = new CorcodragonFightEngine(mkPlayers(2), { aiLevel: 'hard' as never });
+    expect(hard.aiLevel).toBe('hard');
+    const bad = new CorcodragonFightEngine(mkPlayers(2), { aiLevel: 'god' as never });
+    expect(bad.aiLevel).toBe('normal');
   });
 
   it('移动 AI 会走动，但 20 秒内不产生任何射击/命中/击杀', () => {

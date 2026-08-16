@@ -41,6 +41,8 @@ export interface CombatBalance {
   ultPerKill: number;
   ultPerSecond: number;
   respawnMs: number;
+  /** 重生后无敌时间（毫秒） */
+  respawnInvulnMs: number;
   explosionFalloff: number;
   scoreLimitDefault: number;
   matchTimeMsDefault: number;
@@ -56,22 +58,28 @@ export interface HeroAbilityBalance {
   ultDamage?: number;
   stealthDuration?: number;
   stealthSpeedMult?: number;
-  stealthDamageMult?: number;
   markRange?: number;
   markDelay?: number;
   markDamage?: number;
   shieldValue?: number;
   shieldDuration?: number;
+  shieldDistance?: number;
+  shieldWidth?: number;
+  shieldHeight?: number;
+  shieldCenterY?: number;
   fortifyDuration?: number;
   fortifyDamageMult?: number;
   fortifyFireRateMult?: number;
   selfHeal?: number;
   allyHeal?: number;
-  allyRadius?: number;
+  waveRange?: number;
+  waveAngleDeg?: number;
   zoneRadius?: number;
   zoneDuration?: number;
   zoneHealPerSec?: number;
   bombThrowRange?: number;
+  bombSpeed?: number;
+  bombGravity?: number;
   bombFuse?: number;
   bombRadius?: number;
   bombDamage?: number;
@@ -128,11 +136,24 @@ export interface WeaponBalance {
   desc: string;
 }
 
+export type AILevelKey = 'easy' | 'normal' | 'hard';
+
+export interface AILevelBalance {
+  /** bot 决策周期（毫秒） */
+  thinkMs: number;
+  /** 允许开火的视角误差（弧度） */
+  aimTolerance: number;
+  /** 满足条件时实际开火概率（0-1） */
+  fireChance: number;
+}
+
 export interface AIBalance {
   preferredRange: number;
   meleeRange: number;
   aimTolerance: number;
   meleeAimTolerance: number;
+  /** AI 难度分级：easy/normal/hard */
+  levels: Record<AILevelKey, AILevelBalance>;
 }
 
 export interface ClientBalance {
@@ -207,22 +228,28 @@ function abilityOf(hero: string, obj: Record<string, unknown>): HeroAbilityBalan
     ultDamage: [0, 500],
     stealthDuration: [0.1, 30],
     stealthSpeedMult: [0.5, 3],
-    stealthDamageMult: [0, 10],
     markRange: [1, 50],
     markDelay: [0.1, 30],
     markDamage: [0, 500],
-    shieldValue: [0, 500],
+    shieldValue: [0, 1000],
     shieldDuration: [0.1, 30],
+    shieldDistance: [0.2, 10],
+    shieldWidth: [0.5, 30],
+    shieldHeight: [0.5, 10],
+    shieldCenterY: [0.1, 4],
     fortifyDuration: [0.1, 60],
     fortifyDamageMult: [0, 1],
     fortifyFireRateMult: [0.2, 3],
     selfHeal: [0, 500],
     allyHeal: [0, 500],
-    allyRadius: [0, 40],
+    waveRange: [0.5, 60],
+    waveAngleDeg: [1, 360],
     zoneRadius: [0.5, 40],
     zoneDuration: [0.1, 60],
     zoneHealPerSec: [0, 500],
     bombThrowRange: [1, 60],
+    bombSpeed: [1, 60],
+    bombGravity: [0, 100],
     bombFuse: [0.1, 30],
     bombRadius: [0.5, 30],
     bombDamage: [0, 500],
@@ -295,6 +322,7 @@ export function validateBalance(data: unknown): BalanceData {
       ultPerKill: num(combat.ultPerKill, 'combat.ultPerKill', 0, 500),
       ultPerSecond: num(combat.ultPerSecond, 'combat.ultPerSecond', 0, 100),
       respawnMs: num(combat.respawnMs, 'combat.respawnMs', 0, 120_000),
+      respawnInvulnMs: num(combat.respawnInvulnMs, 'combat.respawnInvulnMs', 0, 30_000),
       explosionFalloff: num(combat.explosionFalloff, 'combat.explosionFalloff', 0, 1),
       scoreLimitDefault: num(combat.scoreLimitDefault, 'combat.scoreLimitDefault', 1, 200),
       matchTimeMsDefault: num(combat.matchTimeMsDefault, 'combat.matchTimeMsDefault', 30_000, 3_600_000),
@@ -307,6 +335,21 @@ export function validateBalance(data: unknown): BalanceData {
       meleeRange: num(ai.meleeRange, 'ai.meleeRange', 0, 10),
       aimTolerance: num(ai.aimTolerance, 'ai.aimTolerance', 0.001, 1),
       meleeAimTolerance: num(ai.meleeAimTolerance, 'ai.meleeAimTolerance', 0.001, 2),
+      levels: (() => {
+        const rawLevels = ai.levels;
+        if (!isRecord(rawLevels)) fail('ai.levels', '必须为对象');
+        const out = {} as Record<AILevelKey, AILevelBalance>;
+        for (const key of ['easy', 'normal', 'hard'] as const) {
+          const lv = rawLevels[key];
+          if (!isRecord(lv)) fail(`ai.levels.${key}`, '必须为对象');
+          out[key] = {
+            thinkMs: num(lv.thinkMs, `ai.levels.${key}.thinkMs`, 20, 5000),
+            aimTolerance: num(lv.aimTolerance, `ai.levels.${key}.aimTolerance`, 0.001, 1.5),
+            fireChance: num(lv.fireChance, `ai.levels.${key}.fireChance`, 0, 1),
+          };
+        }
+        return out;
+      })(),
     },
     client: {
       mouseSensitivity: num(client.mouseSensitivity, 'client.mouseSensitivity', 0.0001, 0.1),
