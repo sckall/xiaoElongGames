@@ -90,7 +90,7 @@ exec python3 server.py
 );
 fs.writeFileSync(
   path.join(pkgDir, '启动.bat'),
-  `@echo off\r\nchcp 65001 >nul\r\ncd /d "%%~dp0"\r\nwhere python >nul 2>&1\r\nif %%errorlevel%% neq 0 (\r\n  echo [小鳄龙之家] 未检测到 Python，单机启动需要它：\r\n  echo   方法1（推荐）：winget install Python.Python.3.12\r\n  echo   方法2：浏览器打开 https://www.python.org/downloads/ 安装，勾选 "Add Python to PATH"\r\n  echo   装好后重新双击本脚本\r\n  pause\r\n  exit /b 1\r\n)\r\nstart http://127.0.0.1:8123\r\npython server.py\r\necho [小鳄龙之家] 服务已停止（闲置自动退出或你关闭了窗口）\r\npause\r\n`,
+  `@echo off\r\nchcp 65001 >nul\r\ncd /d "%~dp0"\r\nwhere python >nul 2>&1\r\nif %errorlevel% neq 0 (\r\n  echo [小鳄龙之家] 未检测到 Python，单机启动需要它：\r\n  echo   方法1（推荐）：winget install Python.Python.3.12\r\n  echo   方法2：浏览器打开 https://www.python.org/downloads/ 安装，勾选 "Add Python to PATH"\r\n  echo   装好后重新双击本脚本\r\n  pause\r\n  exit /b 1\r\n)\r\nstart http://127.0.0.1:8123\r\npython server.py\r\necho [小鳄龙之家] 服务已停止（闲置自动退出或你关闭了窗口）\r\npause\r\n`,
 );
 fs.writeFileSync(
   path.join(pkgDir, '使用说明.txt'),
