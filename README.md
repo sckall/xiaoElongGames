@@ -51,6 +51,21 @@ node scripts/pack-local.mjs
 开发时则是 `pnpm dev`（vite dev server 只是加载页面的工具，不是游戏服务端；
 游戏服务端 8787 只有联机模式才需要）。
 
+**🌐 纯静态托管（GitHub Pages，仅单人 vs AI）**：
+
+```bash
+pnpm build   # 产物 apps/web/dist 已配置相对资源路径（vite base: './'），可放任意子路径
+```
+
+- 单人 vs AI、训练场等本地玩法完全在浏览器内运行，把 `apps/web/dist` 放到任意
+  静态托管（GitHub Pages / Netlify / OSS 静态网站等）即可直接玩；
+- 仓库自带 `.github/workflows/pages.yml`：推送到 `main` 会自动构建并部署到
+  GitHub Pages。首次使用需在仓库 Settings → Pages → Source 选择 **GitHub Actions**；
+  仓库需为 public（免费），或账号为 Pro/Team/Enterprise（private 可用）；
+- 站点地址形如 `https://<用户名>.github.io/xiaoElongGames/`；
+- 游戏内「联机入口」仍可填已部署的游戏服务器地址；注意 https 页面连接
+  ws/http 服务器会被浏览器按混合内容拦截，公网服务器建议配 wss/https。
+
 ## 🚀 本地开发
 
 ```bash

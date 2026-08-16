@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  // 相对路径产物：可部署到任意子路径（如 GitHub Pages 的 /<repo>/），
+  // 也兼容本地包在根路径托管；单人 vs AI 模式因此可纯静态托管。
+  base: './',
   plugins: [react()],
   server: {
     port: 5173,

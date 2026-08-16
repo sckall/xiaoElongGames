@@ -4,6 +4,13 @@
 
 ## 未发布（0.2.x 工作区）
 
+- 🌐 **前端支持纯静态托管（GitHub Pages 等，仅单人 vs AI）**：
+  - vite `base: './'`：构建产物资源全部相对路径，可部署到任意子路径
+    （如 `https://<用户名>.github.io/xiaoElongGames/`），单人玩法无需任何服务器
+  - 新增 `.github/workflows/pages.yml`：push `main` 自动构建并部署 GitHub Pages；
+    本地以 `<仓库名>/` 子路径模拟验证通过（index/JS/CSS 200、headless 进入大厅无报错）
+  - 注意：https 页面里联机需服务器支持 wss/https（浏览器混合内容限制）
+
 - 🐛 **修复 Windows 单机包「启动.bat」无法运行**：
   - 第一轮根因：模板把 `%` 误写为 `%%`（`%%~dp0` / `%%errorlevel%%`），导致 `cd` 失败与语法报错
   - 第二轮根因（Windows 实测反馈）：UTF-8 中文 + `chcp 65001` + `if(...)` 复合块在部分控制台
