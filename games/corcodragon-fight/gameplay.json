@@ -26,7 +26,7 @@
     "ultPerDamage": 0.05,
     "ultPerKill": 40,
     "ultPerSecond": 2,
-    "respawnMs": 3000,
+    "respawnMs": 15000,
     "respawnInvulnMs": 1500,
     "explosionFalloff": 0.5,
     "scoreLimitDefault": 15,
@@ -241,9 +241,21 @@
     "aimTolerance": 0.12,
     "meleeAimTolerance": 0.5,
     "levels": {
-      "easy": { "thinkMs": 900, "aimTolerance": 0.32, "fireChance": 0.45 },
-      "normal": { "thinkMs": 350, "aimTolerance": 0.14, "fireChance": 0.85 },
-      "hard": { "thinkMs": 220, "aimTolerance": 0.07, "fireChance": 1 }
+      "easy": {
+        "thinkMs": 900,
+        "aimTolerance": 0.32,
+        "fireChance": 0.45
+      },
+      "normal": {
+        "thinkMs": 350,
+        "aimTolerance": 0.14,
+        "fireChance": 0.85
+      },
+      "hard": {
+        "thinkMs": 220,
+        "aimTolerance": 0.07,
+        "fireChance": 1
+      }
     }
   },
   "client": {

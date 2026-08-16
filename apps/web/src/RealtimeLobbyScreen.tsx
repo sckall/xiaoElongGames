@@ -61,10 +61,12 @@ export default function RealtimeLobbyScreen({
   const effectiveMode = roomConfig?.mode === 'tdm' ? 'tdm' : config.mode;
   const effectiveLimit =
     typeof roomConfig?.scoreLimit === 'number' ? roomConfig.scoreLimit : config.scoreLimit;
+  const effectiveRespawn =
+    typeof roomConfig?.respawnMs === 'number' ? roomConfig.respawnMs : config.respawnMs ?? 15_000;
   const effectiveAiStyle = roomConfig?.aiStyle ?? config.aiStyle;
   const effectiveAiLevel = roomConfig?.aiLevel ?? config.aiLevel ?? 'normal';
-  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀 · ${
-    effectiveAiStyle === 'movement' ? '🧪 移动测试 AI' : '⚔️ 实战 AI'
+  const configLabel = `${effectiveMode === 'tdm' ? '🤝 团队死斗' : '🆚 自由混战'} · ${effectiveLimit} 杀 · 复活 ${Math.round(effectiveRespawn / 1000)}s · ${
+    effectiveAiStyle === 'movement' ? '🧪 陪练' : '⚔️ 实战 AI'
   } · ${
     effectiveAiLevel === 'easy' ? '🐣 简单' : effectiveAiLevel === 'hard' ? '🔥 困难' : '⚖️ 普通'
   }`;
@@ -140,7 +142,7 @@ export default function RealtimeLobbyScreen({
             </div>
           )}
           {!isHost && <p className="muted">等待房主开始游戏……</p>}
-          {isHost && remote.lobby.status === 'playing' && <p className="muted">对局进行中（20Hz 服务端权威同步）</p>}
+          {isHost && remote.lobby.status === 'playing' && <p className="muted">对局进行中，祝你好运！</p>}
 
           {remote.error && <div className="error-box">{remote.error}</div>}
           <button className="ghost-btn" onClick={remote.leave}>
@@ -258,6 +260,7 @@ export default function RealtimeLobbyScreen({
                   remote.create(defaultName, 0, createPw, {
                     mode: config.mode,
                     scoreLimit: config.scoreLimit,
+                    respawnMs: config.respawnMs ?? 15_000,
                     aiStyle: config.aiStyle ?? 'combat',
                     aiLevel: config.aiLevel ?? 'normal',
                   });

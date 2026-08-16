@@ -15,7 +15,7 @@ export const corcodragonFightModule: GameModule = {
   mode: 'realtime',
   minPlayers: 2,
   maxPlayers: 7,
-  description: '3D 实时英雄射击：5 位鳄龙英雄 × 4 种武器，20Hz 服务端权威联机对战。',
+  description: '3D 实时英雄射击：5 位鳄龙英雄 × 4 种武器，自由混战、团队死斗与训练场。',
   available: true,
   createRealtimeEngine(players: PlayerConfig[], options?: unknown, rng?: () => number): RealtimeGameEngine {
     return createEngine(players, options, rng);

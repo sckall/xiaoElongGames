@@ -26,7 +26,7 @@ const CorcodragonFightOnlineScreen = lazy(() => import('./CorcodragonFightOnline
 const Loading = () => (
   <div className="page">
     <div className="panel">
-      <p className="tagline">🐊 正在加载 3D 引擎……</p>
+      <p className="tagline">🐊 正在准备战场……</p>
     </div>
   </div>
 );
@@ -76,6 +76,7 @@ export default function App() {
   const [fightConfig, setFightConfig] = useState<FightConfig>({
     mode: 'ffa',
     scoreLimit: 15,
+    respawnMs: 15_000,
     aiStyle: 'combat',
     aiLevel: 'normal',
   });

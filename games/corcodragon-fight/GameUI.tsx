@@ -209,6 +209,8 @@ export interface FpsDriver {
 export interface FightConfig {
   mode: GameModeKind;
   scoreLimit: number;
+  /** 复活时长（毫秒） */
+  respawnMs: number;
   /** bot 行为：combat=实战 AI；movement=移动测试 AI（只走位不攻击） */
   aiStyle: AIStyle;
   /** bot 难度：easy 低命中/慢反应；normal；hard 高命中 */
@@ -1419,12 +1421,25 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       const snap = snapRef.current;
       if (snap?.phase === 'playing') canvas.requestPointerLock();
     };
+    // 鼠标滚轮切换武器：向上=前一把，向下=后一把
+    const onWheel = (e: WheelEvent) => {
+      if (document.pointerLockElement !== canvas) return;
+      e.preventDefault();
+      const snap = snapRef.current;
+      const me = snap?.players.find((p) => p.id === driverRef.current.myId);
+      const cur = me?.weapon ?? 'rifle';
+      const idx = WEAPON_IDS.indexOf(cur);
+      const next = WEAPON_IDS[(idx + (e.deltaY > 0 ? 1 : -1) + WEAPON_IDS.length) % WEAPON_IDS.length];
+      send({ type: 'switchWeapon', weapon: next });
+      if (driverRef.current.sound !== false) getSfx().switchWeapon();
+    };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('wheel', onWheel, { passive: false });
     document.addEventListener('pointerlockchange', onLockChange);
     canvas.addEventListener('contextmenu', onContext);
     canvas.addEventListener('click', onClick);
@@ -1434,6 +1449,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('wheel', onWheel);
       document.removeEventListener('pointerlockchange', onLockChange);
       canvas.removeEventListener('contextmenu', onContext);
       canvas.removeEventListener('click', onClick);
@@ -1523,11 +1539,23 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         />
       )}
       {snap?.phase === 'playing' && me && !me.alive && (
-        <div className="ccf-overlay" style={{ pointerEvents: 'none' }}>
+        <div className="ccf-overlay">
           <div className="ccf-overlay-panel">
             <div className="ccf-title">💀 你阵亡了</div>
             <div className="ccf-big-num">{Math.max(0, Math.ceil(me.respawnIn))}</div>
-            <p className="ccf-muted">即将自动重返战场……</p>
+            <p className="ccf-muted">等待复活期间可以更换英雄，复活后立即生效：</p>
+            <div className="ccf-death-heroes">
+              {HERO_LIST.map((h) => (
+                <button
+                  key={h.key}
+                  className={`ccf-death-hero ${me.hero === h.key ? 'active' : ''}`}
+                  onClick={() => driver.send({ type: 'selectHero', hero: h.key })}
+                >
+                  <span>{h.emoji}</span>
+                  {h.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -1550,7 +1578,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       )}
       {!locked && snap?.phase === 'playing' && me?.alive && (
         <button className="ccf-hint" onClick={() => canvasRef.current?.requestPointerLock()}>
-          🖱️ 点击锁定鼠标开始操作（WASD 移动 / 左键射击 / 右键开镜 / R 换弹 / 1-4 切枪 / Q 技能 / E 终极技）
+          🖱️ 点击锁定鼠标开始操作（WASD 移动 / 左键射击 / 右键开镜 / 滚轮或 1-4 切枪 / R 换弹 / Q 技能 / E 终极技 / 按住 Tab 战绩）
         </button>
       )}
       {driver.error && <div className="ccf-hint" style={{ top: 10 }}>⚠️ {driver.error}</div>}
@@ -2136,6 +2164,7 @@ export function CorcodragonFightLocalScreen({
     const engine = new CorcodragonFightEngine(players, {
       mode: config.mode,
       scoreLimit: config.scoreLimit,
+      respawnMs: config.respawnMs ?? 15_000,
       aiStyle: config.aiStyle ?? 'combat',
       aiLevel: config.aiLevel ?? 'normal',
       trainingTargets: training ? TRAINING_TARGETS.map((t) => ({ ...t })) : undefined,
@@ -2208,9 +2237,10 @@ export function CorcodragonFightDetailScreen({
 }) {
   const [mode, setMode] = useState<GameModeKind>('ffa');
   const [scoreLimit, setScoreLimit] = useState(15);
+  const [respawnMs, setRespawnMs] = useState(15_000);
   const [aiStyle, setAiStyle] = useState<AIStyle>('combat');
   const [aiLevel, setAiLevel] = useState<AILevel>('normal');
-  const config = { mode, scoreLimit, aiStyle, aiLevel };
+  const config = { mode, scoreLimit, respawnMs, aiStyle, aiLevel };
   return (
     <div className="page detail-page">
       <div className="panel detail-panel ccf-detail-panel">
@@ -2218,12 +2248,12 @@ export function CorcodragonFightDetailScreen({
           <span className="detail-emoji">🐊</span>
           <div className="detail-title">
             <h1>鳄龙咆哮</h1>
-            <span className="detail-meta">实时 · 3D 英雄射击｜2-7 人｜20Hz 服务端权威</span>
+            <span className="detail-meta">实时 · 3D 英雄射击｜2-7 人｜自由混战 / 团队死斗 / 训练场</span>
           </div>
         </div>
         <p className="detail-desc">
           第一人称 3D 英雄射击：5 位鳄龙英雄（冲刺/隐身/护盾/治疗/炸弹）× 4 种武器，
-          服务端权威判定弹道与技能，先到击杀线者获胜。建议使用桌面浏览器 + 鼠标键盘。
+          每一发都有清晰的命中与爆头反馈，先到击杀线者获胜。建议使用桌面浏览器 + 鼠标键盘。
         </p>
 
         <div className="detail-modes">
@@ -2252,10 +2282,22 @@ export function CorcodragonFightDetailScreen({
               </select>
             </div>
             <div className="field">
+              <span>复活等待</span>
+              <select
+                className="bot-select"
+                value={respawnMs}
+                onChange={(e) => setRespawnMs(Number(e.target.value))}
+              >
+                {[3, 5, 10, 15, 20].map((s) => (
+                  <option key={s} value={s * 1000}>{s} 秒</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
               <span>AI 行为</span>
               <select className="bot-select" value={aiStyle} onChange={(e) => setAiStyle(e.target.value as AIStyle)}>
-                <option value="combat">⚔️ 实战 AI（索敌/射击/技能）</option>
-                <option value="movement">🧪 移动测试 AI（只走位不攻击）</option>
+                <option value="combat">⚔️ 实战 AI（会索敌和进攻）</option>
+                <option value="movement">🧪 陪练（只走位不攻击）</option>
               </select>
             </div>
             <div className="field">
@@ -2294,7 +2336,7 @@ export function CorcodragonFightDetailScreen({
           <section className="detail-mode">
             <h2>🌐 联机对战</h2>
             <p className="muted">
-              创建房间分享房间码，2-7 人同房；服务端权威 20Hz 同步，支持 AI 补位。
+              创建房间分享房间码，2-7 人同房实时对战，支持 AI 补位。
             </p>
             <button
               className="primary-btn big"
@@ -2328,7 +2370,7 @@ export function CorcodragonFightDetailScreen({
                 {prefs.fx ? '✨ 特效开' : '💤 特效关'}
               </button>
             </div>
-            <p className="muted">保存在本机 `tm-fight-settings`，不与出包魔法师共用。</p>
+            <p className="muted">音效与特效偏好只对本游戏生效，设置会保存在你的浏览器中。</p>
           </section>
         </div>
 
@@ -2343,7 +2385,7 @@ export function CorcodragonFightDetailScreen({
           <div className="ccf-controls-grid">
             <span>🖱️ 鼠标：环顾 / 左键射击 / 右键开镜</span>
             <span>⌨️ WASD 移动 · 空格跳跃</span>
-            <span>🔢 1-4 切枪 · R 换弹</span>
+            <span>🔢 滚轮或 1-4 切枪 · R 换弹 · 按住 Tab 战绩</span>
             <span>⚡ Q 技能 · E 终极技 · Tab 计分板</span>
           </div>
           <h3>五位英雄</h3>

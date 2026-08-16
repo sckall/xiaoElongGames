@@ -267,6 +267,7 @@ export class CorcodragonFightEngine {
   readonly scoreLimit: number;
   readonly matchTimeMs: number;
   readonly heroSelectMs: number;
+  readonly respawnMs: number;
   readonly aiStyle: AIStyle;
   readonly aiLevel: AILevel;
   phase: 'heroSelect' | 'playing' | 'gameOver' = 'heroSelect';
@@ -305,12 +306,19 @@ export class CorcodragonFightEngine {
     const aiStyle: AIStyle = options.aiStyle === 'movement' ? 'movement' : 'combat';
     const aiLevel: AILevel =
       options.aiLevel === 'easy' || options.aiLevel === 'hard' ? options.aiLevel : 'normal';
+    const respawnMs = optNum(
+      options.respawnMs,
+      1_000,
+      120_000,
+      BALANCE.combat.respawnMs,
+    );
     const rng = typeof options.rng === 'function' ? options.rng : Math.random;
 
     this.mode = mode;
     this.scoreLimit = scoreLimit;
     this.matchTimeMs = matchTimeMs;
     this.heroSelectMs = heroSelectMs;
+    this.respawnMs = respawnMs;
     this.aiStyle = aiStyle;
     this.aiLevel = aiLevel;
     this.timeLeft = matchTimeMs;
@@ -555,16 +563,33 @@ export class CorcodragonFightEngine {
 
     switch (type) {
       case 'selectHero': {
-        if (this.phase !== 'heroSelect') return { ok: false, error: '当前阶段不能选择英雄' };
+        const canPickWhileDead =
+          this.phase === 'playing' && !p.alive && this.t < p.respawnAt;
+        if (this.phase !== 'heroSelect' && !canPickWhileDead) {
+          return { ok: false, error: '当前阶段不能选择英雄' };
+        }
         if (typeof raw.hero !== 'string' || !(HERO_IDS as readonly string[]).includes(raw.hero)) {
           return { ok: false, error: '非法英雄 id' };
         }
+        const prev = p.hero;
         p.hero = raw.hero as HeroId;
         const def = HERO_DEFS[p.hero];
         p.maxHp = def.hp;
-        p.hp = def.hp;
-        this.pushEvent('info', `${p.name} 选择了 ${def.emoji} ${def.name}`, undefined, true, []);
-        if (this.players.every((x) => x.hero)) this.beginMatch();
+        if (canPickWhileDead) {
+          // 死亡换英雄：复活时按新英雄满血重生，当前仍保持阵亡状态
+          this.pushEvent(
+            'info',
+            `${p.name} 阵亡期间换为 ${def.emoji} ${def.name}（复活后生效）`,
+            undefined,
+            true,
+            [],
+          );
+        } else {
+          p.hp = def.hp;
+          this.pushEvent('info', `${p.name} 选择了 ${def.emoji} ${def.name}`, undefined, true, []);
+        }
+        void prev;
+        if (this.phase === 'heroSelect' && this.players.every((x) => x.hero)) this.beginMatch();
         return { ok: true };
       }
       case 'move': {
@@ -1175,7 +1200,7 @@ export class CorcodragonFightEngine {
     victim.moveX = 0;
     victim.moveZ = 0;
     victim.respawnAt =
-      this.t + (this.mode === 'training' ? this.trainingRespawnMs : BALANCE.combat.respawnMs);
+      this.t + (this.mode === 'training' ? this.trainingRespawnMs : this.respawnMs);
     this.killLog.push({ at: this.t, shooterId: killer?.id ?? null, targetId: victim.id });
     if (killer) {
       killer.kills += 1;
@@ -1965,10 +1990,18 @@ export function createEngine(
 ): CorcodragonFightEngine {
   const opts: EngineOptions = isRecord(options)
     ? {
-        mode: options.mode === 'tdm' ? 'tdm' : options.mode === 'ffa' ? 'ffa' : undefined,
+        mode:
+          options.mode === 'tdm'
+            ? 'tdm'
+            : options.mode === 'ffa'
+              ? 'ffa'
+              : options.mode === 'training'
+                ? 'training'
+                : undefined,
         scoreLimit: typeof options.scoreLimit === 'number' ? options.scoreLimit : undefined,
         matchTimeMs: typeof options.matchTimeMs === 'number' ? options.matchTimeMs : undefined,
         heroSelectMs: typeof options.heroSelectMs === 'number' ? options.heroSelectMs : undefined,
+        respawnMs: typeof options.respawnMs === 'number' ? options.respawnMs : undefined,
         aiStyle: options.aiStyle === 'movement' ? 'movement' : options.aiStyle === 'combat' ? 'combat' : undefined,
         aiLevel:
           options.aiLevel === 'easy' || options.aiLevel === 'normal' || options.aiLevel === 'hard'

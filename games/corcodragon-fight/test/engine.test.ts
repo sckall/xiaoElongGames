@@ -34,6 +34,7 @@ function mkEngine(n = 2, opts: EngineOptions = {}): CorcodragonFightEngine {
     scoreLimit: 10,
     heroSelectMs: 10_000,
     matchTimeMs: 60_000,
+    respawnMs: 1_000,
     rng: mulberry32(42),
     ...opts,
   });
@@ -327,6 +328,37 @@ describe('射击与伤害', () => {
     expect(bp.alive).toBe(false);
   });
 
+  it('默认复活时长 15 秒，且可每局配置', () => {
+    const def = new CorcodragonFightEngine(mkPlayers(2), { rng: mulberry32(5) });
+    expect(def.respawnMs).toBe(15_000);
+    const custom = new CorcodragonFightEngine(mkPlayers(2), {
+      respawnMs: 5_000,
+      rng: mulberry32(5),
+    });
+    expect(custom.respawnMs).toBe(5_000);
+  });
+
+  it('死亡期间可换英雄，复活后按新英雄满血重生', () => {
+    const e = mkEngine();
+    start(e);
+    const [a, b] = [e.players[0].id, e.players[1].id];
+    const bp = e.player(b)!;
+    e.debug.place(a, { x: -5, y: 0, z: -6 }, 0, 0);
+    e.debug.place(b, { x: -5, y: 0, z: -1 }, Math.PI, 0);
+    bp.hp = 1;
+    e.applyInput(a, { type: 'fire', pressed: true });
+    tick(e, 50);
+    expect(bp.alive).toBe(false);
+    expect(e.applyInput(b, { type: 'selectHero', hero: 'tiebi' })).toEqual({ ok: true });
+    expect(bp.hero).toBe('tiebi');
+    expect(bp.maxHp).toBe(250);
+    expect(bp.hp).toBe(0); // 换英雄不立即复活
+    for (let i = 0; i < 30; i++) tick(e, 50);
+    expect(bp.alive).toBe(true);
+    expect(bp.hero).toBe('tiebi');
+    expect(bp.hp).toBe(250);
+  });
+
   it('死亡 3 秒后自动重生并回满状态', () => {
     const e = mkEngine();
     start(e);
@@ -346,7 +378,7 @@ describe('射击与伤害', () => {
   });
 
   it('重生后 1.5 秒无敌：期间不受伤，结束后恢复可伤害', () => {
-    const e = mkEngine();
+    const e = mkEngine(); // 本测试环境复活 1s，便于验证
     start(e);
     const [a, b] = [e.players[0].id, e.players[1].id];
     const ap = e.player(a)!;
@@ -356,7 +388,7 @@ describe('射击与伤害', () => {
     bp.hp = 1;
     e.applyInput(a, { type: 'fire', pressed: true });
     tick(e, 50);
-    for (let i = 0; i < 70; i++) tick(e, 50);
+    for (let i = 0; i < 25; i++) tick(e, 50); // 1.25s：已复活且无敌尚未结束
     expect(bp.alive).toBe(true);
     expect(bp.invulnT).toBeGreaterThan(0);
     // 无敌期间：打不进去

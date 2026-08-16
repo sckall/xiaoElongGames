@@ -240,6 +240,8 @@ export interface EngineOptions {
   matchTimeMs?: number;
   /** 英雄选择阶段最长时长（毫秒），到时自动补选 */
   heroSelectMs?: number;
+  /** 阵亡后复活时长（毫秒，默认取 gameplay.json combat.respawnMs） */
+  respawnMs?: number;
   /**
    * bot 行为风格：
    * - combat：实战 AI（索敌/射击/技能）
