@@ -27,12 +27,10 @@ import {
 } from '@tm/rules';
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
+import { sanitizeRoomSettings } from './security';
 
 const BOT_NAMES = ['阿呆', '梅林', '小圆', '老巴'];
 const BOT_RISKS = [0.15, 0.28, 0.42, 0.55];
-
-const AI_SPEED_MIN = 300;
-const AI_SPEED_MAX = 4000;
 
 export type RoomSocket = Socket<ClientToServerEvents, ServerToClientEvents, object, RoomSocketData>;
 
@@ -98,7 +96,7 @@ export class Room {
     this.hostId = hostId;
     this.io = io;
     this.onEmpty = onEmpty;
-    this.settings = { ...DEFAULT_ROOM_SETTINGS, ...settings };
+    this.settings = sanitizeRoomSettings(settings);
     this.password = sanitizePassword(password);
     this.seats.push({
       id: hostId,
@@ -250,17 +248,7 @@ export class Room {
   /** 房间设置（仅房主；大厅/对局均可改；白名单校验防伪造） */
   updateSettings(actorId: string, patch: Partial<RoomSettings>, actorSocketId: string): void {
     if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以修改房间设置');
-    const next: RoomSettings = { ...this.settings };
-    if (patch.aiSpeed != null) {
-      const v = Math.floor(Number(patch.aiSpeed));
-      if (Number.isFinite(v)) {
-        next.aiSpeed = Math.max(AI_SPEED_MIN, Math.min(AI_SPEED_MAX, v));
-      }
-    }
-    if (patch.autopilot != null && patch.autopilot in AUTOPILOT_DELAYS) {
-      next.autopilot = patch.autopilot;
-    }
-    this.settings = next;
+    this.settings = sanitizeRoomSettings({ ...this.settings, ...patch });
     this.broadcastLobby();
     this.schedule();
   }

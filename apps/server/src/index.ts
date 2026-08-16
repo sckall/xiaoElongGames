@@ -13,16 +13,21 @@ import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
 import { Room, RoomSocket, genRoomCode, sanitizeName } from './room';
 import { RealtimeRoom, RT_GAME_ID } from './realtime-room';
+import { clientIp, sanitizeJoinCode } from './security';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '0.0.0.0';
+/** 仅当部署在可信反向代理后时置 1，才允许 X-Forwarded-For 参与限流/审计 */
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 
 // ---- 资源限制（防滥用/耗尽攻击） ----
 const MAX_ROOMS = 200; // 全局房间数上限
 const MAX_ROOMS_PER_IP = 5; // 每个 IP 可同时创建的房间数
 const MAX_CONNS_PER_IP = 8; // 每个 IP 最大并发连接数
+const MAX_SOCKET_PAYLOAD = 64 * 1024; // 64KB：正常输入远小于此值
 
 const app = express();
+app.disable('x-powered-by');
 const server = http.createServer(app);
 
 // CORS：默认仅同源（vite 代理/同端口部署均同源）；前后端分离部署时用 CORS_ORIGIN 配白名单
@@ -31,6 +36,7 @@ const corsOrigin = process.env.CORS_ORIGIN
   : false;
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: { origin: corsOrigin },
+  maxHttpBufferSize: MAX_SOCKET_PAYLOAD,
 });
 
 const rooms = new Map<string, Room | RealtimeRoom>();
@@ -38,10 +44,7 @@ const connByIp = new Map<string, number>();
 const roomsByIp = new Map<string, number>();
 
 function ipOf(socket: RoomSocket): string {
-  // 经反代部署时由 X-Forwarded-For 提供真实 IP（需信任代理）
-  const fwd = socket.handshake.headers['x-forwarded-for'];
-  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim();
-  return socket.handshake.address ?? 'unknown';
+  return clientIp(socket.handshake, TRUST_PROXY);
 }
 
 function guard<T>(fn: () => T): void {
@@ -141,7 +144,7 @@ io.on('connection', (socket: RoomSocket) => {
 
   socket.on('joinRoom', (payload, cb) => {
     guard(() => {
-      const code = String(payload?.code ?? '').trim().toUpperCase();
+      const code = sanitizeJoinCode(payload?.code);
       const name = sanitizeName(payload?.name);
       const room = rooms.get(code);
       if (!room) {

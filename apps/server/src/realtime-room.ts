@@ -21,6 +21,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
 import { sanitizeName, sanitizePassword, type RoomSocketData } from './room';
+import { MAX_RT_INPUT_PER_SEC, sanitizeRoomSettings } from './security';
 
 export const RT_GAME_ID = 'corcodragon-fight';
 export const RT_TICK_MS = 50;
@@ -55,6 +56,7 @@ export class RealtimeRoom {
   private onEmpty: (code: string) => void;
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private lastErrorAt = new Map<string, number>();
+  private inputRate = new Map<string, { count: number; windowStart: number }>();
 
   constructor(
     code: string,
@@ -222,15 +224,7 @@ export class RealtimeRoom {
 
   updateSettings(actorId: string, patch: Partial<RoomSettings>, actorSocketId: string): void {
     if (actorId !== this.hostId) return this.emitError(actorSocketId, '只有房主可以修改房间设置');
-    const next: RoomSettings = { ...this.settings };
-    if (patch.aiSpeed != null) {
-      const v = Math.floor(Number(patch.aiSpeed));
-      if (Number.isFinite(v)) next.aiSpeed = Math.max(300, Math.min(4000, v));
-    }
-    if (patch.autopilot != null && patch.autopilot in AUTOPILOT_DELAYS) {
-      next.autopilot = patch.autopilot;
-    }
-    this.settings = next;
+    this.settings = sanitizeRoomSettings({ ...this.settings, ...patch });
     this.broadcastLobby();
   }
 
@@ -284,8 +278,22 @@ export class RealtimeRoom {
       payload && typeof payload === 'object' && !Array.isArray(payload)
         ? (payload as { input?: unknown; seq?: unknown })
         : { input: payload };
-    // 无论输入是否合法都先回执 seq（表示“已收到”，客户端只关心送达确认）
+
+    // 输入洪泛保护：每玩家每秒最多 120 条；超限仍回执 seq，但丢弃输入
+    const now = Date.now();
+    const win = this.inputRate.get(playerId);
+    if (win && now - win.windowStart >= 1000) {
+      this.inputRate.delete(playerId);
+    }
+    const rec = this.inputRate.get(playerId) ?? { count: 0, windowStart: now };
+    rec.count += 1;
+    this.inputRate.set(playerId, rec);
     this.engine.recordInputSeq(playerId, envelope.seq);
+    if (rec.count > MAX_RT_INPUT_PER_SEC) {
+      this.emitError(socketId, '输入过快，已丢弃');
+      return;
+    }
+
     const r = this.engine.applyInput(playerId, envelope.input);
     if (!r.ok) this.emitError(socketId, r.error ?? '非法输入');
   }
@@ -343,6 +351,7 @@ export class RealtimeRoom {
 
   private close(): void {
     this.stopTick();
+    this.inputRate.clear();
     this.onEmpty(this.code);
   }
 }
