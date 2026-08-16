@@ -1,7 +1,7 @@
 /**
  * 《鳄龙咆哮》realtime 联机 driver：
  * - 复用 Socket.IO 大厅生命周期（create/join/rejoin/listRooms/start）；
- * - 对局期发送 `rtInput { input }`，接收 20Hz `rtSnapshot`；
+ * - 对局期发送 `rtInput { input }`，接收 20/30/60Hz（默认 30Hz）`rtSnapshot`；
  * - 与 useRemoteGame 并存，不改动出包魔法师的连接代码。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,6 +16,11 @@ import type {
 import type { RealtimeInputAction, Snapshot } from '@tm/game-corcodragon-fight';
 
 const TOKEN_KEY = 'tm-room-tokens';
+/**
+ * React 状态（HUD）按该间隔节流渲染；渲染循环始终经 snapshotRef 读最新快照。
+ * 带事件或阶段变化的快照立即渲染，保证击杀/命中反馈零感知延迟。
+ */
+const SNAPSHOT_RENDER_INTERVAL_MS = 50;
 
 interface SavedRoom {
   playerId: string;
@@ -74,6 +79,8 @@ export interface RealtimeApi {
   stage: RealtimeStage;
   lobby: LobbyInfo | null;
   snapshot: Snapshot | null;
+  /** 每帧可读的最新快照（不经过节流的 React 渲染管线） */
+  snapshotRef: { current: Snapshot | null };
   error: string | null;
   myId: string | null;
   roomList: RoomListItem[] | null;
@@ -94,6 +101,9 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
   const seqRef = useRef(0);
   const pendingRef = useRef(new Map<number, RealtimeInputAction>());
   const pingRef = useRef(0);
+  const snapshotRef = useRef<Snapshot | null>(null);
+  const lastRenderedSnapRef = useRef<Snapshot | null>(null);
+  const lastSnapshotRenderAtRef = useRef(0);
   const [stage, setStage] = useState<RealtimeStage>('disconnected');
   const [lobby, setLobby] = useState<LobbyInfo | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -125,14 +135,25 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     });
     s.on('rtSnapshot', (snap) => {
       const view = snap as Snapshot;
+      snapshotRef.current = view;
       const me = view.players.find((p) => p.id === view.youId);
       const ack = me?.lastInputSeq ?? -1;
       for (const key of pendingRef.current.keys()) {
         if (key <= ack) pendingRef.current.delete(key);
       }
-      setStats((prev) => ({ ...prev, pendingInputs: pendingRef.current.size }));
-      setSnapshot(view);
-      setStage('playing');
+      // 高频快照不再每次都 setState：渲染循环经 snapshotRef 读最新状态，
+      // HUD 按 ~20Hz 节流渲染；有事件/阶段切换时立即渲染保证反馈及时。
+      const last = lastRenderedSnapRef.current;
+      const phaseChanged = !last || last.phase !== view.phase;
+      const hasEvents = (view.events?.length ?? 0) > 0;
+      const due = performance.now() - lastSnapshotRenderAtRef.current >= SNAPSHOT_RENDER_INTERVAL_MS;
+      if (phaseChanged || hasEvents || due) {
+        lastRenderedSnapRef.current = view;
+        lastSnapshotRenderAtRef.current = performance.now();
+        setStats((prev) => ({ ...prev, pendingInputs: pendingRef.current.size }));
+        setSnapshot(view);
+        setStage('playing');
+      }
     });
     s.on('error', (m) => setError(m));
     s.on('connect', () => setError(null));
@@ -229,6 +250,9 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     seqRef.current = 0;
     pendingRef.current.clear();
     pingRef.current = 0;
+    snapshotRef.current = null;
+    lastRenderedSnapRef.current = null;
+    lastSnapshotRenderAtRef.current = 0;
     setStage('disconnected');
     setLobby(null);
     setSnapshot(null);
@@ -242,6 +266,7 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     stage,
     lobby,
     snapshot,
+    snapshotRef,
     error,
     myId,
     roomList,

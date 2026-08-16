@@ -14,6 +14,7 @@ import { chooseAIInputs } from './ai';
 import { CorcodragonFightEngine } from './engine';
 import { SfxPlayer } from './fx';
 import { BALANCE, balanceToJson, resetBalance } from './balance';
+import { sampleRemote, type RemoteSample } from './interp';
 import {
   ARENA_HALF,
   EYE_Y,
@@ -191,11 +192,8 @@ interface PlayerRender {
   shield: THREE.Mesh;
   wall: THREE.Mesh;
   ring?: THREE.Mesh;
-  target: THREE.Vector3;
-  prevTarget: THREE.Vector3;
-  targetAt: number;
-  yaw: number;
-  prevYaw: number;
+  /** 按服务端时间戳排列的位置样本（插值缓冲，最多 32 个） */
+  samples: RemoteSample[];
   alive: boolean;
   visible: boolean;
   shieldVal: number;
@@ -211,6 +209,8 @@ interface Tracer {
 
 export interface FpsDriver {
   snapshot: Snapshot | null;
+  /** 联机：每帧可读的最新快照（不经节流渲染管线）；本地驱动可省略 */
+  snapshotRef?: { current: Snapshot | null };
   myId: string | null;
   online: boolean;
   error: string | null;
@@ -251,8 +251,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const driverRef = useRef(driver);
   driverRef.current = driver;
-  const snapRef = useRef<Snapshot | null>(null);
-  snapRef.current = driver.snapshot;
+  const snapRef = useRef<Snapshot | null>(driver.snapshotRef?.current ?? driver.snapshot);
+  snapRef.current = driver.snapshotRef?.current ?? driver.snapshot;
+  /** 已送入远端插值缓冲的快照 seq */
+  const lastRemoteSeqRef = useRef(-1);
+  /** 客户端与服务端引擎时钟的偏移估计（EMA） */
+  const netOffsetRef = useRef<number | null>(null);
 
   const [tuningEnabled] = useState(
     () =>
@@ -564,7 +568,33 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           setQualityNote('已自动降低分辨率以保持流畅');
         }
       }
+      // 联机：每帧直接读最新快照（快照接收频率高于 HUD 的节流渲染频率）
+      const liveSnap = driverRef.current.snapshotRef?.current ?? driverRef.current.snapshot;
+      if (liveSnap !== snapRef.current) snapRef.current = liveSnap;
       const snap = snapRef.current;
+      // 远端插值缓冲：每个新快照立刻采样，不等 React 渲染
+      if (snap && snap.seq !== lastRemoteSeqRef.current) {
+        lastRemoteSeqRef.current = snap.seq;
+        const recvAt = performance.now();
+        if (netOffsetRef.current === null) {
+          netOffsetRef.current = recvAt - snap.t;
+        } else {
+          netOffsetRef.current = netOffsetRef.current * 0.9 + (recvAt - snap.t) * 0.1;
+        }
+        for (const p of snap.players) {
+          if (p.id === driverRef.current.myId) continue;
+          const pr = playerRendersRef.current.get(p.id);
+          if (!pr) continue;
+          if (!p.visible) {
+            pr.samples.length = 0;
+            continue;
+          }
+          const s = pr.samples;
+          if (s.length && snap.t <= s[s.length - 1].t) continue;
+          s.push({ t: snap.t, x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw });
+          if (s.length > 32) s.shift();
+        }
+      }
       const me = snap?.players.find((p) => p.id === driverRef.current.myId) ?? null;
       const cam = cameraRef.current;
       const scene = sceneRef.current;
@@ -650,27 +680,18 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         }
       }
 
-      // 其他玩家平滑插值
+      // 其他玩家平滑插值：按服务端时间戳渲染 90ms 前的状态（快照插值缓冲），
+      // 到达间隔抖动只影响缓冲深度，不再用墙钟速度外推造成跳变
+      const nowMs = performance.now();
       for (const [id, pr] of playerRendersRef.current) {
         if (id === driverRef.current.myId) continue;
         pr.group.visible = pr.visible && pr.alive;
         if (!pr.visible || !pr.alive) continue;
-        // 20Hz 服务端快照 → 远端渲染插值：按最近两帧速度外推一个缓冲窗口，
-        // 消除“每秒20次跳变”的卡顿感（见 REALTIME.md 客户端策略）
-        const nowMs = performance.now();
-        const dtSnapMs = Math.max(16, nowMs - pr.targetAt);
-        const bufferSec = BALANCE.client.interpolationBufferMs / 1000;
-        const k = Math.min(1, BALANCE.client.interpolationRate * dt);
-        const velX = (pr.target.x - pr.prevTarget.x) / (dtSnapMs / 1000);
-        const velY = (pr.target.y - pr.prevTarget.y) / (dtSnapMs / 1000);
-        const velZ = (pr.target.z - pr.prevTarget.z) / (dtSnapMs / 1000);
-        const desired = new THREE.Vector3(
-          pr.target.x + velX * bufferSec,
-          pr.target.y + velY * bufferSec,
-          pr.target.z + velZ * bufferSec,
-        );
-        pr.group.position.lerp(desired, k);
-        pr.group.rotation.y += (pr.yaw - pr.group.rotation.y) * Math.min(1, 10 * dt);
+        const renderT = nowMs - (netOffsetRef.current ?? 0) - BALANCE.client.interpolationBufferMs;
+        const out = sampleRemote(pr.samples, renderT);
+        if (!out) continue;
+        pr.group.position.set(out.x, out.y, out.z);
+        pr.group.rotation.y = out.yaw;
         const wallOn = pr.shieldVal > 0 && pr.hero === 'tiebi';
         pr.wall.visible = wallOn;
         pr.shield.visible = pr.shieldVal > 0 && pr.hero !== 'tiebi';
@@ -679,10 +700,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           const height = BALANCE.heroes.tiebi.ability.shieldHeight ?? 3;
           pr.wall.scale.set(width, height, 1);
           const mat = pr.wall.material as THREE.MeshBasicMaterial;
-          mat.opacity = 0.3 + Math.sin(performance.now() / 180) * 0.05;
+          mat.opacity = 0.3 + Math.sin(nowMs / 180) * 0.05;
         }
         if (pr.shield.visible) {
-          const s = 1.1 + Math.sin(performance.now() / 180) * 0.04;
+          const s = 1.1 + Math.sin(nowMs / 180) * 0.04;
           pr.shield.scale.setScalar(s);
         }
       }
@@ -1062,11 +1083,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           shield,
           wall,
           ring,
-          target: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
-          prevTarget: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
-          targetAt: performance.now(),
-          yaw: p.yaw,
-          prevYaw: p.yaw,
+          samples: p.visible ? [{ t: snap.t, x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw }] : [],
           alive: p.alive,
           visible: p.visible,
           shieldVal: p.shield,
@@ -1075,15 +1092,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         playerRendersRef.current.set(p.id, pr);
       }
       if (pr) {
-        pr.prevTarget.copy(pr.target);
-        pr.prevYaw = pr.yaw;
-        pr.target.set(p.pos.x, p.pos.y, p.pos.z);
-        pr.targetAt = performance.now();
-        pr.yaw = p.yaw;
+        // 位置/朝向样本由渲染循环在收到每个快照时直接入队（见 rAF loop），
+        // 这里只同步可见性/护盾/英雄等低频元数据。
         pr.alive = p.alive;
         pr.visible = p.visible;
         pr.shieldVal = p.shield;
         pr.hero = p.hero;
+        if (!p.visible) pr.samples.length = 0;
         pr.wall.position.set(
           0,
           BALANCE.heroes.tiebi.ability.shieldCenterY ?? 1.2,

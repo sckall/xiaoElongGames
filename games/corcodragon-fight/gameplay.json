@@ -262,7 +262,7 @@
     "mouseSensitivity": 0.0022,
     "interpolationRate": 12,
     "correctionRate": 6,
-    "softCorrectionThreshold": 0.4,
+    "softCorrectionThreshold": 1.5,
     "maxDeltaMs": 60,
     "maxPixelRatio": 1.0,
     "shadows": false,

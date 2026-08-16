@@ -149,7 +149,9 @@ export class RealtimeRoom {
     if (!this.engine) return;
     for (const s of this.seats) {
       if (!s.isBot && s.connected && s.socketId) {
-        this.io.to(s.socketId).emit('rtSnapshot', this.engine.getSnapshot(s.id));
+        // volatile：快照是“最新状态为准”的数据。客户端渲染/网络落后时直接丢弃
+        // 排队中的旧快照，避免慢连接积压后一次性吐出一串过期状态造成卡顿。
+        this.io.to(s.socketId).volatile.emit('rtSnapshot', this.engine.getSnapshot(s.id));
       }
     }
   }

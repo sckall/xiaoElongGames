@@ -30,6 +30,7 @@ export default function CorcodragonFightOnlineScreen({
       <FpsGameView
         driver={{
           snapshot: remote.snapshot,
+          snapshotRef: remote.snapshotRef,
           myId: remote.myId,
           online: true,
           error: remote.error,
