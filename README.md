@@ -64,7 +64,9 @@ pnpm build   # 产物 apps/web/dist 已配置相对资源路径（vite base: './
   仓库需为 public（免费），或账号为 Pro/Team/Enterprise（private 可用）；
 - 站点地址形如 `https://<用户名>.github.io/xiaoElongGames/`；
 - 游戏内「联机入口」仍可填已部署的游戏服务器地址；注意 https 页面连接
-  ws/http 服务器会被浏览器按混合内容拦截，公网服务器建议配 wss/https。
+  ws/http 服务器会被浏览器按混合内容拦截，公网服务器建议配 wss/https；
+- 完整部署步骤、混合内容/CORS_ORIGIN/自定义域名等注意事项见
+  [docs/GITHUB-PAGES.md](docs/GITHUB-PAGES.md)。
 
 ## 🚀 本地开发
 

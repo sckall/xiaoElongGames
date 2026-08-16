@@ -4,6 +4,12 @@
 
 ## 未发布（0.2.x 工作区）
 
+- 📖 **新增 GitHub Pages 部署注意事项文档**（`docs/GITHUB-PAGES.md`）：
+  - 覆盖首次启用（Pages Source 选 GitHub Actions）、自动部署流程、本地子路径验证；
+  - 汇总关键注意事项：`base: './'` 相对路径不能改、无路由刷新 404 说明、
+    https 页面连 ws/http 的混合内容限制、`CORS_ORIGIN`/`TRUST_PROXY` 配置、
+    前端不放密钥、自定义域名等；README 与 DEPLOY.md 已互相链接
+
 - 🐛 **修复《鳄龙咆哮》英雄模型与碰撞盒视觉偏移**：
   - 根因：KayKit 角色 GLB 的武器/盾牌/法杖/帽子会显著撑大整棵节点树的 AABB；
     按整树 AABB 居中并归一高度时，铁壁被长剑向后带偏约 0.53m、影枭/诡雷被弩
