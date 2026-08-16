@@ -7,8 +7,8 @@
 import { AUTOPILOT_DELAYS, DEFAULT_ROOM_SETTINGS, type RoomSettings } from '@tm/rules';
 
 export const MAX_JOIN_CODE_LEN = 16;
-/** realtime 每玩家每秒最大输入条数（洪泛保护） */
-export const MAX_RT_INPUT_PER_SEC = 120;
+/** realtime 每玩家每秒最大输入条数（洪泛保护；正常客户端 look+move 节流后约 120/s） */
+export const MAX_RT_INPUT_PER_SEC = 240;
 const AI_SPEED_MIN = 300;
 const AI_SPEED_MAX = 4000;
 

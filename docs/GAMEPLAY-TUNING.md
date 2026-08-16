@@ -39,7 +39,7 @@ open 'http://127.0.0.1:5173/?debug=1'
 | `heroes.*` | `hp` / `speed` / `skillCd` / `ability.*` | 英雄基础 + 各技能参数（如 `dashDistance`、`shieldValue`、`markDamage`） | ✅ |
 | `weapons.*` | `damage` / `interval` / `spread` / `adsSpread` / `adsFov` / `recoil` / `headshot` / `reloadMs` / `falloffStart/End` / `minDmgMult` / `range` | 武器手感（开镜 FOV 与后坐上跳可实时调） | ✅ |
 | `ai` | `preferredRange` / `meleeRange` / `aimTolerance` / `meleeAimTolerance` | bot 战斗风格 | ✅ |
-| `client` | `mouseSensitivity` / `interpolationRate` / `correctionRate` / `softCorrectionThreshold` / `maxDeltaMs` | 灵敏度、他人插值、服务端校正、预测回滚阈值 | ✅ |
+| `client` | `mouseSensitivity` / `interpolationRate` / `correctionRate` / `softCorrectionThreshold` / `maxDeltaMs` / `maxPixelRatio` / `shadows` / `antialias` / `autoQuality` | 灵敏度、插值、服务端校正、回滚阈值、画质与自适应帧率 | ✅ |
 
 约定：
 

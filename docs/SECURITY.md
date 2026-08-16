@@ -14,7 +14,7 @@
 | 昵称/密码裁剪 | `room.ts` | 昵称 12 字符、密码 16 字符 |
 | 房间设置白名单 | `security.ts` | `aiSpeed/autopilot` 之外全部忽略并钳制 |
 | 引擎动作白名单 | 游戏引擎 | `apply/applyInput` 对全部动作与数值域校验，非法安全拒绝 |
-| realtime 输入洪泛保护 | `realtime-room.ts` | 每玩家每秒最多 120 条输入，超限丢弃并回执 |
+| realtime 输入洪泛保护 | `realtime-room.ts` | 每玩家每秒最多 240 条输入（正常客户端已按 60Hz 节流），超限丢弃并回执 |
 | CORS 同源默认 | `index.ts` | 默认拒绝跨域 Socket.IO；`CORS_ORIGIN` 白名单 |
 | 异常兜底 | `index.ts` | 所有事件 handler 包 `guard()`，坏消息不会打崩进程 |
 | 空房自动回收 | `Room/RealtimeRoom` | 所有真人断开后自动关闭并释放资源 |

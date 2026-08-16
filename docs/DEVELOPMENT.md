@@ -72,6 +72,13 @@ node scripts/smoke-tuning.mjs                     # ?debug=1 调参面板冒烟
 - 训练场：详情页选「训练场」，打四种靶子看命中率/爆头率。
 - 完整流程见 [GAMEPLAY-TUNING.md](GAMEPLAY-TUNING.md) 与 [SHOOTING-FEEL.md](SHOOTING-FEEL.md)。
 
+画质与帧率：
+
+- 服务端权威模拟固定 20Hz（游戏逻辑），浏览器渲染为 rAF（目标 60fps）；
+- URL 加 `?quality=low` 流畅优先（关阴影/降分辨率/去尘埃），`?quality=high` 画质优先；
+  缺省为自动：连续低帧会自动关阴影、降像素比；
+- `?debug=1` 左上角可查看实时 `fps`、ping、漂移与待确认输入数。
+
 ## 5. 客户端（前端）部署
 
 - `apps/web` 是纯静态产物：`pnpm build` 生成 `apps/web/dist`；

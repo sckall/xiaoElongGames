@@ -263,6 +263,10 @@
     "interpolationRate": 12,
     "correctionRate": 8,
     "softCorrectionThreshold": 0.5,
-    "maxDeltaMs": 60
+    "maxDeltaMs": 60,
+    "maxPixelRatio": 1.0,
+    "shadows": false,
+    "antialias": false,
+    "autoQuality": true
   }
 }

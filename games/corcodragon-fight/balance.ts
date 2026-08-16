@@ -162,6 +162,10 @@ export interface ClientBalance {
   correctionRate: number;
   softCorrectionThreshold: number;
   maxDeltaMs: number;
+  maxPixelRatio: number;
+  shadows: boolean;
+  antialias: boolean;
+  autoQuality: boolean;
 }
 
 export interface BalanceData {
@@ -357,6 +361,10 @@ export function validateBalance(data: unknown): BalanceData {
       correctionRate: num(client.correctionRate, 'client.correctionRate', 0, 60),
       softCorrectionThreshold: num(client.softCorrectionThreshold, 'client.softCorrectionThreshold', 0, 20),
       maxDeltaMs: num(client.maxDeltaMs, 'client.maxDeltaMs', 10, 250),
+      maxPixelRatio: num(client.maxPixelRatio, 'client.maxPixelRatio', 0.5, 3),
+      shadows: bool(client.shadows, 'client.shadows'),
+      antialias: bool(client.antialias, 'client.antialias'),
+      autoQuality: bool(client.autoQuality, 'client.autoQuality'),
     },
   };
 

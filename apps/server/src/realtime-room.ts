@@ -290,7 +290,7 @@ export class RealtimeRoom {
     this.inputRate.set(playerId, rec);
     this.engine.recordInputSeq(playerId, envelope.seq);
     if (rec.count > MAX_RT_INPUT_PER_SEC) {
-      this.emitError(socketId, '输入过快，已丢弃');
+      this.emitError(socketId, '操作太快啦，已忽略部分指令');
       return;
     }
 

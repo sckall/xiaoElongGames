@@ -62,6 +62,21 @@ function heroColor(hero: HeroId | null, team: string): number {
   return team === 'B' ? TEAM_COLORS.B : TEAM_COLORS.A;
 }
 
+/** 画质偏好：?quality=low(流畅优先) / high(画质优先)；缺省=自动 */
+function qualityMode(): 'auto' | 'low' | 'high' {
+  if (typeof window === 'undefined') return 'auto';
+  const q = new URLSearchParams(window.location.search).get('quality');
+  return q === 'low' ? 'low' : q === 'high' ? 'high' : 'auto';
+}
+
+/** 与渲染器一致的阴影开关（low 强制关、high 强制开、auto 读配置） */
+function qualityShadows(): boolean {
+  const q = qualityMode();
+  if (q === 'high') return true;
+  if (q === 'low') return false;
+  return BALANCE.client.shadows;
+}
+
 /** Kenney Blaster Kit（CC0）第一人称枪模：GLB 文件名 + 枪口本地坐标 */
 const GUN_GLB: Partial<Record<WeaponId, { file: string; muzzle: THREE.Vector3 }>> = {
   rifle: { file: 'blaster-a.glb', muzzle: new THREE.Vector3(0.22, -0.14, -1.0) },
@@ -109,8 +124,8 @@ async function attachHeroModel(holder: THREE.Group, hero: HeroId): Promise<void>
     model.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
-        m.castShadow = true;
-        m.receiveShadow = true;
+        m.castShadow = qualityShadows();
+        m.receiveShadow = qualityShadows();
       }
     });
     for (const child of [...holder.children]) {
@@ -244,6 +259,11 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const [hitAt, setHitAt] = useState(0);
   const [driftM, setDriftM] = useState(0);
   const [showColliders, setShowColliders] = useState(false);
+  const emaDtRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const fpsRef = useRef(0);
+  const [fps, setFps] = useState(0);
+  const [qualityNote, setQualityNote] = useState<string | null>(null);
   const [killFeed, setKillFeed] = useState<string[]>([]);
 
   // 视图/输入状态（本帧立即生效，再同步给引擎）
@@ -251,6 +271,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const keysRef = useRef<Record<string, boolean>>({});
   const localPosRef = useRef(new THREE.Vector3(0, 0, 0));
   const lastMoveRef = useRef({ x: 0, z: 0 });
+  const lastLookSentRef = useRef(0);
+  const lastMoveSentRef = useRef(0);
   const lastAliveRef = useRef(false);
 
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -349,8 +371,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const hemi = new THREE.HemisphereLight(0xcfe2ff, 0x2a3648, 1.7);
     const sun = new THREE.DirectionalLight(0xffffff, 3.0);
     sun.position.set(20, 30, 14);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.castShadow = qualityShadows();
+    sun.shadow.mapSize.set(512, 512);
     sun.shadow.camera.left = -30;
     sun.shadow.camera.right = 30;
     sun.shadow.camera.top = 30;
@@ -363,7 +385,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       new THREE.MeshStandardMaterial({ color: 0x3b475c, roughness: 0.95 }),
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
+    floor.receiveShadow = qualityShadows();
     scene.add(floor);
     const grid = new THREE.GridHelper(ARENA_HALF * 2 + 8, ARENA_HALF * 2 + 8, 0x61789c, 0x34405a);
     grid.position.y = 0.02;
@@ -379,8 +401,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       const cz = (b.minZ + b.maxZ) / 2;
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, b.height, d), boxMat);
       mesh.position.set(cx, b.height / 2, cz);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = qualityShadows();
+      mesh.receiveShadow = qualityShadows();
       const edge = new THREE.LineSegments(
         new THREE.EdgesGeometry(mesh.geometry),
         new THREE.LineBasicMaterial({ color: 0xff9a4d, transparent: true, opacity: 0.35 }),
@@ -415,8 +437,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           model.traverse((o) => {
             const m = o as THREE.Mesh;
             if (m.isMesh) {
-              m.castShadow = true;
-              m.receiveShadow = true;
+              m.castShadow = qualityShadows();
+              m.receiveShadow = qualityShadows();
             }
           });
           scene.add(model);
@@ -438,8 +460,8 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     for (const w of wallDefs) {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w.w, WALL_HEIGHT + 1, w.d), wallMat);
       mesh.position.set(w.x, (WALL_HEIGHT + 1) / 2, w.z);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = qualityShadows();
+      mesh.receiveShadow = qualityShadows();
       const edge = new THREE.LineSegments(
         new THREE.EdgesGeometry(mesh.geometry),
         new THREE.LineBasicMaterial({ color: 0x57c7ff, transparent: true, opacity: 0.4 }),
@@ -449,7 +471,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     }
 
     // 环境尘埃粒子（氛围）
-    const dustCount = 160;
+    const dustCount = qualityMode() === 'low' ? 0 : 160;
     const dustGeo = new THREE.BufferGeometry();
     const dustPos = new Float32Array(dustCount * 3);
     for (let i = 0; i < dustCount; i++) {
@@ -478,10 +500,16 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const renderer = new THREE.WebGLRenderer({
+      antialias: qualityMode() === 'high' ? true : BALANCE.client.antialias,
+      powerPreference: 'high-performance',
+    });
+    const q = qualityMode();
+    const targetRatio =
+      q === 'low' ? 0.75 : q === 'high' ? Math.min(window.devicePixelRatio, 1.5) : BALANCE.client.maxPixelRatio;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, targetRatio));
+    renderer.shadowMap.enabled = q === 'high' ? true : q === 'low' ? false : BALANCE.client.shadows;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     host.appendChild(renderer.domElement);
     canvasRef.current = renderer.domElement;
     rendererRef.current = renderer;
@@ -503,6 +531,28 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const dt = Math.min(BALANCE.client.maxDeltaMs / 1000, clockRef.current.getDelta());
+      // 自适应画质：连续低帧率时自动关阴影/降像素比，优先保证流畅
+      const dtMs = dt * 1000;
+      emaDtRef.current = emaDtRef.current === 0 ? dtMs : emaDtRef.current * 0.95 + dtMs * 0.05;
+      frameCountRef.current += 1;
+      if (dtMs > 0) {
+        fpsRef.current = fpsRef.current === 0 ? 1000 / dtMs : fpsRef.current * 0.9 + (1000 / dtMs) * 0.1;
+        if (frameCountRef.current % 60 === 0) setFps(Math.round(fpsRef.current));
+      }
+      if (
+        BALANCE.client.autoQuality &&
+        frameCountRef.current % 240 === 0 &&
+        emaDtRef.current > 25
+      ) {
+        if (renderer.shadowMap.enabled) {
+          renderer.shadowMap.enabled = false;
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+          setQualityNote('已自动降低画质（关闭阴影）以保持流畅');
+        } else if (renderer.getPixelRatio() > 0.8) {
+          renderer.setPixelRatio(0.8);
+          setQualityNote('已自动降低分辨率以保持流畅');
+        }
+      }
       const snap = snapRef.current;
       const me = snap?.players.find((p) => p.id === driverRef.current.myId) ?? null;
       const cam = cameraRef.current;
@@ -876,7 +926,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
             new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.5 }),
           );
           face.position.y = 0.2 + h - 0.06;
-          face.castShadow = true;
+          face.castShadow = qualityShadows();
           const ringMat = new THREE.MeshBasicMaterial({ color: 0xd83030 });
           const ring1 = new THREE.Mesh(new THREE.TorusGeometry(p.hitRadius * 0.55, 0.04, 8, 28), ringMat);
           const ring2 = new THREE.Mesh(new THREE.TorusGeometry(p.hitRadius * 0.18, 0.04, 8, 20), ringMat);
@@ -895,13 +945,13 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
             new THREE.MeshStandardMaterial({ color: 0xd8dde6, roughness: 0.55 }),
           );
           body.position.y = 0.78;
-          body.castShadow = true;
+          body.castShadow = qualityShadows();
           const head = new THREE.Mesh(
             new THREE.SphereGeometry(0.38, 14, 10),
             new THREE.MeshStandardMaterial({ color: 0xc84545, roughness: 0.5 }),
           );
           head.position.y = 1.78;
-          head.castShadow = true;
+          head.castShadow = qualityShadows();
           const bull = new THREE.Mesh(
             new THREE.TorusGeometry(0.16, 0.05, 8, 20),
             new THREE.MeshBasicMaterial({ color: 0xff3030 }),
@@ -913,10 +963,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           const visual = new THREE.Group();
           const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 1.35, 12), mat);
           body.position.y = 0.78;
-          body.castShadow = true;
+          body.castShadow = qualityShadows();
           const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 10), mat);
           head.position.y = 1.78;
-          head.castShadow = true;
+          head.castShadow = qualityShadows();
           const visor = new THREE.Mesh(
             new THREE.SphereGeometry(0.17, 10, 8),
             new THREE.MeshBasicMaterial({ color: 0xd7f4ff }),
@@ -1284,6 +1334,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       const dir = viewRelativeMove(viewRef.current.yaw, mx, mz);
       const last = lastMoveRef.current;
       if (Math.abs(dir.x - last.x) > 1e-4 || Math.abs(dir.z - last.z) > 1e-4) {
+        // 视角转动时会高频触发：move 以 60Hz 上限发送，避免触发服务端洪泛保护
+        const now = performance.now();
+        if (now - lastMoveSentRef.current < 16) return;
+        lastMoveSentRef.current = now;
         lastMoveRef.current = { x: dir.x, z: dir.z };
         send({ type: 'move', x: dir.x, z: dir.z });
       }
@@ -1383,7 +1437,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       v.yaw -= e.movementX * BALANCE.client.mouseSensitivity;
       v.pitch -= e.movementY * BALANCE.client.mouseSensitivity;
       v.pitch = Math.max(-BALANCE.arena.pitchClamp, Math.min(BALANCE.arena.pitchClamp, v.pitch));
-      send({ type: 'look', yaw: v.yaw, pitch: v.pitch });
+      // look 同样按 60Hz 上限发送；本地渲染始终使用即时视角
+      const now = performance.now();
+      if (now - lastLookSentRef.current >= 16) {
+        lastLookSentRef.current = now;
+        send({ type: 'look', yaw: v.yaw, pitch: v.pitch });
+      }
       // 按住方向键转身时，立即按新视角重算移动向量（服务器以世界系执行）
       syncMove();
     };
@@ -1478,10 +1537,12 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
       <button className="ccf-exit" onClick={driver.onExit} title="退出对局">
         ← 退出
       </button>
+      {qualityNote && <div className="ccf-netstats" style={{ top: 80 }}>⚡ {qualityNote}</div>}
       {tuningEnabled && (
         <div className="ccf-netstats">
           🛰 ping {driver.stats?.pingMs ?? 0}ms · drift {driftM.toFixed(2)}m · pending{' '}
           {driver.stats?.pendingInputs ?? 0}
+          {tuningEnabled ? ` · ${fps} fps` : ''}
           {driver.online ? '' : '（本地模式无网络）'}
         </div>
       )}
