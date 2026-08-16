@@ -8,8 +8,8 @@
 
 | 素材 | 来源 | 许可证 | 用途 | 位置 |
 |------|------|--------|------|------|
-| `crate-small/medium/wide.glb` + `Textures/colormap.png` | [Kenney · Blaster Kit 2.1](https://kenney.nl/assets/blaster-kit)（直链 zip 已归档 `tools/assets-archive/`，1.6MB） | **CC0**（公有领域，可商用，署名非必须） | 竞技场掩体木箱替换占位盒 | `games/corcodragon-fight/assets/models/` |
-| `blaster-a.glb`（步枪）/ `blaster-e.glb`（狙击）/ `blaster-h.glb`（手枪） | 同上 | **CC0** | 第一人称枪模（GLTFLoader 加载，失败回退程序化枪模） | `games/corcodragon-fight/assets/models/` |
+| `crate-small/medium/wide.glb`（colormap 贴图已内嵌） | [Kenney · Blaster Kit 2.1](https://kenney.nl/assets/blaster-kit)（直链 zip 已归档 `tools/assets-archive/`，1.6MB） | **CC0**（公有领域，可商用，署名非必须） | 竞技场掩体木箱替换占位盒 | `games/corcodragon-fight/assets/models/` |
+| `blaster-a.glb`（步枪）/ `blaster-e.glb`（狙击）/ `blaster-h.glb`（手枪），colormap 贴图已内嵌 | 同上 | **CC0** | 第一人称枪模（GLTFLoader 加载，失败回退程序化枪模） | `games/corcodragon-fight/assets/models/` |
 | `characters/hero-{barbarian,rogue-hooded,knight,mage,rogue}.glb` | [KayKit · Character Pack Adventures 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) | **CC0**（包内 `LICENSE-KayKit.txt` 已随资产保存） | 5 位英雄的低多边形角色模型（替换胶囊人视觉；引擎碰撞箱不变） | `games/corcodragon-fight/assets/models/characters/` |
 | 程序化音效（射击/命中/爆头/击杀/换弹/技能/终极技/跳跃/治疗/重生） | 自研 WebAudio（`fx.ts`） | 自有 | 全部音效 | `games/corcodragon-fight/fx.ts` |
 | 程序化匕首模型 + 挥砍动画 | 自研 Three.js 几何体 | 自有 | 近战武器 | `GameUI.tsx` |
@@ -17,6 +17,11 @@
 > 下载前已核对包内 `License.txt`：CC0 1.0，允许个人/教育/商业使用。
 > 完整包（含 18 支 blaster 枪模 FBX/GLB、弹药、手雷等）保存在
 > `tools/assets-archive/kenney_blaster-kit_2.1.zip`（gitignore，不占仓库体积）。
+>
+> ⚠️ 上述 6 个 Kenney GLB 原本引用外部 `Textures/colormap.png`：dev 模式能加载，
+> 但 Vite 生产构建会把 `.glb` 哈希化、外部贴图不跟随，导致打包后箱子/枪全白。
+> 已用 `scripts/embed-glb-textures.mjs` 把贴图内嵌进每个 GLB（原 PNG 仍保留在
+> `assets/models/Textures/` 供重新生成）；**以后替换这些 GLB 后需重跑该脚本**。
 
 ## 2. 可用的免费/CC0 素材来源（已联网调研）
 

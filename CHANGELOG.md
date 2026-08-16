@@ -4,6 +4,12 @@
 
 ## 未发布（0.2.x 工作区）
 
+- 🎨 **打包白模修复（箱子和枪全白）**：
+  - 根因：6 个 Kenney GLB（3 木箱 + 3 枪）引用外部 `Textures/colormap.png`，
+    Vite 生产构建只哈希化 `.glb`、外部贴图不跟随 → 打包后贴图 404 → 材质全白
+  - 修复：`scripts/embed-glb-textures.mjs` 把 colormap 内嵌进每个 GLB
+    （GLB 自包含，任何环境不再依赖外部贴图）；重新打包并视觉复核通过
+
 - 📦 **发布打包补齐（完整游戏大厅）**：
   - `pack-release.mjs` 现在把 **apps/web（大厅前端）+ 全部 games/* workspace 包 +
     pnpm-lock 一致** 完整打入服务器发布包，修复旧清单缺 `games/` 导致服务器
