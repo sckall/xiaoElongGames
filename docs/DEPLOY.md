@@ -1,7 +1,9 @@
 # 服务端部署指南（腾讯云）
 
-《出包魔法师》联机版是**单进程服务**：Socket.IO 对战 + 同端口托管前端静态产物，
-一个端口即可上线。客户端无需单独部署（浏览器访问即客户端）。
+《小鳄龙之家》游戏大厅是**单进程服务**：完整大厅（《出包魔法师》桌游 +
+《鳄龙咆哮》3D FPS）+ Socket.IO 对战 + 同端口托管前端静态产物，
+一个端口即可上线。客户端无需单独部署（浏览器访问即客户端）；
+另有「双击即玩」的本地客户端包，见 README「本地单机入口」。
 
 ## 1. 支持的系统与环境依赖
 
@@ -29,7 +31,9 @@
 ```bash
 # ---- 本地（开发机）打包 ----
 node scripts/pack-release.mjs
-# 产物：release/trouble-magician-<版本>.tar.gz（约 4.4MB，含服务端源码+前端构建产物）
+# 产物：release/trouble-magician-<版本>.tar.gz
+# 内容：完整游戏大厅（前端 dist + 服务端源码 + 全部 workspace 游戏包 + 文档），
+#      解压后即包含大厅里的两款游戏；大小约 20MB（主要是 3D 模型）。
 
 # ---- 上传到服务器 ----
 scp release/trouble-magician-<版本>.tar.gz ubuntu@<服务器IP>:~/
@@ -117,9 +121,10 @@ curl http://127.0.0.1:<端口>/healthz        # {"ok":true,"rooms":0,...}
 # 2) 页面与静态资源
 curl -I http://127.0.0.1:<端口>/            # 200，text/html
 
-# 3) 端到端冒烟（在任意装了依赖的机器上，或服务器本机）
+# 3) 端到端冒烟（推荐在开发机执行；服务器 --prod 安装不含 socket.io-client 等 devDeps）
 node apps/server/scripts/smoke.mjs http://127.0.0.1:<端口>
-# 预期：建房→密码校验→房间列表→开局→对局至终局→断线重连→全员退出关房，全部 ✅
+node apps/server/scripts/smoke-realtime.mjs http://127.0.0.1:<端口>
+# 预期：建房→密码校验→开局→终局→断线重连→关房 / realtime 快照冒烟，全部 ✅
 
 # 4) 浏览器实测：两个设备/窗口分别建房与加入，能进入对局即为通过
 ```

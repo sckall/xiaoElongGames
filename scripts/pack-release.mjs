@@ -34,32 +34,53 @@ execSync('pnpm build', { cwd: root, stdio: 'inherit' });
 fs.rmSync(pkgDir, { recursive: true, force: true });
 fs.mkdirSync(pkgDir, { recursive: true });
 
+/** 复制单个文件或目录（目录默认排除 node_modules 与 assets；dist 必须保留 assets） */
+function copyItem(from, to, opts = {}) {
+  const src = path.join(root, from);
+  const dest = path.join(pkgDir, to);
+  if (!fs.existsSync(src)) {
+    console.warn(`⚠️ 跳过（不存在）：${from}`);
+    return;
+  }
+  const stat = fs.statSync(src);
+  if (stat.isFile()) {
+    fs.cpSync(src, dest);
+    return;
+  }
+  fs.cpSync(src, dest, {
+    recursive: true,
+    filter: (p) => {
+      const parts = p.split(path.sep);
+      if (parts.includes('node_modules')) return false;
+      if (opts.excludeAssets !== false && parts.includes('assets')) return false;
+      return !p.endsWith('.DS_Store');
+    },
+  });
+}
+
+// pnpm-lock.yaml 的 importer 覆盖根 + apps/server + apps/web + 全部 games/* + packages/rules，
+// 发布包必须包含这些 workspace 包目录（至少 package.json），否则服务器上
+// `pnpm install --frozen-lockfile` 会因锁文件与工作区不一致而失败。
+// games 源文件只保留运行/审查所需源码，排除 node_modules 与 assets（3D 素材已打进 web dist）。
 const include = [
   ['package.json', 'package.json'],
   ['pnpm-workspace.yaml', 'pnpm-workspace.yaml'],
   ['pnpm-lock.yaml', 'pnpm-lock.yaml'],
   ['tsconfig.base.json', 'tsconfig.base.json'],
-  ['packages/rules/package.json', 'packages/rules/package.json'],
-  ['packages/rules/tsconfig.json', 'packages/rules/tsconfig.json'],
-  ['packages/rules/src', 'packages/rules/src'],
-  ['apps/server/package.json', 'apps/server/package.json'],
-  ['apps/server/tsconfig.json', 'apps/server/tsconfig.json'],
-  ['apps/server/src', 'apps/server/src'],
-  ['apps/web/dist', 'apps/web/dist'],
+  ['packages/rules', 'packages/rules'],
+  ['apps/server', 'apps/server'],
+  ['apps/web/package.json', 'apps/web/package.json'],
+  ['apps/web/tsconfig.json', 'apps/web/tsconfig.json'],
+  ['apps/web/dist', 'apps/web/dist', { excludeAssets: false }],
+  ['games/types.ts', 'games/types.ts'],
+  ['games/trouble-magician', 'games/trouble-magician'],
+  ['games/corcodragon-fire', 'games/corcodragon-fire'],
+  ['games/corcodragon-fight', 'games/corcodragon-fight'],
   ['README.md', 'README.md'],
   ['docs', 'docs'],
-  ['出包魔法师桌游基本规则.md', '出包魔法师桌游基本规则.md'],
 ];
 
-for (const [from, to] of include) {
-  const src = path.join(root, from);
-  const dest = path.join(pkgDir, to);
-  if (!fs.existsSync(src)) {
-    console.warn(`⚠️ 跳过（不存在）：${from}`);
-    continue;
-  }
-  fs.cpSync(src, dest, { recursive: true });
-}
+for (const [from, to, opts] of include) copyItem(from, to, opts);
 
 // 3. 打包
 fs.rmSync(tarball, { force: true });

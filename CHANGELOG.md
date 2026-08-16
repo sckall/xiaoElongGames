@@ -4,6 +4,13 @@
 
 ## 未发布（0.2.x 工作区）
 
+- 📦 **发布打包补齐（完整游戏大厅）**：
+  - `pack-release.mjs` 现在把 **apps/web（大厅前端）+ 全部 games/* workspace 包 +
+    pnpm-lock 一致** 完整打入服务器发布包，修复旧清单缺 `games/` 导致服务器
+    `pnpm install --frozen-lockfile` 失败的问题；游戏 3D 素材已由 Vite 打进 dist
+  - `pack-local.mjs` 单机包说明更新为完整大厅（桌游 + 3D FPS），`启动.command`
+    打包时自动加执行权限；README/DEPLOY 同步更新
+
 - 🐊 **联机卡顿修复（上线前）**：
   - 🧭 远端玩家插值重写：改为按**服务端时间戳**的 90ms 快照插值缓冲
     （Gaffer On Games "Snapshot Interpolation"），到达间隔抖动不再引起跳变；
