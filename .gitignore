@@ -9,6 +9,9 @@ tools/
 .env.*
 !.env.example
 
+# 本地开发资料（截图/风险日志/规划/搜索报告，不随仓库分发）
+docs-dev/
+
 # 发布打包产物
 release/
 *.tgz

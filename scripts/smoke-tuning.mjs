@@ -1,6 +1,6 @@
 /**
  * 手感调试面板冒烟：?debug=1 进入本地对局，确认 tweakpane 面板渲染且可交互，
- * 截图留档 docs/screenshots/corcodragon-fight/。
+ * 截图留档 docs-dev/screenshots/corcodragon-fight/。
  * 用法：先启动前端(5173)，`node scripts/smoke-tuning.mjs`
  */
 import { chromium } from 'playwright';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.TM_WEB ?? 'http://127.0.0.1:5173';
-const OUT = fileURLToPath(new URL('../docs/screenshots/corcodragon-fight/', import.meta.url));
+const OUT = fileURLToPath(new URL('../docs-dev/screenshots/corcodragon-fight/', import.meta.url));
 fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

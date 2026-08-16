@@ -66,5 +66,5 @@
 1. 只引入 **CC0 / 自研** 素材进 git；CC-BY 需保留署名文件；其他许可证一律不进仓库。
 2. 原始下载包放 `tools/assets-archive/`（gitignore），**不要**提交大 zip。
 3. 拷贝进 `games/corcodragon-fight/assets/` 的文件必须附带对应 `License.txt` 与来源。
-4. 任何外网下载前在 `tools/RISK_LOG.md` 登记（本次为 #31），下载后回填结果。
+4. 任何外网下载前在 `docs-dev/RISK_LOG.md` 登记（本次为 #31），下载后回填结果。
 5. 二进制大文件控制体积：单文件 >5MB 先压缩/降面；GLB 优先（内嵌贴图，少文件依赖）。

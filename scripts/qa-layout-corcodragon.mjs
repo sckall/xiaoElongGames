@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.TM_WEB ?? 'http://127.0.0.1:5173';
-const OUT = fileURLToPath(new URL('../docs/screenshots/corcodragon-fire/', import.meta.url));
+const OUT = fileURLToPath(new URL('../docs-dev/screenshots/corcodragon-fire/', import.meta.url));
 fs.mkdirSync(OUT, { recursive: true });
 
 const VIEWPORTS = [

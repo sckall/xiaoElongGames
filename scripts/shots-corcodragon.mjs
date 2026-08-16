@@ -1,5 +1,5 @@
 /**
- * 《鳄龙战场》截图脚本：捕获大厅/详情/英雄选择/对局界面，存至 docs/screenshots/corcodragon-fire/。
+ * 《鳄龙战场》截图脚本：捕获大厅/详情/英雄选择/对局界面，存至 docs-dev/screenshots/corcodragon-fire/。
  * 用法：先启动服务端(8787，可选)与前端(5173)，再 `node scripts/shots-corcodragon.mjs`
  */
 import { chromium } from 'playwright';
@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.TM_WEB ?? 'http://127.0.0.1:5173';
-const OUT = fileURLToPath(new URL('../docs/screenshots/corcodragon-fire/', import.meta.url));
+const OUT = fileURLToPath(new URL('../docs-dev/screenshots/corcodragon-fire/', import.meta.url));
 fs.mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

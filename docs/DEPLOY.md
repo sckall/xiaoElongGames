@@ -101,10 +101,14 @@ pnpm --filter @tm/web build
 | `PORT` | 8787 | 服务端口（发布包/生产常用 8080） |
 | `HOST` | 0.0.0.0 | 监听地址；只走 nginx 反代时设 `127.0.0.1` 更安全 |
 | `CORS_ORIGIN` | 空 | 跨源白名单（逗号分隔）。默认仅同源；**前后端分离部署**时填前端域名 |
+| `TRUST_PROXY` | 空 | 仅当部署在可信反代（nginx/caddy）后置 `1`，才允许 `X-Forwarded-For` 参与限流；直连暴露时必须保持空，否则可被伪造绕过限流 |
 
 > 客户端侧配置（服务器地址）在页面「联机大厅 → 服务器地址」填写，同源部署留空即可。
 
 ## 7. 部署后自检（测试清单）
+
+安全边界与加固清单见 [SECURITY.md](SECURITY.md)，上线前建议额外执行
+`pnpm --filter @tm/server exec node scripts/security-smoke.mjs`。
 
 ```bash
 # 1) 健康检查

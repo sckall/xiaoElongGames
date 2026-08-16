@@ -1,14 +1,14 @@
 /**
  * 《鳄龙咆哮》双窗口联机回归：A 建房 → B 加入 → 开始 → 双方选英雄 → 进入对局。
  * 用法：先启动服务端(8787)与前端(5173)，`node scripts/e2e-twowindow-corcodragon.mjs`
- * 输出：docs/screenshots/corcodragon-fight/ 截图留档。
+ * 输出：docs-dev/screenshots/corcodragon-fight/ 截图留档。
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.TM_WEB ?? 'http://127.0.0.1:5173';
-const OUT = fileURLToPath(new URL('../docs/screenshots/corcodragon-fight/', import.meta.url));
+const OUT = fileURLToPath(new URL('../docs-dev/screenshots/corcodragon-fight/', import.meta.url));
 fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

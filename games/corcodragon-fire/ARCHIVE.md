@@ -41,7 +41,7 @@
 - 出包魔法师联机冒烟未回归：`apps/server/scripts/smoke.mjs` 通过
 - UI 冒烟：能自动打到结算页
 - 布局 QA：桌面/平板/手机三档无横向溢出
-- 截图：`docs/screenshots/corcodragon-fire/`（8 张，已提交归档）
+- 截图：`docs-dev/screenshots/corcodragon-fire/`（8 张，已提交归档）
 
 ## 5. 已知限制
 
@@ -56,7 +56,7 @@
 - [ ] 先与用户确认方向：**继续回合制**，还是**升级平台做原版实时 FPS**。
 - [ ] 若继续回合制：
   - [ ] 把 `index.ts` 中 `available` 改回 `true`；
-  - [ ] 按 `ARCHITECTURE.md` 步骤 4 做服务端通用化（`gameAction { gameId, action }`）后再开联机；
+  - [ ] 按 `docs/ARCHITECTURE.md` 步骤 4 做服务端通用化（`gameAction { gameId, action }`）后再开联机；
   - [ ] 补 TDM 模式选择 UI；
   - [ ] 补音效/特效与更完整的战斗反馈。
 - [ ] 若做原版实时 FPS：

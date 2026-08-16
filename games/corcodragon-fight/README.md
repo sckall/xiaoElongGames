@@ -3,7 +3,7 @@
 > 3D 实时英雄射击（FPS）：2-7 人联机，服务端权威 20Hz tick 模拟，
 > 5 位鳄龙英雄 × 4 种武器，自由混战 / 团队死斗。
 
-本包按 `games/<id>/` 接入小鳄龙之家大厅，遵守 `ARCHITECTURE.md` 的
+本包按 `games/<id>/` 接入小鳄龙之家大厅，遵守 `docs/ARCHITECTURE.md` 的
 **realtime（FPS/动作）接入路线**与 `games/types.ts` 契约。
 
 ## 新框架引入说明（必读）
@@ -23,7 +23,7 @@
 可独立单测；Three.js 只在 `GameUI.tsx`（子路径 `./GameUI`）中使用，服务端
 不会被打包 React/Three 代码。
 
-**不引入 Colyseus/WebRTC**：按 `ARCHITECTURE.md` 原型期路线先使用
+**不引入 Colyseus/WebRTC**：按 `docs/ARCHITECTURE.md` 原型期路线先使用
 Socket.IO + 服务端 tick（20Hz）广播快照；正式期如需状态补丁/插值/重连开箱
 能力，再评估 Colyseus（见 docs/REALTIME.md 迁移说明）。
 

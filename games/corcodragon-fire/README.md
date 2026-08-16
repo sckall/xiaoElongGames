@@ -7,7 +7,7 @@
 ## 与需求文档的关系
 
 需求文档描述的 3D 实时 FPS 形态需要平台层增加 tick/差量快照/输入流等
-realtime 房间能力（见 `ARCHITECTURE.md` 的 realtime 路线）。本包遵循当前
+realtime 房间能力（见 `docs/ARCHITECTURE.md` 的 realtime 路线）。本包遵循当前
 `games/types.ts` 的 **turn-based GameEngine 契约**，在不改动大厅/房间/连接
 代码的前提下，把「英雄射击」落地为事件驱动的回合制战术版：
 

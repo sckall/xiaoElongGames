@@ -19,7 +19,7 @@
   - 🦉 影枭死亡标记改为锁定**视野内血量最低**的敌人（同血量取最近）
   - ⛈️ 诡雷雷暴云伤害 8→18（回调，仍以减速控制为主）
   - 🙈 关闭敌人头顶 ID 视野：只显示队友名（TDM）与训练场靶名，敌人不显示名字
-  - 📋 规划归档 `docs/CORCODRAGON-ROADMAP.md`：复杂地形改造与地图编辑器列入规划（暂不实现）
+  - 📋 规划归档 `docs-dev/CORCODRAGON-ROADMAP.md`：复杂地形改造与地图编辑器列入规划（暂不实现）
 - 🐊 **《鳄龙咆哮》第二轮战斗/技能迭代**：
   - 🔫 步枪枪模按反馈下调一档（0.9→0.78），其余武器不变
   - 🛡️ 重生后 1.5 秒无敌（`combat.respawnInvulnMs`）：期间不吃任何伤害，
@@ -49,7 +49,7 @@
   - 地图扩大：半场 20→26，三线布局 13 组掩体（四角高箱/中央高台/四边横梁/侧翼短墙），
     重生点扩至 8 个；训练场靶位同步避让新掩体
   - 技能 QA 截图脚本 `scripts/qa-skills-corcodragon.mjs`，截图留档
-    `docs/screenshots/corcodragon-fight/skills-rework/`
+    `docs-dev/screenshots/corcodragon-fight/skills-rework/`
 - 🐊 **新游戏《鳄龙咆哮》（corcodragon-fight）**：2-7 人 3D 实时英雄射击（自由混战/团队死斗）
   - 服务端权威 20Hz tick：移动/重力/碰撞/弹道/爆头/技能/效果/重生/胜负全在引擎结算；
     `applyInput` 全动作白名单 + 数值域校验，非法输入安全拒绝
@@ -57,7 +57,7 @@
   - 平台新增 realtime 通道：`rtInput`/`rtSnapshot`、RealtimeRoom 与旧 Room 平行，
     旧回合制大厅/房间/连接代码不受影响；Three.js 按需分包加载
   - 文档：`docs/REALTIME.md`（实时通道设计）与 `games/corcodragon-fight/README.md`
-    （新框架引入说明）；截图留档 `docs/screenshots/corcodragon-fight/`
+    （新框架引入说明）；截图留档 `docs-dev/screenshots/corcodragon-fight/`
   - 测试：30 个引擎单测、realtime 端到端冒烟、双窗口联机回归、三档布局 QA 全部通过
 - 🐛 修复《鳄龙咆哮》A/D 横移与视角不一致（客户端右向量换算错误，改为 `viewRelativeMove`
   单一方向出口并加单测；W/S 前后方向经核验本就一致）
@@ -119,7 +119,7 @@
 - 🐛 修复：系统「减弱动态效果」下全屏特效瞬闪不可见（reduced-motion 规则改为针对性）；骰子浮层加语境
 - 游戏大厅雏形；房间列表（刷新/锁/人数/状态）；房间密码（创建/校验/房主设置清除）
 - 修复 createRoom 的 botCount 从未生效；昵称只在设置页、AI 补位只在房间内
-- 测试截图入库 docs/screenshots/
+- 测试截图入库 docs-dev/screenshots/
 
 ## v6 — 视角动态剩余数 + 全屏特效重做 + 战报默认隐藏
 

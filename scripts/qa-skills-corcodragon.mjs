@@ -1,7 +1,7 @@
 /**
  * 《鳄龙咆哮》技能/枪模 QA 截图：逐英雄进入本地对局，触发技能并截图。
  * 用法：先启动前端(5173)，`node scripts/qa-skills-corcodragon.mjs [heroKey]`
- * 输出：docs/screenshots/corcodragon-fight/skills-rework/（截图只新增，不删除）
+ * 输出：docs-dev/screenshots/corcodragon-fight/skills-rework/（截图只新增，不删除）
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.TM_WEB ?? 'http://127.0.0.1:5173';
 const OUT = fileURLToPath(
-  new URL('../docs/screenshots/corcodragon-fight/skills-rework/', import.meta.url),
+  new URL('../docs-dev/screenshots/corcodragon-fight/skills-rework/', import.meta.url),
 );
 fs.mkdirSync(OUT, { recursive: true });
 
