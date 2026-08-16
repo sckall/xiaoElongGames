@@ -39,7 +39,7 @@ const created = await new Promise((resolve) =>
     'createRoom',
     {
       name: '鳄龙A',
-      botCount: 2,
+      botCount: 3,
       gameId: 'corcodragon-fight',
       config: { mode: 'ffa', scoreLimit: 2, heroSelectMs: 8000, aiLevel: 'hard' },
     },
@@ -56,10 +56,10 @@ if (!joined.ok) fail(`加入失败：${joined.error}`);
 console.log(`✅ B 已加入（playerId=${joined.playerId}）`);
 
 const lobby1 = await waitEvent(a, 'lobby');
-if (lobby1.gameId !== 'corcodragon-fight' || lobby1.players.length !== 4) {
+if (lobby1.gameId !== 'corcodragon-fight' || lobby1.players.length !== 5) {
   fail(`lobby 异常：${JSON.stringify(lobby1)}`);
 }
-console.log(`✅ lobby 正常（gameId=${lobby1.gameId}，4 座位）`);
+console.log(`✅ lobby 正常（gameId=${lobby1.gameId}，5 座位）`);
 
 a.emit('startGame');
 const snapA1 = await waitEvent(a, 'rtSnapshot');
@@ -147,14 +147,18 @@ const snapB = await waitEvent(b2, 'rtSnapshot', 5000);
 if (snapB.youId !== joined.playerId) fail('重连快照 youId 错误');
 console.log('✅ B 重连恢复，收到本人视角快照');
 
-// 等对局自然结束（bot 会把击杀线打到 2）
-let gameOver = null;
-for (let i = 0; i < 600 && !gameOver; i++) {
-  await sleep(200);
-  const s = await waitEvent(a, 'rtSnapshot', 1000).catch(() => null);
-  if (s && s.phase === 'gameOver') gameOver = s;
-}
-if (!gameOver) fail('对局未在预期时间内结束');
+// 等对局自然结束（持续监听 rtSnapshot，避免轮询错过事件）
+const gameOver = await new Promise((resolve, reject) => {
+  const t = setTimeout(() => reject(new Error('对局未在预期时间内结束')), 180_000);
+  const on = (s) => {
+    if (s?.phase === 'gameOver') {
+      clearTimeout(t);
+      a.off('rtSnapshot', on);
+      resolve(s);
+    }
+  };
+  a.on('rtSnapshot', on);
+});
 console.log(`✅ 对局结束：winnerId=${gameOver.winnerId}（${gameOver.events.at(-1)?.text ?? ''}）`);
 
 a.disconnect();
