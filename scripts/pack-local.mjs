@@ -90,7 +90,10 @@ exec python3 server.py
 );
 fs.writeFileSync(
   path.join(pkgDir, '启动.bat'),
-  `@echo off\r\nchcp 65001 >nul\r\ncd /d "%~dp0"\r\nwhere python >nul 2>&1\r\nif %errorlevel% neq 0 (\r\n  echo [小鳄龙之家] 未检测到 Python，单机启动需要它：\r\n  echo   方法1（推荐）：winget install Python.Python.3.12\r\n  echo   方法2：浏览器打开 https://www.python.org/downloads/ 安装，勾选 "Add Python to PATH"\r\n  echo   装好后重新双击本脚本\r\n  pause\r\n  exit /b 1\r\n)\r\nstart http://127.0.0.1:8123\r\npython server.py\r\necho [小鳄龙之家] 服务已停止（闲置自动退出或你关闭了窗口）\r\npause\r\n`,
+  // 说明：该启动器刻意只用 ASCII 文本，不依赖 chcp/UTF-8 控制台，避免部分
+  // Windows 代码页/字体组合下中文 echo 报 "The system cannot write to the
+  // specified device" 或 if(...) 复合块被误执行的问题；中文说明见 使用说明.txt。
+  `@echo off\r\nsetlocal\r\ncd /d "%~dp0"\r\n\r\nrem --- Find a working Python 3 (only used to serve files locally) ---\r\nset "PY_CMD="\r\nwhere python >nul 2>&1\r\nif not errorlevel 1 (\r\n  python -c "import sys" >nul 2>&1\r\n  if not errorlevel 1 set "PY_CMD=python"\r\n)\r\nif defined PY_CMD goto :run\r\n\r\nwhere py >nul 2>&1\r\nif not errorlevel 1 (\r\n  py -3 -c "import sys" >nul 2>&1\r\n  if not errorlevel 1 set "PY_CMD=py -3"\r\n)\r\nif defined PY_CMD goto :run\r\n\r\necho [Gator Hall] Python 3 was not found (needed only to host files locally).\r\necho   1. Recommended: winget install Python.Python.3.12\r\necho   2. Or download https://www.python.org/downloads/ and check "Add Python to PATH"\r\necho   Install it, then double-click this file again.\r\npause\r\nexit /b 1\r\n\r\n:run\r\nstart "" "http://127.0.0.1:8123"\r\n%PY_CMD% server.py\r\necho [Gator Hall] Server stopped (idle auto-exit or window closed).\r\npause\r\n`,
 );
 fs.writeFileSync(
   path.join(pkgDir, '使用说明.txt'),
@@ -105,6 +108,7 @@ fs.writeFileSync(
 【怎么玩】
 - macOS：双击「启动.command」（如被拦截：右键→打开；或首次在终端执行 chmod +x 启动.command）
 - Windows：双击「启动.bat」，浏览器自动打开 http://127.0.0.1:8123
+  （启动器提示为英文以保证各 Windows 代码页兼容；中文说明即本文件）
 
 【服务会自动关闭，不留后台进程】
 - 玩完关掉启动时弹出的那个小窗口（或按 Ctrl+C），服务立即停止

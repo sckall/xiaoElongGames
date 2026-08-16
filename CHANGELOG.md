@@ -5,11 +5,13 @@
 ## 未发布（0.2.x 工作区）
 
 - 🐛 **修复 Windows 单机包「启动.bat」无法运行**：
-  - 根因：`pack-local.mjs` 生成批处理时误把 `%` 写成 `%%`（`%%~dp0` / `%%errorlevel%%`），
-    而在 `.bat` 文件里这两处必须是单 `%`（`%%` 仅用于 `for` 变量），
-    导致 `cd` 路径解析失败并触发语法报错，双击后窗口直接退出
-  - 修复：模板改为 `%~dp0` 与 `%errorlevel%`，重新出包并校验 tar 内 bat 一致、
-    打包目录静态服务可正常访问（8123 验证后已释放）
+  - 第一轮根因：模板把 `%` 误写为 `%%`（`%%~dp0` / `%%errorlevel%%`），导致 `cd` 失败与语法报错
+  - 第二轮根因（Windows 实测反馈）：UTF-8 中文 + `chcp 65001` + `if(...)` 复合块在部分控制台
+    代码页/字体组合下会误执行分支，中文 `echo` 报 "The system cannot write to the specified
+    device" 后退出
+  - 最终修复：启动器改为**纯 ASCII**（不再依赖 chcp/UTF-8），用 `if errorlevel 1` 替代
+    `%errorlevel%` 展开、`goto` 替代含中文的 `if(...)` 块；并用 `python -c` 探测过滤
+    Microsoft Store 假别名、增加 `py -3` 启动器兜底；重新出包校验通过
 
 - 🎨 **打包白模修复（箱子和枪全白）**：
   - 根因：6 个 Kenney GLB（3 木箱 + 3 枪）引用外部 `Textures/colormap.png`，
