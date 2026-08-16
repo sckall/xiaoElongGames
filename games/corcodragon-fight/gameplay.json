@@ -261,12 +261,13 @@
   "client": {
     "mouseSensitivity": 0.0022,
     "interpolationRate": 12,
-    "correctionRate": 8,
-    "softCorrectionThreshold": 0.5,
+    "correctionRate": 6,
+    "softCorrectionThreshold": 0.4,
     "maxDeltaMs": 60,
     "maxPixelRatio": 1.0,
     "shadows": false,
     "antialias": false,
-    "autoQuality": true
+    "autoQuality": true,
+    "interpolationBufferMs": 90
   }
 }

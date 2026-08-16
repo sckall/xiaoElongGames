@@ -166,6 +166,8 @@ export interface ClientBalance {
   shadows: boolean;
   antialias: boolean;
   autoQuality: boolean;
+  /** 远端玩家渲染缓冲（毫秒）：20Hz 快照的平滑补偿 */
+  interpolationBufferMs: number;
 }
 
 export interface BalanceData {
@@ -365,6 +367,7 @@ export function validateBalance(data: unknown): BalanceData {
       shadows: bool(client.shadows, 'client.shadows'),
       antialias: bool(client.antialias, 'client.antialias'),
       autoQuality: bool(client.autoQuality, 'client.autoQuality'),
+      interpolationBufferMs: num(client.interpolationBufferMs, 'client.interpolationBufferMs', 0, 300),
     },
   };
 

@@ -191,7 +191,10 @@ interface PlayerRender {
   wall: THREE.Mesh;
   ring?: THREE.Mesh;
   target: THREE.Vector3;
+  prevTarget: THREE.Vector3;
+  targetAt: number;
   yaw: number;
+  prevYaw: number;
   alive: boolean;
   visible: boolean;
   shieldVal: number;
@@ -644,7 +647,21 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         if (id === driverRef.current.myId) continue;
         pr.group.visible = pr.visible && pr.alive;
         if (!pr.visible || !pr.alive) continue;
-        pr.group.position.lerp(pr.target, Math.min(1, BALANCE.client.interpolationRate * dt));
+        // 20Hz 服务端快照 → 远端渲染插值：按最近两帧速度外推一个缓冲窗口，
+        // 消除“每秒20次跳变”的卡顿感（见 REALTIME.md 客户端策略）
+        const nowMs = performance.now();
+        const dtSnapMs = Math.max(16, nowMs - pr.targetAt);
+        const bufferSec = BALANCE.client.interpolationBufferMs / 1000;
+        const k = Math.min(1, BALANCE.client.interpolationRate * dt);
+        const velX = (pr.target.x - pr.prevTarget.x) / (dtSnapMs / 1000);
+        const velY = (pr.target.y - pr.prevTarget.y) / (dtSnapMs / 1000);
+        const velZ = (pr.target.z - pr.prevTarget.z) / (dtSnapMs / 1000);
+        const desired = new THREE.Vector3(
+          pr.target.x + velX * bufferSec,
+          pr.target.y + velY * bufferSec,
+          pr.target.z + velZ * bufferSec,
+        );
+        pr.group.position.lerp(desired, k);
         pr.group.rotation.y += (pr.yaw - pr.group.rotation.y) * Math.min(1, 10 * dt);
         const wallOn = pr.shieldVal > 0 && pr.hero === 'tiebi';
         pr.wall.visible = wallOn;
@@ -1038,7 +1055,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
           wall,
           ring,
           target: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
+          prevTarget: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
+          targetAt: performance.now(),
           yaw: p.yaw,
+          prevYaw: p.yaw,
           alive: p.alive,
           visible: p.visible,
           shieldVal: p.shield,
@@ -1047,7 +1067,10 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         playerRendersRef.current.set(p.id, pr);
       }
       if (pr) {
+        pr.prevTarget.copy(pr.target);
+        pr.prevYaw = pr.yaw;
         pr.target.set(p.pos.x, p.pos.y, p.pos.z);
+        pr.targetAt = performance.now();
         pr.yaw = p.yaw;
         pr.alive = p.alive;
         pr.visible = p.visible;
@@ -1973,6 +1996,7 @@ function TuningPanel({
         bind(client, BALANCE.client, 'mouseSensitivity', { min: 0.0005, max: 0.02, step: 0.0002, label: '鼠标灵敏度' });
         bind(client, BALANCE.client, 'correctionRate', { min: 0, max: 60, step: 0.5, label: '服务端校正速率' });
         bind(client, BALANCE.client, 'interpolationRate', { min: 0, max: 60, step: 0.5, label: '他人插值速率' });
+        bind(client, BALANCE.client, 'interpolationBufferMs', { min: 0, max: 200, step: 5, label: '联机插值缓冲(ms)' });
 
         pane.addButton({ title: '⬇️ 导出 gameplay.tuned.json' }).on('click', () => {
           const blob = new Blob([balanceToJson()], { type: 'application/json' });
