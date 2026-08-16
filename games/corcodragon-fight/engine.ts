@@ -39,6 +39,9 @@ import type {
   SnapshotEvent,
   SnapshotPlayer,
   TeamId,
+  TrainingPattern,
+  TrainingTargetConfig,
+  TrainingTargetKind,
   Vec3,
   WeaponId,
 } from './defs';
@@ -52,6 +55,8 @@ export interface EnginePlayerState {
   isBot: boolean;
   team: TeamId;
   hero: HeroId | null;
+  targetKind: TrainingTargetKind | null;
+  hitRadius: number;
   maxHp: number;
   hp: number;
   shield: number;
@@ -265,6 +270,8 @@ export class CorcodragonFightEngine {
 
   private rng: () => number;
   private acc = 0;
+  private targetMeta = new Map<string, TrainingTargetConfig>();
+  private trainingRespawnMs = 1200;
   private effectSeq = 1;
   private eventSeq = 0;
   /** 全部事件环（供测试/回放检查；平台只消费 getSnapshot 的增量投影） */
@@ -280,7 +287,8 @@ export class CorcodragonFightEngine {
     if (!Array.isArray(players) || players.length < 1 || players.length > 8) {
       throw new Error(`玩家数量需在 1-8 之间（实际 ${Array.isArray(players) ? players.length : '非数组'}）`);
     }
-    const mode = options.mode === 'tdm' ? 'tdm' : 'ffa';
+    const mode: GameModeKind =
+      options.mode === 'tdm' ? 'tdm' : options.mode === 'training' ? 'training' : 'ffa';
     const scoreLimit = optNum(options.scoreLimit, 1, 200, BALANCE.combat.scoreLimitDefault);
     const matchTimeMs = optNum(options.matchTimeMs, 30_000, 3_600_000, BALANCE.combat.matchTimeMsDefault);
     const heroSelectMs = optNum(options.heroSelectMs, 5_000, 120_000, BALANCE.combat.heroSelectMsDefault);
@@ -302,7 +310,8 @@ export class CorcodragonFightEngine {
       if (seen.has(id)) throw new Error(`玩家 id 重复：${id}`);
       seen.add(id);
       const team: TeamId = mode === 'tdm' ? (i % 2 === 0 ? 'A' : 'B') : 'A';
-      const hero = p?.isBot ? heroForPlayer(i, rng) : null;
+      const hero =
+        mode === 'training' && !p?.isBot ? 'yanren' : p?.isBot ? heroForPlayer(i, rng) : null;
       const def = hero ? HERO_DEFS[hero] : null;
       this.players.push({
         id,
@@ -310,6 +319,8 @@ export class CorcodragonFightEngine {
         isBot: !!p?.isBot,
         team,
         hero,
+        targetKind: null,
+        hitRadius: BALANCE.arena.playerRadius,
         maxHp: def?.hp ?? 100,
         hp: def?.hp ?? 100,
         shield: 0,
@@ -350,6 +361,90 @@ export class CorcodragonFightEngine {
       });
       if (p?.isBot) this.botNextThink.set(id, 300 + i * 180);
     });
+
+    if (mode === 'training') {
+      const targets = Array.isArray(options.trainingTargets) ? options.trainingTargets : [];
+      this.trainingRespawnMs =
+        typeof options.trainingTargetRespawnMs === 'number' &&
+        Number.isFinite(options.trainingTargetRespawnMs)
+          ? Math.max(100, Math.min(30_000, options.trainingTargetRespawnMs))
+          : 1200;
+      for (const t of targets) {
+        if (!t || typeof t.id !== 'string' || seen.has(t.id)) continue;
+        seen.add(t.id);
+        const kind: TrainingTargetKind = t.kind === 'human' ? 'human' : 'round';
+        const hp = optNum(t.hp, 1, 10_000, kind === 'round' ? 1 : 100);
+        const radius =
+          t.kind === 'round'
+            ? optNum(t.radius, 0.2, 3, 0.8) ?? 0.8
+            : BALANCE.arena.playerRadius;
+        const pos = {
+          x: optNum(t.pos?.x, -BALANCE.arena.half + 2, BALANCE.arena.half - 2, 0) ?? 0,
+          y: 0,
+          z: optNum(t.pos?.z, -BALANCE.arena.half + 2, BALANCE.arena.half - 2, 0) ?? 0,
+        };
+        this.targetMeta.set(t.id, {
+          id: t.id,
+          kind,
+          pattern: t.pattern === 'patrol' ? 'patrol' : t.pattern === 'osc' ? 'osc' : 'fixed',
+          pos: { ...pos },
+          hp,
+          radius,
+          range: optNum(t.range, 0.5, 20, 8) ?? 8,
+          speed: optNum(t.speed, 0.1, 5, kind === 'round' ? 1.2 : 0.7) ?? 0.7,
+        });
+        this.players.push({
+          id: t.id,
+          name: kind === 'round' ? `圆靶 ${t.id}` : `人靶 ${t.id}`,
+          isBot: false,
+          team: 'A',
+          hero: null,
+          targetKind: kind,
+          hitRadius: radius,
+          maxHp: hp,
+          hp,
+          shield: 0,
+          shieldT: 0,
+          alive: true,
+          pos: { ...pos },
+          yaw: Math.PI,
+          pitch: 0,
+          velY: 0,
+          onGround: true,
+          weapon: 'dagger',
+          ammo: Infinity,
+          reserve: Infinity,
+          reloading: false,
+          reloadT: 0,
+          fireCd: 0,
+          skillCd: 0,
+          ultCharge: 0,
+          ads: false,
+          spreadBloom: 0,
+          shots: 0,
+          hits: 0,
+          headshots: 0,
+          damageDealt: 0,
+          stealthT: 0,
+          fortifyT: 0,
+          slowT: 0,
+          slowMult: 0.5,
+          respawnAt: 0,
+          kills: 0,
+          deaths: 0,
+          score: 0,
+          moveX: 0,
+          moveZ: 0,
+          fireHeld: false,
+          jumpRequested: false,
+          adsHeld: false,
+        });
+      }
+      this.pushEvent('info', '🎯 训练场：命中圆靶/人靶，HUD 实时统计命中率', undefined, true, []);
+      this.beginMatch();
+      return;
+    }
+
     this.pushEvent('info', '🐊 《鳄龙咆哮》对局创建：选择你的英雄，准备开战！', undefined, true, []);
     if (this.players.every((p) => p.hero)) this.beginMatch();
   }
@@ -361,6 +456,9 @@ export class CorcodragonFightEngine {
   }
 
   isEnemy(a: EnginePlayerState, b: EnginePlayerState): boolean {
+    if (this.mode === 'training') {
+      return !!a.targetKind !== !!b.targetKind; // 真人 vs 靶子
+    }
     return this.mode === 'ffa' ? a.id !== b.id : a.team !== b.team;
   }
 
@@ -580,7 +678,9 @@ export class CorcodragonFightEngine {
 
     if (this.phase === 'gameOver') return;
 
-    this.timeLeft = Math.max(0, this.timeLeft - BALANCE.tick.stepMs);
+    if (this.mode !== 'training') {
+      this.timeLeft = Math.max(0, this.timeLeft - BALANCE.tick.stepMs);
+    }
 
     // 1. 冷却与状态推进
     for (const p of this.players) {
@@ -626,6 +726,9 @@ export class CorcodragonFightEngine {
       this.movePlayer(p, dt);
     }
 
+    // 2.5 训练场靶子移动
+    if (this.mode === 'training') this.stepTrainingTargets();
+
     // 3. 射击（长按 + 近战）
     for (const p of this.players) {
       if (!p.alive) continue;
@@ -650,8 +753,8 @@ export class CorcodragonFightEngine {
       }
     }
 
-    // 6. 胜负判定
-    if (this.timeLeft <= 0) {
+    // 6. 胜负判定（训练场无胜负）
+    if (this.mode !== 'training' && this.timeLeft <= 0) {
       this.endGame();
     }
   }
@@ -769,18 +872,24 @@ export class CorcodragonFightEngine {
     let bestTarget: EnginePlayerState | null = null;
     for (const q of this.players) {
       if (!q.alive || !this.isEnemy(p, q)) continue;
+      const capBottom =
+        q.targetKind === 'round' ? 0.2 : BALANCE.arena.capsuleBottomY;
+      const capTop =
+        q.targetKind === 'round'
+          ? capBottom + q.hitRadius * 2
+          : BALANCE.arena.capsuleTopY;
       const t = rayCapsule(
         eye.x,
         eye.y,
         eye.z,
         dir,
         q.pos.x,
-        q.pos.y + BALANCE.arena.capsuleBottomY,
+        q.pos.y + capBottom,
         q.pos.z,
         q.pos.x,
-        q.pos.y + BALANCE.arena.capsuleTopY,
+        q.pos.y + capTop,
         q.pos.z,
-        BALANCE.arena.playerRadius,
+        q.hitRadius,
       );
       if (t < bestT) {
         bestT = t;
@@ -914,11 +1023,12 @@ export class CorcodragonFightEngine {
     victim.fireHeld = false;
     victim.moveX = 0;
     victim.moveZ = 0;
-    victim.respawnAt = this.t + BALANCE.combat.respawnMs;
+    victim.respawnAt =
+      this.t + (this.mode === 'training' ? this.trainingRespawnMs : BALANCE.combat.respawnMs);
     this.killLog.push({ at: this.t, shooterId: killer?.id ?? null, targetId: victim.id });
     if (killer) {
       killer.kills += 1;
-      killer.score += 1;
+      if (this.mode !== 'training') killer.score += 1;
       killer.ultCharge = Math.min(
         BALANCE.combat.ultChargeMax,
         killer.ultCharge + BALANCE.combat.ultPerKill,
@@ -926,7 +1036,7 @@ export class CorcodragonFightEngine {
       if (this.mode === 'tdm') this.teamScores[killer.team] += 1;
       this.pushEvent(
         'kill',
-        `${killer.name} 击杀了 ${victim.name}`,
+        `${killer.name} 击碎了 ${victim.name}`,
         { ...victim.pos },
         true,
         [],
@@ -1201,6 +1311,28 @@ export class CorcodragonFightEngine {
     });
   }
 
+  /** 训练场靶子运动：fixed 静止；osc 正弦往复；patrol 慢速巡逻 */
+  private stepTrainingTargets(): void {
+    for (const meta of this.targetMeta.values()) {
+      const p = this.player(meta.id);
+      if (!p || !p.alive) continue;
+      if (meta.pattern === 'fixed') {
+        p.moveX = 0;
+        p.moveZ = 0;
+        continue;
+      }
+      const t = this.t / 1000;
+      const speed = meta.speed ?? 0.7;
+      const range = meta.range ?? 8;
+      const phase = t * (meta.pattern === 'patrol' ? speed * 0.5 : speed);
+      p.pos.x = meta.pos.x;
+      p.pos.z = meta.pos.z + Math.sin(phase) * range;
+      this.resolveCollision(p);
+      p.moveX = 0;
+      p.moveZ = 0;
+    }
+  }
+
   private stepEffects(): void {
     const dt = BALANCE.tick.stepMs / 1000;
     const chunkSec = BALANCE.tick.effectChunkMs / 1000;
@@ -1419,6 +1551,8 @@ export class CorcodragonFightEngine {
         headshots: p.id === you.id ? p.headshots : 0,
         damageDealt: p.id === you.id ? p.damageDealt : 0,
         spreadBloom: p.id === you.id ? p.spreadBloom : 0,
+        targetKind: p.targetKind,
+        hitRadius: p.hitRadius,
         visible,
         lastInputSeq: p.id === you.id ? (this.lastInputSeq.get(p.id) ?? -1) : -1,
       };

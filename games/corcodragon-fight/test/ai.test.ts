@@ -48,6 +48,8 @@ function p(partial: Partial<SnapshotPlayer> & { id: string }): SnapshotPlayer {
     headshots: 0,
     damageDealt: 0,
     spreadBloom: 0,
+    targetKind: null,
+    hitRadius: 0.55,
     visible: true,
     lastInputSeq: -1,
     ...partial,

@@ -514,6 +514,51 @@ describe('视角相对移动换算（客户端方向唯一出口）', () => {
   });
 });
 
+describe('训练场模式', () => {
+  function trainingEngine(): CorcodragonFightEngine {
+    return new CorcodragonFightEngine([{ id: 'you', name: '你' }], {
+      mode: 'training',
+      rng: mulberry32(31),
+      trainingTargetRespawnMs: 1200,
+      trainingTargets: [
+        { id: 'roundFixed', kind: 'round', pattern: 'fixed', pos: { x: -11, y: 0, z: -2 }, hp: 1, radius: 0.8 },
+        { id: 'humanFixed', kind: 'human', pattern: 'fixed', pos: { x: 11, y: 0, z: -2 }, hp: 100 },
+        { id: 'roundMove', kind: 'round', pattern: 'osc', pos: { x: -11, y: 0, z: -2 }, hp: 1, radius: 0.8, range: 6, speed: 1 },
+        { id: 'humanMove', kind: 'human', pattern: 'patrol', pos: { x: 11, y: 0, z: -2 }, hp: 100, range: 6, speed: 0.5 },
+      ],
+    });
+  }
+
+  it('单玩家直接进入对局，生成 4 种靶子', () => {
+    const e = trainingEngine();
+    expect(e.mode).toBe('training');
+    expect(e.phase).toBe('playing');
+    expect(e.players).toHaveLength(5);
+    expect(e.players.filter((p) => p.targetKind === 'round')).toHaveLength(2);
+    expect(e.players.filter((p) => p.targetKind === 'human')).toHaveLength(2);
+  });
+
+  it('射击圆靶计入命中统计，靶子会重生且无胜负结算', () => {
+    const e = trainingEngine();
+    const me = e.players[0];
+    const target = e.player('roundFixed')!;
+    const zBefore = e.player('roundMove')!.pos.z;
+    e.debug.place(me.id, { x: -11, y: 0, z: -16 }, 0, 0);
+    for (let i = 0; i < 10; i++) tick(e, 50); // 让移动靶动起来
+    expect(e.player('roundMove')!.pos.z).not.toBeCloseTo(zBefore);
+    e.applyInput(me.id, { type: 'fire', pressed: true });
+    tick(e, 50);
+    expect(target.alive).toBe(false);
+    const snap = e.getSnapshot(me.id).players.find((p) => p.id === me.id)!;
+    expect(snap.shots).toBeGreaterThanOrEqual(1);
+    expect(snap.hits).toBeGreaterThanOrEqual(1);
+    for (let i = 0; i < 40; i++) tick(e, 50); // 1.2s 后重生
+    expect(target.alive).toBe(true);
+    for (let i = 0; i < 200; i++) tick(e, 50);
+    expect(e.phase).toBe('playing'); // 训练场永不 gameOver
+  });
+});
+
 describe('移动测试 AI（只走位不攻击）', () => {
   it('aiStyle 白名单钳制', () => {
     const e = new CorcodragonFightEngine(mkPlayers(2), {

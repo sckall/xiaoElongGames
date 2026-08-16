@@ -25,7 +25,26 @@ export const WEAPON_IDS = ['rifle', 'sniper', 'pistol', 'dagger'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
 
 export type TeamId = 'A' | 'B';
-export type GameModeKind = 'ffa' | 'tdm';
+export type GameModeKind = 'ffa' | 'tdm' | 'training';
+
+/** 训练场靶子类型 */
+export type TrainingTargetKind = 'round' | 'human';
+/** 靶子移动模式 */
+export type TrainingPattern = 'fixed' | 'osc' | 'patrol';
+
+export interface TrainingTargetConfig {
+  id: string;
+  kind: TrainingTargetKind;
+  pattern: TrainingPattern;
+  pos: Vec3;
+  hp?: number;
+  /** 圆形靶半径/人形靶半径（默认：圆 0.75 / 人 0.55） */
+  radius?: number;
+  /** osc/patrol 移动幅度（米） */
+  range?: number;
+  /** 移动角速度系数（弧度/秒基准） */
+  speed?: number;
+}
 
 export interface Vec3 {
   x: number;
@@ -211,6 +230,10 @@ export interface EngineOptions {
    * - movement：移动测试 AI（只走位不攻击，用于验证手感/碰撞）
    */
   aiStyle?: AIStyle;
+  /** 训练场靶子配置（mode='training' 时生效） */
+  trainingTargets?: TrainingTargetConfig[];
+  /** 训练场靶子被击倒后的重生时间（毫秒） */
+  trainingTargetRespawnMs?: number;
   /** 可注入随机数（测试/回放用） */
   rng?: () => number;
 }
@@ -314,6 +337,10 @@ export interface SnapshotPlayer {
   damageDealt: number;
   /** 当前散布膨胀（弧度，仅本人；客户端动态准星用） */
   spreadBloom: number;
+  /** 训练场靶子类型（普通玩家为 null） */
+  targetKind: TrainingTargetKind | null;
+  /** 命中半径（米；普通玩家=玩家胶囊半径，圆靶可自定义） */
+  hitRadius: number;
   /** 该玩家是否对当前视图者可见（隐身投影） */
   visible: boolean;
   /** 服务端已确认的该玩家最后输入序号（仅本人快照有意义，用于客户端回滚） */

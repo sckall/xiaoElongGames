@@ -30,9 +30,12 @@ try {
   await page.locator('.hall-card').filter({ hasText: '鳄龙咆哮' }).click();
   await page.waitForSelector('.ccf-detail-panel');
   const aiStyle = process.env.TM_AI_STYLE === 'movement' ? 'movement' : 'combat';
-  const mode = process.env.TM_MODE === 'tdm' ? 'tdm' : 'ffa';
+  const mode = process.env.TM_MODE === 'tdm' ? 'tdm' : process.env.TM_MODE === 'training' ? 'training' : 'ffa';
   if (mode === 'tdm') {
     await page.locator('.ccf-mode-btn').filter({ hasText: '团队死斗' }).click();
+    await sleep(200);
+  } else if (mode === 'training') {
+    await page.locator('.ccf-mode-btn').filter({ hasText: '训练场' }).click();
     await sleep(200);
   }
   if (aiStyle === 'movement') {
@@ -43,13 +46,14 @@ try {
   await shot(page, `2026-08-15-detail${aiStyle === 'movement' ? '-movement' : ''}`);
   console.log(`✅ detail（AI=${aiStyle}）`);
 
-  await page.click('button:has-text("开始（本地 vs AI）")');
-  await page.waitForSelector('.ccf-hero-grid');
-  await sleep(400);
-  await shot(page, '2026-08-15-hero-select');
-  console.log('✅ hero-select');
-
-  await page.locator('.ccf-hero-card').first().click();
+  await page.click(mode === 'training' ? 'button:has-text("进入训练场")' : 'button:has-text("开始（本地 vs AI）")');
+  if (mode !== 'training') {
+    await page.waitForSelector('.ccf-hero-grid');
+    await sleep(400);
+    await shot(page, '2026-08-15-hero-select');
+    console.log('✅ hero-select');
+    await page.locator('.ccf-hero-card').first().click();
+  }
   await page.waitForSelector('.ccf-canvas-host canvas');
   // 等世界与玩家模型初始化
   for (let i = 0; i < 20; i++) {
@@ -57,8 +61,15 @@ try {
     if (await page.locator('.ccf-crosshair').count()) break;
   }
   await sleep(1800);
-  await shot(page, '2026-08-15-battle');
-  console.log('✅ battle');
+  if (mode === 'training') {
+    await shot(page, '2026-08-15-training');
+    const hud = await page.locator('.ccf-hud-top').innerText();
+    if (!hud.includes('命中率')) throw new Error('训练场 HUD 缺少命中统计');
+    console.log('✅ training（命中率 HUD 正常）');
+  } else {
+    await shot(page, '2026-08-15-battle');
+    console.log('✅ battle');
+  }
 
   // 等待 bot 对局推进，观察击杀信息/计分变化
   await sleep(12_000);

@@ -48,6 +48,14 @@ const HERO_COLORS: Record<HeroId, number> = {
 };
 const TEAM_COLORS = { A: 0xff7a45, B: 0x4da3ff };
 
+/** 训练场默认靶位：固定圆靶 / 移动圆靶 / 固定人靶 / 移动人靶 */
+const TRAINING_TARGETS = [
+  { id: 'round-fixed', kind: 'round', pattern: 'fixed', pos: { x: -11, y: 0, z: -4 }, hp: 1, radius: 0.8 },
+  { id: 'round-moving', kind: 'round', pattern: 'osc', pos: { x: -11, y: 0, z: -4 }, hp: 1, radius: 0.8, range: 7, speed: 1.1 },
+  { id: 'human-fixed', kind: 'human', pattern: 'fixed', pos: { x: 11, y: 0, z: -4 }, hp: 100, range: 0, speed: 0.7 },
+  { id: 'human-moving', kind: 'human', pattern: 'patrol', pos: { x: 11, y: 0, z: -4 }, hp: 100, range: 7, speed: 0.7 },
+] as const;
+
 function heroColor(hero: HeroId | null, team: string): number {
   if (hero) return HERO_COLORS[hero];
   return team === 'B' ? TEAM_COLORS.B : TEAM_COLORS.A;
@@ -649,33 +657,75 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         const color = heroColor(p.hero, p.team);
         const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
         const group = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 1.35, 12), mat);
-        body.position.y = 0.78;
-        body.castShadow = true;
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 10), mat);
-        head.position.y = 1.78;
-        head.castShadow = true;
-        const visor = new THREE.Mesh(
-          new THREE.SphereGeometry(0.17, 10, 8),
-          new THREE.MeshBasicMaterial({ color: 0xd7f4ff }),
-        );
-        visor.position.set(0, 1.78, 0.3);
-        const stripe = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.51, 0.56, 0.16, 12),
-          new THREE.MeshStandardMaterial({
-            color: p.team === 'B' ? 0x2d6bff : 0xff5a3c,
-            roughness: 0.5,
-            emissive: p.team === 'B' ? 0x12233f : 0x3a1208,
-            emissiveIntensity: 0.6,
-          }),
-        );
-        stripe.position.y = 1.25;
-        const handGun = new THREE.Mesh(
-          new THREE.BoxGeometry(0.09, 0.09, 0.55),
-          new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.4 }),
-        );
-        handGun.position.set(0.42, 1.15, 0.32);
-        group.add(body, head, visor, stripe, handGun);
+        if (p.targetKind === 'round') {
+          // 圆形靶：白色靶面 + 双红环 + 支架
+          const h = p.hitRadius * 2;
+          const face = new THREE.Mesh(
+            new THREE.CylinderGeometry(p.hitRadius, p.hitRadius, 0.12, 28),
+            new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.5 }),
+          );
+          face.position.y = 0.2 + h - 0.06;
+          face.castShadow = true;
+          const ringMat = new THREE.MeshBasicMaterial({ color: 0xd83030 });
+          const ring1 = new THREE.Mesh(new THREE.TorusGeometry(p.hitRadius * 0.55, 0.04, 8, 28), ringMat);
+          const ring2 = new THREE.Mesh(new THREE.TorusGeometry(p.hitRadius * 0.18, 0.04, 8, 20), ringMat);
+          ring1.position.y = face.position.y;
+          ring2.position.y = face.position.y;
+          const stand = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, 0.4, 10),
+            new THREE.MeshStandardMaterial({ color: 0x3a4a5a, roughness: 0.6 }),
+          );
+          stand.position.y = 0.2;
+          group.add(face, ring1, ring2, stand);
+        } else if (p.targetKind === 'human') {
+          // 人形靶：白色躯干 + 红头 + 胸口红心靶
+          const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.5, 0.55, 1.35, 12),
+            new THREE.MeshStandardMaterial({ color: 0xd8dde6, roughness: 0.55 }),
+          );
+          body.position.y = 0.78;
+          body.castShadow = true;
+          const head = new THREE.Mesh(
+            new THREE.SphereGeometry(0.38, 14, 10),
+            new THREE.MeshStandardMaterial({ color: 0xc84545, roughness: 0.5 }),
+          );
+          head.position.y = 1.78;
+          head.castShadow = true;
+          const bull = new THREE.Mesh(
+            new THREE.TorusGeometry(0.16, 0.05, 8, 20),
+            new THREE.MeshBasicMaterial({ color: 0xff3030 }),
+          );
+          bull.position.set(0, 1.3, 0.36);
+          group.add(body, head, bull);
+        } else {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 1.35, 12), mat);
+          body.position.y = 0.78;
+          body.castShadow = true;
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 10), mat);
+          head.position.y = 1.78;
+          head.castShadow = true;
+          const visor = new THREE.Mesh(
+            new THREE.SphereGeometry(0.17, 10, 8),
+            new THREE.MeshBasicMaterial({ color: 0xd7f4ff }),
+          );
+          visor.position.set(0, 1.78, 0.3);
+          const stripe = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.51, 0.56, 0.16, 12),
+            new THREE.MeshStandardMaterial({
+              color: p.team === 'B' ? 0x2d6bff : 0xff5a3c,
+              roughness: 0.5,
+              emissive: p.team === 'B' ? 0x12233f : 0x3a1208,
+              emissiveIntensity: 0.6,
+            }),
+          );
+          stripe.position.y = 1.25;
+          const handGun = new THREE.Mesh(
+            new THREE.BoxGeometry(0.09, 0.09, 0.55),
+            new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.4 }),
+          );
+          handGun.position.set(0.42, 1.15, 0.32);
+          group.add(body, head, visor, stripe, handGun);
+        }
         const shield = new THREE.Mesh(
           new THREE.SphereGeometry(1, 16, 12),
           new THREE.MeshBasicMaterial({
@@ -1488,9 +1538,26 @@ function Hud({ snap, me, killFeed }: { snap: Snapshot; me: SnapshotPlayer; killF
     <div className="ccf-hud">
       <div className="ccf-hud-top">
         <div className="ccf-chips">
-          <span className="ccf-chip">🎯 {snap.mode === 'tdm' ? `团队死斗 ${snap.teamScores.A}:${snap.teamScores.B}/${snap.scoreLimit}` : `自由混战 ${me.kills}/${snap.scoreLimit}`}</span>
-          <span className="ccf-chip">⏱ {Math.max(0, Math.ceil(snap.timeLeft / 1000))}s</span>
-          <span className="ccf-chip">🏆 {me.score} 分 · {me.kills} 杀 {me.deaths} 死</span>
+          {snap.mode === 'training' ? (
+            <>
+              <span className="ccf-chip">
+                🎯 命中率 {me.shots > 0 ? Math.round((me.hits / me.shots) * 100) : 0}%
+              </span>
+              <span className="ccf-chip">
+                ✅ 命中 {me.hits}/{me.shots} 发
+              </span>
+              <span className="ccf-chip">
+                💥 爆头率 {me.hits > 0 ? Math.round((me.headshots / me.hits) * 100) : 0}%
+              </span>
+              <span className="ccf-chip">📊 伤害 {me.damageDealt} · 击碎 {me.kills}</span>
+            </>
+          ) : (
+            <>
+              <span className="ccf-chip">🎯 {snap.mode === 'tdm' ? `团队死斗 ${snap.teamScores.A}:${snap.teamScores.B}/${snap.scoreLimit}` : `自由混战 ${me.kills}/${snap.scoreLimit}`}</span>
+              <span className="ccf-chip">⏱ {Math.max(0, Math.ceil(snap.timeLeft / 1000))}s</span>
+              <span className="ccf-chip">🏆 {me.score} 分 · {me.kills} 杀 {me.deaths} 死</span>
+            </>
+          )}
         </div>
         {hero && (
           <span className="ccf-chip">
@@ -1645,18 +1712,22 @@ export function CorcodragonFightLocalScreen({
   const engineRef = useRef<CorcodragonFightEngine | null>(null);
 
   useEffect(() => {
-    const players = [
-      { id: 'you', name: myName || '你', isBot: false },
-      ...Array.from({ length: Math.max(1, playerCount - 1) }, (_, i) => ({
-        id: `bot${i + 1}`,
-        name: ['阿呆', '梅林', '小圆', '老巴', '铁柱', '花卷'][i % 6],
-        isBot: true,
-      })),
-    ];
+    const training = config.mode === 'training';
+    const players = training
+      ? [{ id: 'you', name: myName || '你', isBot: false }]
+      : [
+          { id: 'you', name: myName || '你', isBot: false },
+          ...Array.from({ length: Math.max(1, playerCount - 1) }, (_, i) => ({
+            id: `bot${i + 1}`,
+            name: ['阿呆', '梅林', '小圆', '老巴', '铁柱', '花卷'][i % 6],
+            isBot: true,
+          })),
+        ];
     const engine = new CorcodragonFightEngine(players, {
       mode: config.mode,
       scoreLimit: config.scoreLimit,
       aiStyle: config.aiStyle ?? 'combat',
+      trainingTargets: training ? TRAINING_TARGETS.map((t) => ({ ...t })) : undefined,
       matchTimeMs: config.mode === 'ffa' ? 10 * 60_000 : 8 * 60_000,
     });
     engineRef.current = engine;
@@ -1755,6 +1826,9 @@ export function CorcodragonFightDetailScreen({
                 <button className={`ccf-mode-btn ${mode === 'tdm' ? 'active' : ''}`} onClick={() => setMode('tdm')}>
                   🤝 团队死斗
                 </button>
+                <button className={`ccf-mode-btn ${mode === 'training' ? 'active' : ''}`} onClick={() => setMode('training')}>
+                  🎯 训练场
+                </button>
               </div>
             </div>
             <div className="field">
@@ -1775,19 +1849,25 @@ export function CorcodragonFightDetailScreen({
           </section>
 
           <section className="detail-mode">
-            <h2>🎮 本地 vs AI（浏览器内）</h2>
-            <div className="field">
-              <span>玩家总数（其余为 AI）</span>
-              <div className="count-picker">
-                {Array.from({ length: 6 }, (_, i) => i + 2).map((n) => (
-                  <button key={n} className={n === playerCount ? 'count-btn active' : 'count-btn'} onClick={() => onPlayerCountChange(n)}>
-                    {n} 人
-                  </button>
-                ))}
+            <h2>🎮 本地对局（浏览器内）</h2>
+            {mode === 'training' ? (
+              <p className="muted">
+                训练场：固定圆靶 / 移动圆靶 / 固定人靶 / 移动人靶，实时统计命中率与爆头率。
+              </p>
+            ) : (
+              <div className="field">
+                <span>玩家总数（其余为 AI）</span>
+                <div className="count-picker">
+                  {Array.from({ length: 6 }, (_, i) => i + 2).map((n) => (
+                    <button key={n} className={n === playerCount ? 'count-btn active' : 'count-btn'} onClick={() => onPlayerCountChange(n)}>
+                      {n} 人
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
             <button className="primary-btn big" onClick={() => onPlayLocal(config)}>
-              🎮 开始（本地 vs AI）
+              {mode === 'training' ? '🎯 进入训练场' : '🎮 开始（本地 vs AI）'}
             </button>
           </section>
 
@@ -1796,8 +1876,17 @@ export function CorcodragonFightDetailScreen({
             <p className="muted">
               创建房间分享房间码，2-7 人同房；服务端权威 20Hz 同步，支持 AI 补位。
             </p>
-            <button className="primary-btn big" disabled={!onlineReady} onClick={() => onPlayOnline(config)}>
-              {onlineReady ? '🌐 进入联机大厅' : '🔧 联机通道接入中……'}
+            <button
+              className="primary-btn big"
+              disabled={!onlineReady || mode === 'training'}
+              onClick={() => onPlayOnline(config)}
+              title={mode === 'training' ? '训练场仅本地可用' : ''}
+            >
+              {mode === 'training'
+                ? '🎯 训练场仅本地可用'
+                : onlineReady
+                  ? '🌐 进入联机大厅'
+                  : '🔧 联机通道接入中……'}
             </button>
           </section>
 
