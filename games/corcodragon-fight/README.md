@@ -1,6 +1,6 @@
 # 《鳄龙咆哮》corcodragon-fight
 
-> 3D 实时英雄射击（FPS）：2-7 人联机，服务端权威 20Hz tick 模拟，
+> 3D 实时英雄射击（FPS）：2-7 人联机，服务端权威 20/30/60Hz tick 模拟（默认 30Hz），
 > 5 位鳄龙英雄 × 4 种武器，自由混战 / 团队死斗。
 
 本包按 `games/<id>/` 接入小鳄龙之家大厅，遵守 `docs/ARCHITECTURE.md` 的
