@@ -13,6 +13,8 @@ export class SfxPlayer {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
 
+  private ambientStarted = false;
+
   /** 必须在用户手势里调用一次（浏览器自动播放策略） */
   unlock(): void {
     if (!this.enabled) return;
@@ -27,8 +29,33 @@ export class SfxPlayer {
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      this.startAmbient();
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
+  }
+
+  /** 训练场/对局底噪：很轻的风声循环 */
+  private startAmbient(): void {
+    if (!this.ctx || !this.master || !this.noise || this.ambientStarted) return;
+    this.ambientStarted = true;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 420;
+    const g = this.ctx.createGain();
+    g.gain.value = 0.05;
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.master);
+    src.start();
+  }
+
+  /** 脚步声（按步幅触发，音量随节奏微调） */
+  step(): void {
+    if (!this.ready()) return;
+    this.osc('sine', 95 + Math.random() * 20, 55, 0.1, 0.07);
   }
 
   private ready(): boolean {

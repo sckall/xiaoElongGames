@@ -100,12 +100,14 @@
   align-items: center;
 }
 .ccf-chip {
-  background: rgba(10, 16, 28, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 16, 28, 0.66);
+  border: 1px solid rgba(120, 200, 255, 0.18);
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 14px;
   font-weight: 600;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 .ccf-killfeed {
   position: absolute;
@@ -159,7 +161,8 @@
 }
 .ccf-hp-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3fd06a, #a0f06a);
+  background: linear-gradient(90deg, #2fca62, #a4f06a);
+  box-shadow: 0 0 10px rgba(90, 240, 130, 0.45);
   transition: width 0.15s linear;
 }
 .ccf-shield-fill {

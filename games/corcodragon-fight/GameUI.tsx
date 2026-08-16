@@ -203,6 +203,7 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
   const meleeSwingRef = useRef(-1);
   const slashRefs = useRef<{ mesh: THREE.Mesh; born: number }[]>([]);
   const prevReloadingRef = useRef(false);
+  const stepAccRef = useRef(0);
   const sparksRef = useRef<{ mesh: THREE.Mesh; vel: THREE.Vector3; born: number; life: number }[]>([]);
   const dustRef = useRef<THREE.Points | null>(null);
   const crosshairRef = useRef<HTMLDivElement | null>(null);
@@ -447,6 +448,15 @@ export function FpsGameView({ driver }: { driver: FpsDriver }) {
         const dir = viewRelativeMove(viewRef.current.yaw, mx, mz);
         localPosRef.current.x += dir.x * speed * dt;
         localPosRef.current.z += dir.z * speed * dt;
+        if (me.onGround && driverRef.current.sound !== false) {
+          stepAccRef.current += speed * dt;
+          if (stepAccRef.current > 2.6) {
+            stepAccRef.current = 0;
+            getSfx().step();
+          }
+        } else {
+          stepAccRef.current = 0;
+        }
       }
       if (me) {
         const target = new THREE.Vector3(me.pos.x, me.pos.y, me.pos.z);

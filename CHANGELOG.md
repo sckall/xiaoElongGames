@@ -25,6 +25,13 @@
   - 联机同步调试：输入 `seq` + 快照 `lastInputSeq` 回执、`rtPing` 延迟探测、
     预测漂移统计与 `softCorrectionThreshold` 硬回滚软校正
   - 调试文档：`docs/GAMEPLAY-TUNING.md`；面板冒烟 `scripts/smoke-tuning.mjs`
+- 🎯 《鳄龙咆哮》射击手感与训练场：
+  - 成熟 FPS 手感调研落地：散布膨胀/恢复（bloomPerShot/bloomMax/bloomRecoveryPerSec）、
+    动态准星 gap、命中/爆头/受击差异化音效与中央伤害数字、射击统计快照字段；
+    方案见 `docs/SHOOTING-FEEL.md`
+  - 训练场模式：固定圆靶/移动圆靶/固定人靶/移动人靶，复用服务端射线判定；
+    HUD 实时命中率/爆头率/伤害/击碎统计；详情页入口（仅本地）
+  - 音景：按步幅触发的脚步声 + 轻风声环境底噪；HUD 玻璃质感/血条辉光微调
 - 🛠️ 《鳄龙咆哮》联机体验修正与下一阶段：
   - TDM AI 只以敌方为目标；队友绿名◈+绿环、敌人红名+红环（FFA 无环）；
     `killLog` 完整击杀流水

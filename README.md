@@ -19,6 +19,7 @@
 | [docs/GAMEPLAY-TUNING.md](docs/GAMEPLAY-TUNING.md) | 策划 / 开发者 | 《鳄龙咆哮》手感调参（gameplay.json + `?debug=1` 面板） |
 | [docs/ASSETS.md](docs/ASSETS.md) | 美术 / 开发者 | 素材来源（CC0 音效/模型）、已接入资产与后续替换计划 |
 | [docs/COMBAT.md](docs/COMBAT.md) | 开发者 | 战斗判定与弹道算法（hitscan/近战/延迟补偿路线） |
+| [docs/SHOOTING-FEEL.md](docs/SHOOTING-FEEL.md) | 策划 / 开发者 | 成熟 FPS 手感公式、本项目落地与训练场验证方法 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端详细部署（系统要求/依赖/命令/测试/发布包） |
 
 ## 🎮 客户端形态（重要）
@@ -72,7 +73,7 @@ node scripts/qa-layout.mjs
 
 # —— 《鳄龙咆哮》realtime 专属 ——
 node apps/server/scripts/smoke-realtime.mjs        # realtime 端到端冒烟（需服务端）
-node scripts/smoke-corcodragon-fight.mjs           # 3D 本地冒烟 + 截图（需前端）
+node scripts/smoke-corcodragon-fight.mjs           # 3D 本地冒烟 + 截图（TM_MODE=tdm|training 可选）
 node scripts/e2e-twowindow-corcodragon.mjs         # 双窗口联机回归 + 截图（需前端+服务端）
 node scripts/qa-layout-corcodragon-fight.mjs       # 桌面/平板/手机三档布局 QA（需前端）
 node scripts/smoke-tuning.mjs                      # 手感调试面板冒烟（需前端，?debug=1）
