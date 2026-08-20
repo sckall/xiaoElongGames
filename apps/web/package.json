@@ -15,6 +15,7 @@
     "@tm/rules": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
     "socket.io-client": "^4.8.1",
     "@tm/game-corcodragon-fire": "workspace:*"
   },
