@@ -4,6 +4,35 @@
 
 ## 未发布（0.2.x 工作区）
 
+### 阶段 0 启动 · 路线图与基础设施（0.2.x 工作区第一批）
+
+- 🛠 **dev 端口支持环境变量覆盖**（commit 4e6fa30）：
+  - vite `server.port` 与 `/socket.io` 代理目标改读 `TM_WEB_PORT` / `TM_SERVER_PORT`
+  - 默认仍为 5173 / 8787，向后兼容；新增 `strictPort:false` 自动 +1 避免冲突
+  - 服务端 dev 脚本透传 `PORT` / `HOST`
+
+- 📖 **新增路线图三件套**（commit 0949162）：
+  - `docs/ROADMAP.md`：2025-2027 五阶段路线图，每阶段含关键任务 + 工时 + 退出标准
+  - `docs/COMMERCIAL.md`：商业化与 Steam 上架策略（架构适配、版号路径、联机改造两方案）
+  - `docs/MAINTENANCE.md`：维护与贡献手册（commit 规范、PR 流程、任务流转、代码规范）
+  - `docs/INDEX.md` / `README.md`：把三件套放最显眼位置
+
+- 🌐 **协议升级 v8 → v8.1：可选 userId 字段**（commit 8e0afef）：
+  - `CreateRoomPayload` / `JoinRoomPayload` 各加 `userId?: string`（向后兼容）
+  - 前端：新增 `apps/web/src/storage/userId.ts`，首次访问生成 UUIDv4 持久化到 `localStorage['tm-user-id']`
+  - 服务端：`sanitizeUserId()` 白名单裁剪（防御注入），记到 `socket.data.userId`
+  - 当前 v8.1 仅记录不参与业务，为将来 Steamworks 鉴权 / OAuth / 封号 / 统计做底层预留
+  - 6 个新单测，总测试 9 → 15 全绿；旧 payload 形式冒烟全过（向后兼容验证）
+
+- 🌐 **建立 i18n 模块并抽取首页 + 大厅文案**（commit 12fe39c）：
+  - 新增 `apps/web/src/i18n/{index.ts, zh-CN.ts, en-US.ts}`
+  - `t()` / `tFmt()` API；缺失 key 兜底（dev 模式 warn）
+  - 抽取 App.tsx（5 处）+ HallScreen.tsx（5 处），11 个命名空间 key
+  - 后续 PR 继续抽取其余文件（GameDetail / Lobby / GameTable / LocalGame 等）
+  - `en-US` 阶段 0 占位（fallback 到 zhCN），阶段 1+ 实际翻译
+
+### 历史未发布变更
+
 - 📖 **新增 GitHub Pages 部署注意事项文档**（`docs/GITHUB-PAGES.md`）：
   - 覆盖首次启用（Pages Source 选 GitHub Actions）、自动部署流程、本地子路径验证；
   - 汇总关键注意事项：`base: './'` 相对路径不能改、无路由刷新 404 说明、
