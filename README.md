@@ -14,9 +14,13 @@
 | 文档 | 面向 | 内容 |
 |------|------|------|
 | [docs/INDEX.md](docs/INDEX.md) | 所有人 | **文档总索引**：官方文档 vs 本地开发资料、项目从属关系 |
+| 🆕 [docs/ROADMAP.md](docs/ROADMAP.md) | 维护者 | **项目路线图**（2025-2027 阶段任务 + 时间线 + 退出标准） |
+| 🆕 [docs/COMMERCIAL.md](docs/COMMERCIAL.md) | 维护者 / 决策 | **商业化与 Steam 上架策略**（架构适配、版号、联机改造） |
+| 🆕 [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | 维护者 | **维护与贡献手册**（commit 规范、PR 流程、任务流转、代码规范） |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发者 | 从安装到打包：依赖/目录/命令/测试/调校/部署入口 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 开发者 / Agent | 项目架构、数据流、文件与接口、新游戏接入 checklist |
 | [docs/SECURITY.md](docs/SECURITY.md) | 开发者 / 运维 | 安全边界、加固清单、TRUST_PROXY 等部署须知 |
+| [docs/GITHUB-PAGES.md](docs/GITHUB-PAGES.md) | 开发者 / 运维 | GitHub Pages 纯静态托管（仅单人模式） |
 | [CHANGELOG.md](CHANGELOG.md) | 所有人 | 版本更新日志（v1 ~ 最新） |
 | [docs/REALTIME.md](docs/REALTIME.md) | 开发者 / Agent | 实时 FPS 通道设计（tick/快照/回执/断线语义） |
 | [docs/COMBAT.md](docs/COMBAT.md) | 开发者 | 战斗判定与弹道算法（hitscan/近战/延迟补偿路线） |
@@ -24,6 +28,8 @@
 | [docs/GAMEPLAY-TUNING.md](docs/GAMEPLAY-TUNING.md) | 策划 / 开发者 | 手动调数值：gameplay.json + `?debug=1` 面板 |
 | [docs/ASSETS.md](docs/ASSETS.md) | 美术 / 开发者 | 素材来源（CC0）、已接入资产与替换计划 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 运维 | 服务端部署（系统要求/依赖/命令/测试/发布包） |
+
+> 维护者速查：**新任务看 [ROADMAP.md](docs/ROADMAP.md)**；商业化决策看 [COMMERCIAL.md](docs/COMMERCIAL.md)；commit/PR/任务流转看 [MAINTENANCE.md](docs/MAINTENANCE.md)。
 
 > 截图、风险日志、开发规划、识图报告等开发期资料在 **`docs-dev/`**（gitignore，不进仓库），
 > 与随仓库分发的 `docs/` 分开。

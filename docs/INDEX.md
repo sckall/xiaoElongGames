@@ -28,9 +28,13 @@
 
 | 我想了解 | 读这里 |
 |----------|--------|
+| 🆕 **项目路线图（2025-2027 阶段任务）** | [ROADMAP.md](ROADMAP.md) |
+| 🆕 **商业化与 Steam 上架策略** | [COMMERCIAL.md](COMMERCIAL.md) |
+| 🆕 **维护与贡献手册（commit / PR / 任务流转）** | [MAINTENANCE.md](MAINTENANCE.md) |
 | 整体架构、数据流、目录、接入 checklist | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 从零装环境、跑测试、构建、打包 | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | 服务端/客户端部署、环境变量、运维 | [DEPLOY.md](DEPLOY.md) |
+| GitHub Pages 纯静态托管（仅单人） | [GITHUB-PAGES.md](GITHUB-PAGES.md) |
 | 出包魔法师完整规则 | [出包魔法师桌游基本规则.md](出包魔法师桌游基本规则.md) |
 | 实时 FPS 通道设计（tick/快照/回执/断线） | [REALTIME.md](REALTIME.md) |
 | 战斗判定与弹道算法 | [COMBAT.md](COMBAT.md) |
@@ -38,6 +42,8 @@
 | 手动调数值（gameplay.json + `?debug=1` 面板） | [GAMEPLAY-TUNING.md](GAMEPLAY-TUNING.md) |
 | 素材来源、许可、已接入资产与替换计划 | [ASSETS.md](ASSETS.md) |
 | 服务端安全边界与加固清单 | [SECURITY.md](SECURITY.md) |
+
+> **维护者速查**：开工前先看 [MAINTENANCE.md](MAINTENANCE.md)；新任务属于哪个阶段查 [ROADMAP.md](ROADMAP.md)；商业化 / Steam 决策查 [COMMERCIAL.md](COMMERCIAL.md)。
 
 ## 本地开发资料（docs-dev/，不进 git）
 
