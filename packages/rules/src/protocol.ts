@@ -1,7 +1,20 @@
 /**
  * 联机版 Socket.IO 通信协议（客户端与服务端共用）。
+ *
+ * ## 协议版本约定
+ * - 大版本号变更：协议破坏性更新（如字段类型变更、事件重命名），需双端同步升级
+ * - 小版本号变更：协议向后兼容的新增（如新增可选字段 userId）
+ * - 当前协议版本：v8.1（v8 → v8.1：所有 createRoom/joinRoom payload 新增 userId 可选字段，
+ *   向前兼容；服务端用于将来接入账号体系、Steamworks 鉴权、做封号/统计等）
+ *
+ * ## playerId 与 userId 的区别
+ * - `playerId`：会话级（每个座位一局一换）；UUID 形式；现服务端生成
+ * - `userId`：账号级（同一玩家跨会话不变）；客户端首次访问生成；
+ *   未来接入 Steamworks / OAuth 时会被真实 ID 覆盖
  */
 import type { Magic, PlayerView } from './types';
+
+export const PROTOCOL_VERSION = '8.1';
 
 export const MAX_NAME_LEN = 12;
 export const ROOM_CODE_LEN = 4;
@@ -84,6 +97,14 @@ export interface CreateRoomPayload {
   gameId?: string;
   /** 游戏自定对局配置（由游戏引擎校验，平台不透传语义） */
   config?: Record<string, unknown>;
+  /**
+   * 账号维度用户 ID（v8.1+）。
+   * - 客户端首次访问时生成（localStorage 持久化，跨会话不变）
+   * - 未来接入 Steamworks / OAuth 后会用真实 SteamID / OAuth sub 覆盖
+   * - 服务端 v8.1：仅接收 + 记录到 socket.data（用于将来账号体系/封号/统计），
+   *   业务侧不依赖；缺失时不影响房间创建/加入。
+   */
+  userId?: string;
 }
 
 export interface JoinRoomPayload {
@@ -93,6 +114,8 @@ export interface JoinRoomPayload {
   token?: string;
   /** 房间密码（有锁房间必填） */
   password?: string;
+  /** 同 CreateRoomPayload.userId（v8.1+） */
+  userId?: string;
 }
 
 export type AckResult =

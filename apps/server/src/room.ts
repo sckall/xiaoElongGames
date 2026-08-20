@@ -37,6 +37,13 @@ export type RoomSocket = Socket<ClientToServerEvents, ServerToClientEvents, obje
 export interface RoomSocketData {
   roomCode?: string;
   playerId?: string;
+  /**
+   * 账号级 userId（v8.1+ 协议）。
+   * 客户端首次访问时生成 localStorage 持久化，跨会话不变。
+   * 当前 v8.1 仅记录到 socket.data，不参与业务逻辑；
+   * 后续接入 Steamworks / OAuth 时会替换为真实 SteamID / OAuth sub。
+   */
+  userId?: string;
 }
 
 interface Seat {
