@@ -4,6 +4,7 @@ import OnlineScreen from './OnlineScreen';
 import HallScreen from './HallScreen';
 import GameDetailScreen from './GameDetailScreen';
 import { DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
+import { t } from './i18n';
 import {
   CorcodragonDetailScreen,
   CorcodragonLocalScreen,
@@ -26,7 +27,7 @@ const CorcodragonFightOnlineScreen = lazy(() => import('./CorcodragonFightOnline
 const Loading = () => (
   <div className="page">
     <div className="panel">
-      <p className="tagline">🐊 正在准备战场……</p>
+      <p className="tagline">{t('home.loading')}</p>
     </div>
   </div>
 );
@@ -260,17 +261,17 @@ export default function App() {
     <div className="page setup-page">
       <div className="panel setup-panel">
         <h1>
-          🐊 小鳄龙之家 <span className="subtitle">Game Hall · 游戏大厅</span>
+          {t('home.brand')} <span className="subtitle">{t('home.brandSubtitle')}</span>
         </h1>
-        <p className="tagline">选择游戏，和朋友一起玩</p>
+        <p className="tagline">{t('home.tagline')}</p>
 
         <label className="field">
-          <span>你的名字</span>
+          <span>{t('home.nameLabel')}</span>
           <input value={myName} maxLength={8} onChange={(e) => setMyName(e.target.value)} />
         </label>
 
         <button className="primary-btn big" onClick={() => setScreen('hall')}>
-          🎮 进入游戏大厅
+          {t('home.enterHall')}
         </button>
       </div>
     </div>

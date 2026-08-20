@@ -1,4 +1,5 @@
 import { GAMES } from './games';
+import { t, tFmt } from './i18n';
 
 export default function HallScreen({
   onEnter,
@@ -8,17 +9,20 @@ export default function HallScreen({
   onBack: () => void;
 }) {
   const available = GAMES.filter((g) => g.available);
-  const modeLabel = (mode: string) =>
-    mode === 'turn-based' ? '回合制 · 实时房间' : mode === 'async' ? '异步 · 小数据' : '同步 · 低延迟';
+  const modeLabel = (mode: string) => {
+    if (mode === 'turn-based') return t('hall.mode.turnBased');
+    if (mode === 'async') return t('hall.mode.async');
+    return t('hall.mode.realtime');
+  };
   return (
     <div className="page hall-page">
       <div className="hall-wrap">
         <header className="hall-header">
-          <h1>🐊 小鳄龙之家</h1>
-          <p className="tagline">选择游戏开始游玩</p>
+          <h1>{t('hall.title')}</h1>
+          <p className="tagline">{t('hall.tagline')}</p>
           <div className="hall-actions">
             <button className="ghost-btn" onClick={onBack}>
-              ← 返回首页
+              {t('hall.back')}
             </button>
           </div>
         </header>
@@ -28,10 +32,10 @@ export default function HallScreen({
               <span className="hall-emoji">{g.emoji}</span>
               <span className="hall-name">{g.name}</span>
               <span className="hall-meta">
-                {modeLabel(g.mode)}｜{g.minPlayers}-{g.maxPlayers} 人
+                {modeLabel(g.mode)}｜{tFmt('hall.playerCount', { min: g.minPlayers, max: g.maxPlayers })}
               </span>
               <span className="hall-desc">{g.description}</span>
-              <span className="hall-cta">进入游戏 →</span>
+              <span className="hall-cta">{t('hall.cta')}</span>
             </button>
           ))}
         </div>
