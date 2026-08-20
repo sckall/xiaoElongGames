@@ -1,0 +1,10 @@
+services:
+  tm-server:
+    build: .
+    container_name: tm-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0

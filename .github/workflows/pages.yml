@@ -1,0 +1,61 @@
+name: Deploy to GitHub Pages
+
+# 纯前端静态部署：构建 apps/web/dist 并发布到 GitHub Pages。
+# 单机 vs AI 完全离线可用；联机入口需在游戏内另填已部署的游戏服务器地址
+# （https 页面访问 ws/http 服务器受浏览器混合内容限制，公网服务器建议 wss/https）。
+#
+# 使用前在 GitHub 仓库 Settings → Pages → Source 选择 "GitHub Actions"。
+# 仓库需为 public（免费），或账号为 Pro/Team/Enterprise（private 也可）。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      # 静态资源路径已配置为相对路径（vite base: './'），
+      # 因此可以部署在 /<repo>/ 子路径下。
+      - run: touch apps/web/dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

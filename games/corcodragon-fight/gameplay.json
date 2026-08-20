@@ -1,0 +1,273 @@
+{
+  "tick": {
+    "stepMs": 33.333333333333336,
+    "maxAccumulatedMs": 250,
+    "botThinkMs": 200,
+    "effectChunkMs": 250
+  },
+  "arena": {
+    "half": 26,
+    "wallHeight": 3.2,
+    "playerRadius": 0.55,
+    "eyeY": 1.62,
+    "chestY": 1.15,
+    "capsuleBottomY": 0.15,
+    "capsuleTopY": 1.85,
+    "headshotMinY": 1.72,
+    "pitchClamp": 1.4
+  },
+  "movement": {
+    "gravity": 24,
+    "jumpVelocity": 8.2,
+    "adsSpeedMult": 0.5
+  },
+  "combat": {
+    "ultChargeMax": 100,
+    "ultPerDamage": 0.05,
+    "ultPerKill": 40,
+    "ultPerSecond": 2,
+    "respawnMs": 15000,
+    "respawnInvulnMs": 1500,
+    "explosionFalloff": 0.5,
+    "scoreLimitDefault": 15,
+    "matchTimeMsDefault": 600000,
+    "heroSelectMsDefault": 30000
+  },
+  "heroes": {
+    "yanren": {
+      "name": "炎刃",
+      "emoji": "🔥",
+      "role": "突击",
+      "hp": 150,
+      "speed": 5.4,
+      "skillName": "烈焰冲刺",
+      "skillDesc": "向前突进 10 米并留下火焰路径，灼烧敌人（14/秒）",
+      "skillCd": 8,
+      "ultName": "焚天烈焰",
+      "ultDesc": "以自身为中心半径 12 米爆炸，造成 80 伤害",
+      "ability": {
+        "dashDistance": 10,
+        "trailRadius": 1.1,
+        "trailDuration": 2.5,
+        "trailDps": 14,
+        "ultRadius": 12,
+        "ultDamage": 80
+      }
+    },
+    "yingxiao": {
+      "name": "影枭",
+      "emoji": "🦉",
+      "role": "刺客",
+      "hp": 120,
+      "speed": 5.9,
+      "skillName": "暗影潜行",
+      "skillDesc": "隐身 6 秒并提速；隐身中命中敌人会压至 1 血、立即充满终极技并显形；被命中也会显形",
+      "skillCd": 10,
+      "ultName": "死亡标记",
+      "ultDesc": "标记 20 米内一名可见敌人，2.5 秒后造成 90 伤害；以此击杀立即刷新主动技能",
+      "ability": {
+        "stealthDuration": 6,
+        "stealthSpeedMult": 1.25,
+        "markRange": 20,
+        "markDelay": 2.5,
+        "markDamage": 90
+      }
+    },
+    "tiebi": {
+      "name": "铁壁",
+      "emoji": "🛡️",
+      "role": "坦克",
+      "hp": 250,
+      "speed": 4.5,
+      "skillName": "能量护盾",
+      "skillDesc": "在视角正前方展开 4.8 米宽护盾（300 生命，持续 6 秒），吸收敌方子弹并保护队友",
+      "skillCd": 12,
+      "ultName": "堡垒模式",
+      "ultDesc": "6 秒内受伤 -50%，射速 +40%",
+      "ability": {
+        "shieldValue": 300,
+        "shieldDuration": 6,
+        "shieldDistance": 1.8,
+        "shieldWidth": 4.8,
+        "shieldHeight": 3.0,
+        "shieldCenterY": 1.2,
+        "fortifyDuration": 6,
+        "fortifyDamageMult": 0.5,
+        "fortifyFireRateMult": 0.6
+      }
+    },
+    "lingyin": {
+      "name": "灵音",
+      "emoji": "🎵",
+      "role": "支援",
+      "hp": 175,
+      "speed": 5.0,
+      "skillName": "治愈波",
+      "skillDesc": "向视角方向发射扇形治愈波：自己恢复 45，14 米内 60° 扇形内队友恢复 30",
+      "skillCd": 8,
+      "ultName": "音障领域",
+      "ultDesc": "脚下创造持续 5 秒治疗领域（半径 7，25/秒）",
+      "ability": {
+        "selfHeal": 45,
+        "allyHeal": 30,
+        "waveRange": 14,
+        "waveAngleDeg": 60,
+        "zoneRadius": 7,
+        "zoneDuration": 5,
+        "zoneHealPerSec": 25
+      }
+    },
+    "guilei": {
+      "name": "诡雷",
+      "emoji": "💣",
+      "role": "控场",
+      "hp": 150,
+      "speed": 5.1,
+      "skillName": "粘性炸弹",
+      "skillDesc": "准备投掷粘性炸弹，点击左键向视角方向抛出抛物线炸弹，落地 1.2 秒后爆炸（半径 5，35 伤害）",
+      "skillCd": 6,
+      "ultName": "雷暴云",
+      "ultDesc": "以自身为中心召唤雷暴 4 秒（半径 7，18/秒并减速 50%，控制为主）",
+      "ability": {
+        "bombThrowRange": 30,
+        "bombSpeed": 16,
+        "bombGravity": 12,
+        "bombFuse": 1.2,
+        "bombRadius": 5,
+        "bombDamage": 35,
+        "stormRange": 25,
+        "stormRadius": 7,
+        "stormDuration": 4,
+        "stormDps": 18,
+        "slowDuration": 0.4,
+        "slowMult": 0.5
+      }
+    }
+  },
+  "weapons": {
+    "rifle": {
+      "name": "步枪",
+      "emoji": "🔫",
+      "damage": 20,
+      "interval": 100,
+      "magSize": 30,
+      "reserve": 90,
+      "reloadMs": 1500,
+      "range": 45,
+      "adsFov": 55,
+      "recoil": 0.014,
+      "spread": 0.012,
+      "adsSpread": 0.003,
+      "headshot": 2,
+      "falloffStart": 18,
+      "falloffEnd": 45,
+      "minDmgMult": 0.55,
+      "desc": "均衡的自动步枪，右键开镜",
+      "bloomPerShot": 0.003,
+      "bloomMax": 0.06,
+      "bloomRecoveryPerSec": 0.015
+    },
+    "sniper": {
+      "name": "狙击枪",
+      "emoji": "🎯",
+      "damage": 100,
+      "interval": 1100,
+      "magSize": 5,
+      "reserve": 15,
+      "reloadMs": 2500,
+      "range": 90,
+      "adsFov": 24,
+      "recoil": 0.04,
+      "spread": 0.003,
+      "adsSpread": 0.0005,
+      "headshot": 2.5,
+      "falloffStart": 60,
+      "falloffEnd": 90,
+      "minDmgMult": 0.8,
+      "desc": "高伤害、慢射速，爆头 250",
+      "bloomPerShot": 0.02,
+      "bloomMax": 0.05,
+      "bloomRecoveryPerSec": 0.01
+    },
+    "pistol": {
+      "name": "手枪",
+      "emoji": "🔫",
+      "damage": 15,
+      "interval": 160,
+      "magSize": 12,
+      "reserve": -1,
+      "reloadMs": 1000,
+      "range": 30,
+      "adsFov": 64,
+      "recoil": 0.018,
+      "spread": 0.009,
+      "adsSpread": 0.0025,
+      "headshot": 1.5,
+      "falloffStart": 12,
+      "falloffEnd": 30,
+      "minDmgMult": 0.5,
+      "desc": "无限备弹的可靠副武器",
+      "bloomPerShot": 0.006,
+      "bloomMax": 0.07,
+      "bloomRecoveryPerSec": 0.02
+    },
+    "dagger": {
+      "name": "匕首",
+      "emoji": "🔪",
+      "damage": 40,
+      "interval": 500,
+      "magSize": -1,
+      "reserve": -1,
+      "reloadMs": 0,
+      "range": 2.9,
+      "adsFov": 75,
+      "recoil": 0.006,
+      "spread": 0,
+      "adsSpread": 0,
+      "headshot": 1,
+      "falloffStart": 2.9,
+      "falloffEnd": 2.9,
+      "minDmgMult": 1,
+      "melee": true,
+      "desc": "近战挥砍，不消耗弹药",
+      "bloomPerShot": 0,
+      "bloomMax": 0,
+      "bloomRecoveryPerSec": 1
+    }
+  },
+  "ai": {
+    "preferredRange": 9,
+    "meleeRange": 3.4,
+    "aimTolerance": 0.12,
+    "meleeAimTolerance": 0.5,
+    "levels": {
+      "easy": {
+        "thinkMs": 900,
+        "aimTolerance": 0.32,
+        "fireChance": 0.45
+      },
+      "normal": {
+        "thinkMs": 350,
+        "aimTolerance": 0.14,
+        "fireChance": 0.85
+      },
+      "hard": {
+        "thinkMs": 220,
+        "aimTolerance": 0.07,
+        "fireChance": 1
+      }
+    }
+  },
+  "client": {
+    "mouseSensitivity": 0.0022,
+    "interpolationRate": 12,
+    "correctionRate": 6,
+    "softCorrectionThreshold": 1.5,
+    "maxDeltaMs": 60,
+    "maxPixelRatio": 1.0,
+    "shadows": false,
+    "antialias": false,
+    "autoQuality": true,
+    "interpolationBufferMs": 90
+  }
+}

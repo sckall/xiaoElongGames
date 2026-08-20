@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.dsh/
+tools/
+.env
+.env.*
+!.env.example
+
+# 本地开发资料（截图/风险日志/规划/搜索报告，不随仓库分发）
+docs-dev/
+
+# 发布打包产物
+release/
+*.tgz
+*.tar.gz
+
+# 构建/工具缓存
+*.tsbuildinfo
+.vite/

@@ -1,0 +1,724 @@
+/* 《鳄龙咆哮》3D FPS 客户端样式（独立于大厅样式，全部使用 ccf- 前缀） */
+
+.ccf-root {
+  position: fixed;
+  inset: 0;
+  background: #05070c;
+  color: #e8f0ff;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+.ccf-canvas-host {
+  position: absolute;
+  inset: 0;
+}
+
+.ccf-canvas-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- 准星 ---- */
+.ccf-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.ccf-crosshair i {
+  position: absolute;
+  background: rgba(235, 246, 255, 0.95);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 6px rgba(120, 220, 255, 0.35);
+  border-radius: 1px;
+  transition: transform 0.08s ease, background 0.08s ease;
+}
+.ccf-crosshair .c-top {
+  width: 2px;
+  height: 9px;
+  left: -1px;
+  top: calc(-12px - var(--gap, 0px));
+}
+.ccf-crosshair .c-bottom {
+  width: 2px;
+  height: 9px;
+  left: -1px;
+  top: calc(6px + var(--gap, 0px));
+}
+.ccf-crosshair .c-left {
+  width: 9px;
+  height: 2px;
+  left: calc(-12px - var(--gap, 0px));
+  top: -1px;
+}
+.ccf-crosshair .c-right {
+  width: 9px;
+  height: 2px;
+  left: calc(6px + var(--gap, 0px));
+  top: -1px;
+}
+.ccf-crosshair.hit i {
+  background: #ff5040;
+  box-shadow: 0 0 3px rgba(255, 40, 20, 0.9);
+}
+.ccf-crosshair.hit .c-top {
+  transform: translate(3px, 3px) rotate(45deg);
+}
+.ccf-crosshair.hit .c-bottom {
+  transform: translate(-3px, -3px) rotate(45deg);
+}
+.ccf-crosshair.hit .c-left {
+  transform: translate(3px, -3px) rotate(-45deg);
+}
+.ccf-crosshair.hit .c-right {
+  transform: translate(-3px, 3px) rotate(-45deg);
+}
+/* 二段技能瞄准：准星变成橙色菱形，明确“下一发是技能不是子弹” */
+.ccf-crosshair.aiming i {
+  background: #ffb347;
+  box-shadow: 0 0 6px rgba(255, 150, 30, 0.85);
+}
+.ccf-crosshair.aiming .c-top {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-crosshair.aiming .c-bottom {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-crosshair.aiming .c-left {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-crosshair.aiming .c-right {
+  transform: rotate(45deg) scale(1.35);
+}
+.ccf-aim-banner {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: rgba(20, 12, 2, 0.72);
+  border: 1px solid rgba(255, 179, 71, 0.75);
+  border-radius: 10px;
+  padding: 8px 18px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffd08a;
+  animation: ccf-aim-breathe 0.9s ease-in-out infinite;
+}
+.ccf-aim-banner span {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+@keyframes ccf-aim-breathe {
+  50% { box-shadow: 0 0 18px rgba(255, 160, 40, 0.55); }
+}
+
+/* ---- HUD ---- */
+.ccf-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.ccf-hud-top {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ccf-chips {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ccf-chip {
+  background: rgba(10, 16, 28, 0.66);
+  border: 1px solid rgba(120, 200, 255, 0.18);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.ccf-killfeed {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+.ccf-kill-item {
+  background: rgba(10, 16, 28, 0.66);
+  border-left: 3px solid #ff6b4a;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  animation: ccf-fade-in 0.18s ease-out;
+}
+@keyframes ccf-fade-in {
+  from { transform: translateX(12px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.ccf-hud-bottom-left {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+}
+.ccf-hp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ccf-hp-label {
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 48px;
+}
+.ccf-hp-bar,
+.ccf-shield-bar {
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  flex: 1;
+}
+.ccf-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2fca62, #a4f06a);
+  box-shadow: 0 0 10px rgba(90, 240, 130, 0.45);
+  transition: width 0.15s linear;
+}
+.ccf-shield-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3d8cff, #7bc0ff);
+  transition: width 0.15s linear;
+}
+.ccf-ammo {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.ccf-ammo-cur {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+}
+.ccf-ammo-sep {
+  color: rgba(255, 255, 255, 0.5);
+}
+.ccf-ammo-res {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.ccf-ammo-meta {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #ffd166;
+}
+
+.ccf-hud-bottom-right {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.ccf-skill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 16, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 180px;
+}
+.ccf-skill-key {
+  font-size: 18px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.ccf-skill-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.ccf-cd {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+.ccf-skill-box {
+  position: relative;
+  overflow: hidden;
+}
+.ccf-skill.ready {
+  border-color: rgba(120, 255, 160, 0.55);
+}
+.ccf-skill.aiming {
+  border-color: rgba(255, 179, 71, 0.9);
+  box-shadow: 0 0 14px rgba(255, 150, 30, 0.35);
+}
+.ccf-skill.aiming .ccf-skill-key {
+  background: rgba(255, 179, 71, 0.3);
+  color: #ffd08a;
+}
+.ccf-aiming-dot {
+  position: absolute;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffb347;
+  box-shadow: 0 0 8px rgba(255, 160, 40, 0.9);
+  animation: ccf-pulse 0.7s ease-in-out infinite;
+}
+.ccf-stealth-chip {
+  border-color: rgba(155, 92, 255, 0.65);
+  color: #d9bfff;
+}
+.ccf-invuln-chip {
+  border-color: rgba(255, 214, 120, 0.7);
+  color: #ffe6a8;
+}
+.ccf-invuln {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at center, rgba(255, 220, 130, 0.04) 0%, rgba(255, 200, 90, 0.14) 100%);
+  box-shadow: inset 0 0 80px rgba(255, 214, 120, 0.35);
+  animation: ccf-invuln-breathe 0.8s ease-in-out infinite;
+}
+@keyframes ccf-invuln-breathe {
+  50% { opacity: 0.45; }
+}
+.ccf-ult-ready {
+  color: #ffd166;
+  animation: ccf-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ccf-pulse {
+  50% { text-shadow: 0 0 10px #ffd166; }
+}
+
+/* ---- 遮罩 ---- */
+.ccf-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 7, 13, 0.82);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+.ccf-overlay-panel {
+  background: rgba(14, 22, 36, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: min(92vw, 860px);
+  max-height: 90vh;
+  overflow: auto;
+  text-align: center;
+}
+.ccf-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+.ccf-hero-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.ccf-hero-card:hover {
+  transform: translateY(-3px);
+  border-color: #ffd166;
+}
+.ccf-hero-emoji {
+  font-size: 34px;
+}
+.ccf-hero-name {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 6px 0 2px;
+}
+.ccf-hero-role {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+.ccf-hero-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.ccf-big-num {
+  font-size: 52px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.ccf-title {
+  font-size: 26px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.ccf-muted {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+}
+.ccf-overlay-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.ccf-overlay-actions button {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ccf-overlay-actions button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.ccf-scope {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 26%,
+    rgba(0, 0, 0, 0.96) 34%,
+    rgba(0, 0, 0, 0.98) 100%
+  );
+}
+.ccf-scope::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52vh;
+  height: 52vh;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(0, 0, 0, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(180, 210, 255, 0.25);
+}
+.ccf-scope::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52vh;
+  height: 1px;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.ccf-hitflash {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  font-weight: 900;
+  pointer-events: none;
+  z-index: 6;
+  animation: ccf-hit-rise 0.55s ease-out forwards;
+}
+.ccf-hitflash.dealt {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(120, 220, 255, 0.9);
+}
+.ccf-hitflash.dealt.head {
+  color: #ffd166;
+  text-shadow: 0 0 10px rgba(255, 190, 60, 1);
+}
+.ccf-hitflash.taken {
+  color: #ff5a4a;
+  text-shadow: 0 0 8px rgba(255, 40, 20, 0.9);
+}
+@keyframes ccf-hit-rise {
+  from { transform: translate(-50%, 0); opacity: 1; }
+  to { transform: translate(-50%, -34px); opacity: 0; }
+}
+
+.ccf-killflash {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  transform: translateX(-50%);
+  color: #ffd166;
+  font-size: 22px;
+  font-weight: 900;
+  text-shadow: 0 0 12px rgba(255, 150, 40, 0.9);
+  z-index: 5;
+  pointer-events: none;
+  animation: ccf-kill-pop 0.18s ease-out;
+}
+@keyframes ccf-kill-pop {
+  from { transform: translateX(-50%) scale(1.6); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+/* 低血量红光：50% 轻微警示、30% 以下强烈闪烁（建议1：血量越低红光越明显） */
+.ccf-lowhp {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: inset 0 0 130px rgba(255, 20, 10, 0.4);
+  animation: ccf-lowhp-pulse 0.9s ease-in-out infinite;
+}
+.ccf-lowhp.warn {
+  box-shadow: inset 0 0 110px rgba(255, 40, 20, 0.28);
+  animation-duration: 1.4s;
+}
+.ccf-lowhp.danger {
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0) 55%, rgba(255, 20, 0, 0.38) 100%);
+  box-shadow: inset 0 0 150px rgba(255, 20, 10, 0.62);
+  animation-duration: 0.55s;
+}
+@keyframes ccf-lowhp-pulse {
+  50% { opacity: 0.55; }
+}
+/* 影枭隐身：淡紫色潜行滤镜 + 边缘呼吸 */
+.ccf-stealth {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at center, rgba(120, 80, 255, 0.05) 0%, rgba(80, 40, 200, 0.22) 100%);
+  box-shadow: inset 0 0 90px rgba(155, 92, 255, 0.4);
+  animation: ccf-stealth-breathe 1.6s ease-in-out infinite;
+}
+@keyframes ccf-stealth-breathe {
+  50% { opacity: 0.55; }
+}
+
+.ccf-damage-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: inset 0 0 120px rgba(255, 40, 20, 0.55);
+  opacity: 0;
+  transition: opacity 0.08s ease-out;
+}
+.ccf-damage-vignette.on {
+  opacity: 1;
+}
+.ccf-netstats {
+  position: absolute;
+  left: 14px;
+  top: 56px;
+  z-index: 7;
+  background: rgba(10, 16, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #9fd8ff;
+}
+
+.ccf-tuning-host {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 310px;
+  max-height: calc(100vh - 70px);
+  overflow: auto;
+  z-index: 30;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.ccf-exit {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 7;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 16, 28, 0.66);
+  color: #e8f0ff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ccf-exit:hover {
+  background: rgba(30, 42, 62, 0.9);
+}
+
+.ccf-death-heroes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+.ccf-death-hero {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8f0ff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ccf-death-hero:hover {
+  border-color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+}
+.ccf-death-hero.active {
+  border-color: #ffd166;
+  box-shadow: 0 0 10px rgba(255, 209, 102, 0.5);
+}
+
+.ccf-hint {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  background: rgba(10, 16, 28, 0.8);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 8;
+}
+
+.ccf-scoreboard {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  transform: translateX(-50%);
+  width: min(92vw, 460px);
+  background: rgba(10, 16, 28, 0.78);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 14px 18px;
+  z-index: 9;
+}
+.ccf-scoreboard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ccf-scoreboard td,
+.ccf-scoreboard th {
+  padding: 6px 4px;
+  text-align: left;
+}
+.ccf-scoreboard tr.me-row {
+  color: #ffd166;
+}
+
+/* ---- 详情页 ---- */
+.ccf-detail-panel {
+  max-width: 880px;
+}
+.ccf-mode-row {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+}
+.ccf-mode-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #f4f7fb;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ccf-mode-btn.active {
+  background: #ffd166;
+  border-color: #d9a413;
+}
+.ccf-hero-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+.ccf-hero-line b {
+  min-width: 56px;
+}
+.ccf-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 4px 14px;
+  font-size: 13px;
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .ccf-killfeed {
+    width: 200px;
+  }
+  .ccf-hud-bottom-left {
+    min-width: 220px;
+  }
+  .ccf-ammo-cur {
+    font-size: 30px;
+  }
+}

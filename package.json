@@ -1,0 +1,21 @@
+{
+  "name": "trouble-magician",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @tm/web --filter @tm/server dev",
+    "dev:web": "pnpm --filter @tm/web dev",
+    "dev:server": "pnpm --filter @tm/server dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "preview": "pnpm --filter @tm/web preview"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}
