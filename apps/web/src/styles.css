@@ -803,6 +803,139 @@ li:hover {
   .cloud-login-panel { right: 40px; }
 }
 
+/* ---- 全幅立绘背景登录页（左上品牌 + 右下登录面板） ---- */
+.cloud-entry-fullbleed {
+  position: relative;
+  overflow: hidden;
+  background: #1a1438;
+}
+
+.cloud-entry-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('/characters/character_girl_crocodile.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: cloud-bg-zoom 24s ease-in-out infinite alternate;
+}
+
+@keyframes cloud-bg-zoom {
+  from { transform: scale(1.02); }
+  to   { transform: scale(1.08); }
+}
+
+.cloud-entry-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.25) 70%),
+    linear-gradient(135deg, rgba(20, 18, 46, 0.35) 0%, rgba(0, 0, 0, 0) 50%, rgba(20, 18, 46, 0.55) 100%);
+}
+
+.cloud-entry-brand {
+  position: absolute;
+  top: 4vh;
+  left: 4vw;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1.2vw;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+.cloud-entry-logo {
+  font-size: clamp(40px, 7vh, 60px);
+  filter: drop-shadow(0 0 12px rgba(212, 168, 83, 0.55));
+  animation: login-logo-bob 4s ease-in-out infinite;
+  display: inline-block;
+}
+
+.cloud-entry-brand-text { display: flex; flex-direction: column; }
+
+.cloud-entry-title {
+  margin: 0;
+  font-size: clamp(22px, 3.4vh, 30px);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #fff;
+}
+
+.cloud-entry-tagline {
+  margin: 0.4vh 0 0;
+  font-size: clamp(12px, 1.5vh, 14px);
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.8px;
+}
+
+.cloud-entry-card {
+  position: absolute;
+  right: 4vw;
+  bottom: 8vh;
+  z-index: 2;
+  width: min(360px, 86vw);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+  animation: cloud-card-in 0.5s ease-out;
+}
+
+.cloud-entry-card .login-field {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.cloud-entry-card .login-field input {
+  color: #2a2a2a;
+  font-weight: 700;
+}
+
+@keyframes cloud-card-in {
+  from { opacity: 0; transform: translate(20px, 10px); }
+  to   { opacity: 1; transform: translate(0, 0); }
+}
+
+.cloud-enter-btn {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.cloud-entry-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  letter-spacing: 0.3px;
+}
+
+.cloud-entry-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2vh;
+  z-index: 2;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 700px) {
+  .cloud-entry-brand { top: 3vh; left: 4vw; gap: 3vw; }
+  .cloud-entry-card { right: 4vw; left: 4vw; width: auto; bottom: 7vh; }
+}
+
 /* ==========================================================================
  * 8. 游戏大厅（GameLobbyScreen · 100vh 横向+网格布局）
  * 米白底 + 金色按钮 + 玻璃卡：左栏 24vw 角色立绘 + 右栏主舞台
