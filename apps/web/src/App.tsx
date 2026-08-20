@@ -1,7 +1,8 @@
 import { lazy, Suspense, useState } from 'react';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
-import HallScreen from './HallScreen';
+import GameLobbyScreen from './GameLobbyScreen';
+import CloudGameEntryScreen from './CloudGameEntryScreen';
 import GameDetailScreen from './GameDetailScreen';
 import { DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
 import { t } from './i18n';
@@ -110,12 +111,18 @@ export default function App() {
 
   if (screen === 'hall') {
     return (
-      <HallScreen
+      <GameLobbyScreen
+        playerName={myName}
         onEnter={(gameId) => {
           setSelectedGameId(gameId);
           setScreen('game');
         }}
         onBack={() => setScreen('setup')}
+        onStartWorld={() => {
+          // 占位：未来接第三人称开放世界场景（Three.js）
+          // 这里先用 alert 演示，后续替换成 setScreen('world')
+          window.alert('开放世界场景尚未实现。\\n（占位入口，预留接 Three.js 第三人称世界）');
+        }}
       />
     );
   }
@@ -256,24 +263,14 @@ export default function App() {
     );
   }
 
-  // ---- 首页（昵称 → 游戏大厅） ----
+  // ---- 云原神风格入口页 → 游戏大厅 ----
   return (
-    <div className="page setup-page">
-      <div className="panel setup-panel">
-        <h1>
-          {t('home.brand')} <span className="subtitle">{t('home.brandSubtitle')}</span>
-        </h1>
-        <p className="tagline">{t('home.tagline')}</p>
-
-        <label className="field">
-          <span>{t('home.nameLabel')}</span>
-          <input value={myName} maxLength={8} onChange={(e) => setMyName(e.target.value)} />
-        </label>
-
-        <button className="primary-btn big" onClick={() => setScreen('hall')}>
-          {t('home.enterHall')}
-        </button>
-      </div>
-    </div>
+    <CloudGameEntryScreen
+      initialName={myName}
+      onEnter={(name) => {
+        setMyName(name);
+        setScreen('hall');
+      }}
+    />
   );
 }

@@ -296,7 +296,7 @@ export default function GameTable({
         delay: Math.random() * 1.4,
         dur: 2.2 + Math.random() * 2,
         size: 6 + Math.random() * 8,
-        color: ['#ffb84d', '#8a6bff', '#43d17a', '#ff5d73', '#4dd8ff'][i % 5],
+        color: ['#d4a853', '#b8903e', '#e0945a', '#5a8f5c', '#c87060'][i % 5],
         rot: Math.random() * 720,
       })),
     [],
