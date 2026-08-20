@@ -1,5 +1,15 @@
 # 🐊 小鳄龙之家 · 游戏大厅
 
+> **🆕 本次更新：集成云游戏大厅（Cloud Game Lobby）**
+> - 新增 `apps/web-cloud` 独立的云游戏 web 包
+> - 新增 `CloudGameEntryScreen` 云原神风格入口、`GameLobbyScreen` 游戏大厅、`LoginScreen` 登录页
+> - 新增 `apps/web/src/hooks` / `i18n` / `storage` 通用模块
+> - 新增 `docs/COMMERCIAL.md` / `MAINTENANCE.md` / `ROADMAP.md` 等维护文档
+> - 移除对外部 `/cloud-entry.html` 的 iframe 依赖（本地调试用，已清理）
+> - `.gitignore` 屏蔽 `docs-dev/`、`js_files/`、`js_files_backup/` 等本地调试资料
+>
+> 完整变更：`34827f0 feat: 集成云游戏大厅、清理第三方资源、移除云原神 iframe 依赖`
+
 「小鳄龙之家」是一个网页游戏大厅，当前入驻：
 
 - **《出包魔法师》（Trouble Magician）**：见习魔法师聚在一起乱放魔法——你的手牌背对自己，
