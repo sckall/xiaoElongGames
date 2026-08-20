@@ -13,7 +13,7 @@ import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@tm/rules';
 import { Room, RoomSocket, genRoomCode, sanitizeName } from './room';
 import { RealtimeRoom, RT_GAME_ID } from './realtime-room';
-import { clientIp, sanitizeJoinCode } from './security';
+import { clientIp, sanitizeJoinCode, sanitizeUserId } from './security';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -135,7 +135,7 @@ io.on('connection', (socket: RoomSocket) => {
       rooms.set(code, room);
       roomsByIp.set(ip, (roomsByIp.get(ip) ?? 0) + 1);
       socket.join(code);
-      socket.data = { roomCode: code, playerId };
+      socket.data = { roomCode: code, playerId, userId: sanitizeUserId(payload?.userId) };
       room.attach(socket.id, playerId);
       cb({ ok: true, code, playerId });
       room.broadcastLobby();
@@ -157,7 +157,11 @@ io.on('connection', (socket: RoomSocket) => {
         return;
       }
       socket.join(code);
-      socket.data = { roomCode: code, playerId: res.playerId };
+      socket.data = {
+        roomCode: code,
+        playerId: res.playerId,
+        userId: sanitizeUserId(payload?.userId),
+      };
       room.attach(socket.id, res.playerId);
       cb({ ok: true, code, playerId: res.playerId, rejoin: res.rejoin });
       if (room.status === 'playing') {

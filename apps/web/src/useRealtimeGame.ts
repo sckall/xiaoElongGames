@@ -13,6 +13,7 @@ import type {
   RoomListItem,
   ServerToClientEvents,
 } from '@tm/rules';
+import { getUserId } from './storage/userId';
 import type { RealtimeInputAction, Snapshot } from '@tm/game-corcodragon-fight';
 
 const TOKEN_KEY = 'tm-room-tokens';
@@ -168,7 +169,14 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
       const s = ensure();
       s.emit(
         'createRoom',
-        { name, botCount, password, gameId: 'corcodragon-fight', config },
+        {
+          name,
+          botCount,
+          password,
+          gameId: 'corcodragon-fight',
+          config,
+          userId: getUserId(),
+        },
         (res: AckResult) => {
           if (!res.ok) {
             setError(res.error);
@@ -186,14 +194,18 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     (code: string, name: string, password?: string) => {
       setError(null);
       const s = ensure();
-      s.emit('joinRoom', { code: code.trim().toUpperCase(), name, password }, (res: AckResult) => {
-        if (!res.ok) {
-          setError(res.error);
-          return;
-        }
-        saveToken(res.code, res.playerId, name);
-        setMyId(res.playerId);
-      });
+      s.emit(
+        'joinRoom',
+        { code: code.trim().toUpperCase(), name, password, userId: getUserId() },
+        (res: AckResult) => {
+          if (!res.ok) {
+            setError(res.error);
+            return;
+          }
+          saveToken(res.code, res.playerId, name);
+          setMyId(res.playerId);
+        },
+      );
     },
     [ensure],
   );
@@ -203,14 +215,18 @@ export function useRealtimeGame(serverUrl: string): RealtimeApi {
     if (!saved) return;
     setError(null);
     const s = ensure();
-    s.emit('joinRoom', { code: saved.code, name: saved.name, token: saved.token }, (res: AckResult) => {
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      saveToken(res.code, res.playerId, saved.name);
-      setMyId(res.playerId);
-    });
+    s.emit(
+      'joinRoom',
+      { code: saved.code, name: saved.name, token: saved.token, userId: getUserId() },
+      (res: AckResult) => {
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        saveToken(res.code, res.playerId, saved.name);
+        setMyId(res.playerId);
+      },
+    );
   }, [ensure]);
 
   const listRooms = useCallback(() => {

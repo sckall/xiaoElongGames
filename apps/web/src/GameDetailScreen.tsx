@@ -79,7 +79,7 @@ export default function GameDetailScreen({
 
           <section className="detail-mode">
             <h2>🌐 联机对战</h2>
-            <p className="muted">
+            <p className="muted" style={{ color: 'var(--text-secondary)', margin: '0 0 16px' }}>
               创建房间分享房间码，或从房间列表加入；支持 AI 补位、房间密码、断线托管。
             </p>
             <button className="primary-btn big" onClick={onPlayOnline}>

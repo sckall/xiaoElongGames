@@ -10,6 +10,7 @@ import type {
   RoomSettings,
   ServerToClientEvents,
 } from '@tm/rules';
+import { getUserId } from './storage/userId';
 
 /**
  * 断线重连凭据：按房间码存多份，避免同机多窗口互相覆盖。
@@ -120,7 +121,7 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     (name: string, botCount: number, password?: string) => {
       setError(null);
       const s = ensure();
-      s.emit('createRoom', { name, botCount, password }, (res: AckResult) => {
+      s.emit('createRoom', { name, botCount, password, userId: getUserId() }, (res: AckResult) => {
         if (!res.ok) {
           setError(res.error);
           return;
@@ -137,14 +138,18 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     (code: string, name: string, password?: string) => {
       setError(null);
       const s = ensure();
-      s.emit('joinRoom', { code: code.trim().toUpperCase(), name, password }, (res: AckResult) => {
-        if (!res.ok) {
-          setError(res.error);
-          return;
-        }
-        saveToken(res.code, res.playerId, name);
-        setMyId(res.playerId);
-      });
+      s.emit(
+        'joinRoom',
+        { code: code.trim().toUpperCase(), name, password, userId: getUserId() },
+        (res: AckResult) => {
+          if (!res.ok) {
+            setError(res.error);
+            return;
+          }
+          saveToken(res.code, res.playerId, name);
+          setMyId(res.playerId);
+        },
+      );
     },
     [ensure],
   );
@@ -157,7 +162,7 @@ export function useRemoteGame(serverUrl: string): RemoteApi {
     const s = ensure();
     s.emit(
       'joinRoom',
-      { code: saved.code, name: saved.name, token: saved.token },
+      { code: saved.code, name: saved.name, token: saved.token, userId: getUserId() },
       (res: AckResult) => {
         if (!res.ok) {
           setError(res.error);

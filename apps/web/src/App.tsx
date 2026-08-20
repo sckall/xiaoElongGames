@@ -1,9 +1,11 @@
 import { lazy, Suspense, useState } from 'react';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
-import HallScreen from './HallScreen';
+import GameLobbyScreen from './GameLobbyScreen';
+import CloudGameEntryScreen from './CloudGameEntryScreen';
 import GameDetailScreen from './GameDetailScreen';
 import { DEFAULT_SETTINGS, type GameSettings } from './GameSettings';
+import { t } from './i18n';
 import {
   CorcodragonDetailScreen,
   CorcodragonLocalScreen,
@@ -26,7 +28,7 @@ const CorcodragonFightOnlineScreen = lazy(() => import('./CorcodragonFightOnline
 const Loading = () => (
   <div className="page">
     <div className="panel">
-      <p className="tagline">🐊 正在准备战场……</p>
+      <p className="tagline">{t('home.loading')}</p>
     </div>
   </div>
 );
@@ -109,12 +111,18 @@ export default function App() {
 
   if (screen === 'hall') {
     return (
-      <HallScreen
+      <GameLobbyScreen
+        playerName={myName}
         onEnter={(gameId) => {
           setSelectedGameId(gameId);
           setScreen('game');
         }}
         onBack={() => setScreen('setup')}
+        onStartWorld={() => {
+          // 占位：未来接第三人称开放世界场景（Three.js）
+          // 这里先用 alert 演示，后续替换成 setScreen('world')
+          window.alert('开放世界场景尚未实现。\\n（占位入口，预留接 Three.js 第三人称世界）');
+        }}
       />
     );
   }
@@ -255,24 +263,14 @@ export default function App() {
     );
   }
 
-  // ---- 首页（昵称 → 游戏大厅） ----
+  // ---- 云原神风格入口页 → 游戏大厅 ----
   return (
-    <div className="page setup-page">
-      <div className="panel setup-panel">
-        <h1>
-          🐊 小鳄龙之家 <span className="subtitle">Game Hall · 游戏大厅</span>
-        </h1>
-        <p className="tagline">选择游戏，和朋友一起玩</p>
-
-        <label className="field">
-          <span>你的名字</span>
-          <input value={myName} maxLength={8} onChange={(e) => setMyName(e.target.value)} />
-        </label>
-
-        <button className="primary-btn big" onClick={() => setScreen('hall')}>
-          🎮 进入游戏大厅
-        </button>
-      </div>
-    </div>
+    <CloudGameEntryScreen
+      initialName={myName}
+      onEnter={(name) => {
+        setMyName(name);
+        setScreen('hall');
+      }}
+    />
   );
 }

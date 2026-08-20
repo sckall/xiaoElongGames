@@ -11,6 +11,10 @@ export const MAX_JOIN_CODE_LEN = 16;
 export const MAX_RT_INPUT_PER_SEC = 240;
 const AI_SPEED_MIN = 300;
 const AI_SPEED_MAX = 4000;
+/** userId 最大长度（UUIDv4 = 36；SteamID = 17 位数字；预留 64） */
+export const MAX_USER_ID_LEN = 64;
+/** userId 字符集白名单：UUID、SteamID（数字）、OAuth sub 等只允许字母/数字/-/_ */
+const USER_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export interface ClientAddressInfo {
   address?: string;
@@ -57,4 +61,21 @@ export function sanitizeRoomSettings(raw: unknown): RoomSettings {
     next.autopilot = raw.autopilot as RoomSettings['autopilot'];
   }
   return next;
+}
+
+/**
+ * userId 裁剪：仅保留字母/数字/-/_，限长 64。
+ * - 缺失/类型错/不匹配白名单 → 返回 undefined（让调用方不记录）
+ * - 超长 → 截断
+ *
+ * 设计：userId 是「账号级」标识，服务端当前 v8.1 仅用于记录到 socket.data
+ * （用于将来 Steamworks 接入、封号、统计）。不需要把它当鉴权凭据——
+ * 真正的鉴权要靠 Steam Ticket / OAuth 验签。
+ */
+export function sanitizeUserId(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim().slice(0, MAX_USER_ID_LEN);
+  if (!trimmed) return undefined;
+  if (!USER_ID_PATTERN.test(trimmed)) return undefined;
+  return trimmed;
 }

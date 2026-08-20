@@ -5,6 +5,7 @@ import {
   clientIp,
   sanitizeJoinCode,
   sanitizeRoomSettings,
+  sanitizeUserId,
 } from '../src/security';
 import { DEFAULT_ROOM_SETTINGS } from '@tm/rules';
 import { genRoomCode } from '../src/room';
@@ -108,5 +109,37 @@ describe('realtime 房间基本契约', () => {
     const room = new RealtimeRoom('TEST', 'h', '房主', undefined, 'pw', 0, fakeIo, () => undefined);
     expect(room.gameId).toBe(RT_GAME_ID);
     expect(room.listItem().hasPassword).toBe(true);
+  });
+});
+
+describe('userId 裁剪（v8.1 协议）', () => {
+  it('UUIDv4 字符串通过', () => {
+    expect(sanitizeUserId('550e8400-e29b-41d4-a716-446655440000')).toBe(
+      '550e8400-e29b-41d4-a716-446655440000',
+    );
+  });
+  it('SteamID 数字串通过（17 位）', () => {
+    expect(sanitizeUserId('76561198000000000')).toBe('76561198000000000');
+  });
+  it('缺失/类型错返回 undefined', () => {
+    expect(sanitizeUserId(undefined)).toBeUndefined();
+    expect(sanitizeUserId(null)).toBeUndefined();
+    expect(sanitizeUserId(12345)).toBeUndefined();
+    expect(sanitizeUserId({})).toBeUndefined();
+    expect(sanitizeUserId('')).toBeUndefined();
+    expect(sanitizeUserId('   ')).toBeUndefined();
+  });
+  it('含非法字符返回 undefined（防注入）', () => {
+    expect(sanitizeUserId('user<script>')).toBeUndefined();
+    expect(sanitizeUserId('user;DROP TABLE')).toBeUndefined();
+    expect(sanitizeUserId('user with space')).toBeUndefined();
+    expect(sanitizeUserId('用户')).toBeUndefined();
+  });
+  it('超长字符串截断到 64', () => {
+    const long = 'a'.repeat(200);
+    expect(sanitizeUserId(long)).toBe('a'.repeat(64));
+  });
+  it('前后空白被 trim', () => {
+    expect(sanitizeUserId('  user-123  ')).toBe('user-123');
   });
 });

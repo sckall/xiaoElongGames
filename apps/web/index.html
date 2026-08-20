@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>小鳄龙之家 · 游戏大厅</title>
+    <!--
+      主推封面图预加载：首屏渲染前就把 webp 拉回浏览器缓存，
+      避免主推卡出图前出现白底/骨架闪烁。
+      - fetchpriority="high"：首屏主推图（默认 featured = fight）
+      - 其余两张 fetchpriority="low"：轮播切换时无延迟
+    -->
+    <link rel="preload" as="image" href="./hall/cover-fight.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="./hall/cover-magician.webp" fetchpriority="low" />
+    <link rel="preload" as="image" href="./hall/cover-fire.webp" fetchpriority="low" />
   </head>
   <body>
     <div id="root"></div>
