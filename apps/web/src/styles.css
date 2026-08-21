@@ -1044,7 +1044,10 @@ li:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 22%;
+  /* 图片 1536x1024, 少女在水平 0-50%, 垂直 0-70% 范围;
+     容器 32vw × 100vh cover 后水平只显示 0-38%,
+     所以必须 object-position 贴左才能让少女不被裁掉 */
+  object-position: 0% 20%;
   display: block;
   /* 18s 微缩放动画，让立绘有"呼吸"感 */
   animation: lobby-character-bg-breathe 18s ease-in-out infinite alternate;
