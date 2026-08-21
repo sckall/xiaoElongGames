@@ -3772,6 +3772,380 @@ li:hover {
 }
 
 /* ==========================================================================
+ * 12.6 消息中心（NotificationCenter · 铃铛 popover · 通知 + 数据看板）
+ * ========================================================================== */
+
+.notification-popover {
+  pointer-events: auto;
+  filter: drop-shadow(0 12px 32px rgba(122, 86, 32, 0.18));
+}
+
+.notification-popover-inner {
+  background: var(--bg-surface);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(212, 168, 83, 0.25);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.10);
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.notification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6vw;
+  padding: 1.2vh 1.2vw;
+  border-bottom: 1px solid rgba(212, 168, 83, 0.15);
+  flex-shrink: 0;
+}
+
+.notification-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6vw;
+}
+
+.notification-title {
+  font-size: clamp(13px, 1.6vh, 15px);
+  font-weight: 800;
+  color: var(--text-title);
+  letter-spacing: 0.5px;
+}
+
+.notification-unread-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2vh 0.6vw;
+  font-size: clamp(10px, 1.1vh, 11px);
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-dark) 100%);
+  border-radius: 999px;
+}
+
+.notification-close {
+  width: 2.4vh;
+  min-width: 22px;
+  height: 2.4vh;
+  min-height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(122, 86, 32, 0.06);
+  color: var(--text-secondary);
+  font-size: clamp(14px, 1.6vh, 16px);
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.notification-close:hover {
+  background: rgba(212, 168, 83, 0.20);
+  color: var(--text-title);
+  transform: rotate(90deg);
+}
+
+.notification-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 1.2vw;
+  border-bottom: 1px solid rgba(212, 168, 83, 0.12);
+  flex-shrink: 0;
+}
+
+.notification-tab {
+  flex: 1;
+  padding: 0.9vh 0.6vw;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: clamp(11px, 1.3vh, 13px);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  white-space: nowrap;
+}
+
+.notification-tab:hover {
+  color: var(--text-title);
+  background: rgba(212, 168, 83, 0.05);
+}
+
+.notification-tab.is-active {
+  color: var(--accent-gold-dark);
+  border-bottom-color: var(--accent-gold);
+  font-weight: 800;
+}
+
+.notification-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.8vh 0.8vw 1vh;
+}
+
+/* ---- 通知公告 ---- */
+.notification-notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+}
+
+.notification-notice {
+  padding: 1vh 1vw;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(212, 168, 83, 0.10);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  position: relative;
+}
+
+.notification-notice:hover {
+  background: rgba(255, 255, 255, 0.80);
+  border-color: rgba(212, 168, 83, 0.30);
+  transform: translateX(2px);
+}
+
+.notification-notice.is-unread {
+  background: linear-gradient(90deg, rgba(212, 168, 83, 0.10) 0%, rgba(255, 255, 255, 0.55) 100%);
+  border-left: 3px solid var(--accent-gold);
+}
+
+.notification-notice-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
+  margin-bottom: 0.3vh;
+}
+
+.notification-notice-type {
+  display: inline-block;
+  padding: 0.15vh 0.5vw;
+  font-size: clamp(9px, 1vh, 10px);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: var(--text-secondary);
+  border-radius: 4px;
+}
+
+.notification-notice-type--update       { background: linear-gradient(135deg, #5a8f5c 0%, #3e6b40 100%); }
+.notification-notice-type--event        { background: linear-gradient(135deg, #e0945a 0%, #c87a30 100%); }
+.notification-notice-type--maintenance  { background: linear-gradient(135deg, #b8903e 0%, #8a6a2a 100%); }
+.notification-notice-type--system       { background: linear-gradient(135deg, #88a070 0%, #5a7850 100%); }
+
+.notification-notice-date {
+  font-size: clamp(9px, 1vh, 10px);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.notification-notice-dot {
+  margin-left: auto;
+  width: 0.7vh;
+  min-width: 6px;
+  height: 0.7vh;
+  min-height: 6px;
+  background: var(--accent-gold);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.20);
+}
+
+.notification-notice-title {
+  margin: 0 0 0.2vh;
+  font-size: clamp(12px, 1.35vh, 13px);
+  font-weight: 700;
+  color: var(--text-title);
+  line-height: 1.4;
+}
+
+.notification-notice-body {
+  margin: 0;
+  font-size: clamp(10px, 1.15vh, 12px);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notification-notice-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.4vh;
+}
+
+.notification-mark-all {
+  padding: 0.4vh 0.9vw;
+  background: transparent;
+  border: 0;
+  font-size: clamp(10px, 1.15vh, 12px);
+  color: var(--accent-gold-dark);
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: var(--transition-smooth);
+}
+
+.notification-mark-all:hover {
+  background: rgba(212, 168, 83, 0.10);
+}
+
+/* ---- 数据看板 ---- */
+.notification-board {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2vh;
+}
+
+.notification-board-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  padding: 1vh 1vw;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(212, 168, 83, 0.10);
+  border-radius: 10px;
+}
+
+.notification-board-section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4vw;
+  margin-bottom: 0.2vh;
+}
+
+.notification-board-section-icon {
+  font-size: clamp(13px, 1.6vh, 15px);
+}
+
+.notification-board-section-title {
+  margin: 0;
+  font-size: clamp(12px, 1.4vh, 13px);
+  font-weight: 800;
+  color: var(--text-title);
+  flex: 1;
+}
+
+.notification-board-section-meta {
+  font-size: clamp(9px, 1vh, 10px);
+  color: var(--text-secondary);
+}
+
+.notification-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6vw;
+}
+
+.notification-kpi {
+  padding: 0.8vh 0.6vw;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(212, 168, 83, 0.12);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2vh;
+}
+
+.notification-kpi--accent {
+  background: linear-gradient(135deg, rgba(212, 168, 83, 0.15) 0%, rgba(255, 196, 156, 0.18) 100%);
+  border-color: rgba(212, 168, 83, 0.30);
+}
+
+.notification-kpi-label {
+  font-size: clamp(9px, 1vh, 10px);
+  color: var(--text-secondary);
+}
+
+.notification-kpi-value {
+  font-size: clamp(14px, 1.7vh, 16px);
+  font-weight: 800;
+  color: var(--text-title);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.notification-kpi-value small {
+  font-size: clamp(9px, 1vh, 10px);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
+.notification-board-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(10px, 1.15vh, 12px);
+}
+
+.notification-board-table th,
+.notification-board-table td {
+  padding: 0.4vh 0.4vw;
+  text-align: left;
+  border-bottom: 1px solid rgba(212, 168, 83, 0.10);
+}
+
+.notification-board-table th {
+  font-size: clamp(9px, 1vh, 10px);
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: rgba(212, 168, 83, 0.06);
+}
+
+.notification-board-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-title);
+}
+
+.notification-board-rank {
+  font-weight: 800;
+  color: var(--accent-gold-dark);
+  width: 1.6em;
+  text-align: center;
+}
+
+.notification-board-model {
+  font-weight: 600;
+  color: var(--text-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11vw;
+}
+
+.notification-board-source {
+  margin: 0;
+  font-size: clamp(9px, 1vh, 10px);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+@media (max-width: 720px) {
+  .notification-popover {
+    left: 12px !important;
+    right: 12px;
+    width: auto !important;
+    max-width: none;
+  }
+  .notification-board-table {
+    font-size: 11px;
+  }
+  .notification-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ==========================================================================
  * 13. 响应式
  * ========================================================================== */
 

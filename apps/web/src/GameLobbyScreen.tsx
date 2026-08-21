@@ -11,9 +11,10 @@
  * 配色沿用项目主题：米白暖底 + 金色高光（不取原参考图绿色）。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { GAMES } from './games';
 import { t, tFmt } from './i18n';
+import NotificationCenter from './NotificationCenter';
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -169,6 +170,9 @@ export default function GameLobbyScreen({
   const [isPaused, setIsPaused] = useState(false);
   const [justFeatured, setJustFeatured] = useState<LobbyGameKind | null>(null);
   const [activeTab, setActiveTab] = useState<NavTab>('hall');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const [bellRect, setBellRect] = useState<DOMRect | null>(null);
 
   const availableIds = useMemo(
     () => new Set(GAMES.filter((g) => g.available).map((g) => g.id)),
@@ -299,7 +303,11 @@ export default function GameLobbyScreen({
                 type="button"
                 className="lobby-nav-bell"
                 aria-label="通知"
-                onClick={() => window.alert('暂无新消息 ✨')}
+                ref={bellRef}
+                onClick={() => {
+                  if (bellRef.current) setBellRect(bellRef.current.getBoundingClientRect());
+                  setNotifOpen((v) => !v);
+                }}
               >
                 <span aria-hidden="true">🔔</span>
                 <span className="lobby-nav-bell-dot" aria-hidden="true" />
@@ -545,6 +553,13 @@ export default function GameLobbyScreen({
           </div>
         </div>
       </div>
+
+      {notifOpen && bellRect && (
+        <NotificationCenter
+          anchorRect={bellRect}
+          onClose={() => setNotifOpen(false)}
+        />
+      )}
     </div>
   );
 }

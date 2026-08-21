@@ -9,8 +9,9 @@
  *   - 大厅其它 Tab 暂未实现，仍由 GameLobbyScreen 内部 alert 占位
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { t, tFmt } from './i18n';
+import NotificationCenter from './NotificationCenter';
 
 // ----------------------------------------------------------------------------
 // 类型与示例数据（后续接活动 store）
@@ -121,6 +122,9 @@ export default function EventCenterScreen({
 }) {
   const [activeTab, setActiveTab] = useState<NavTab>('events');
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
+  const [notifOpen, setNotifOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const [bellRect, setBellRect] = useState<DOMRect | null>(null);
 
   const handleTabClick = (tab: NavTab) => {
     setActiveTab(tab);
@@ -186,7 +190,11 @@ export default function EventCenterScreen({
               type="button"
               className="lobby-nav-bell"
               aria-label="通知"
-              onClick={() => window.alert('暂无新消息 ✨')}
+              ref={bellRef}
+              onClick={() => {
+                if (bellRef.current) setBellRect(bellRef.current.getBoundingClientRect());
+                setNotifOpen((v) => !v);
+              }}
             >
               <span aria-hidden="true">🔔</span>
               <span className="lobby-nav-bell-dot" aria-hidden="true" />
@@ -329,6 +337,13 @@ export default function EventCenterScreen({
           </section>
         </main>
       </div>
+
+      {notifOpen && bellRect && (
+        <NotificationCenter
+          anchorRect={bellRect}
+          onClose={() => setNotifOpen(false)}
+        />
+      )}
     </div>
   );
 }
