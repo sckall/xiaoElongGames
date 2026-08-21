@@ -152,12 +152,14 @@ export default function GameLobbyScreen({
   onEnter,
   onBack,
   onSettings,
+  onEvents,
   onStartWorld,
   playerName,
 }: {
   onEnter: (gameId: string) => void;
   onBack: () => void;
   onSettings?: () => void;
+  onEvents?: () => void;
   onStartWorld?: () => void;
   playerName: string;
 }) {
@@ -219,6 +221,10 @@ export default function GameLobbyScreen({
   const handleTabClick = (tab: NavTab) => {
     setActiveTab(tab);
     if (tab === 'hall') return;
+    if (tab === 'events' && onEvents) {
+      onEvents();
+      return;
+    }
     if (tab === 'settings' && onSettings) {
       onSettings();
       return;

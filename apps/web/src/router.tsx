@@ -4,6 +4,7 @@
  * 使用 react-router-dom v6 + HashRouter，URL 形如：
  *   /#/                 登录 / 昵称
  *   /#/hall             游戏大厅
+ *   /#/event-center     活动中心
  *   /#/game/:gameId     某个游戏的详情页
  *   /#/game/:gameId/local   本地对战
  *   /#/game/:gameId/online  联机对战
@@ -32,6 +33,7 @@ import { useNavigate, useParams, Navigate, Route, Routes, useLocation } from 're
 
 import CloudGameEntryScreen from './CloudGameEntryScreen';
 import GameLobbyScreen from './GameLobbyScreen';
+import EventCenterScreen from './EventCenterScreen';
 import GameDetailScreen from './GameDetailScreen';
 import LocalGameScreen from './LocalGameScreen';
 import OnlineScreen from './OnlineScreen';
@@ -286,9 +288,25 @@ function HallRoute() {
         playerName={myName}
         onEnter={(gameId) => navigate(`/game/${gameId}`)}
         onBack={() => navigate('/')}
+        onEvents={() => navigate('/event-center')}
         onStartWorld={() => {
           window.alert('开放世界场景尚未实现。\n（占位入口，预留接 Three.js 第三人称世界）');
         }}
+      />
+    </RequireName>
+  );
+}
+
+/** 活动中心 */
+function EventCenterRoute() {
+  const { myName } = useGameState();
+  const navigate = useNavigate();
+
+  return (
+    <RequireName>
+      <EventCenterScreen
+        playerName={myName}
+        onBack={() => navigate('/hall')}
       />
     </RequireName>
   );
@@ -486,6 +504,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<LoginRoute />} />
       <Route path="/hall" element={<HallRoute />} />
+      <Route path="/event-center" element={<EventCenterRoute />} />
       <Route path="/game/:gameId" element={<GameDetailRoute />} />
       <Route path="/game/:gameId/local" element={<LocalRoute />} />
       <Route path="/game/:gameId/online" element={<OnlineRoute />} />
