@@ -31,6 +31,7 @@
 | 🆕 **项目路线图（2025-2027 阶段任务）** | [ROADMAP.md](ROADMAP.md) |
 | 🆕 **商业化与 Steam 上架策略** | [COMMERCIAL.md](COMMERCIAL.md) |
 | 🆕 **维护与贡献手册（commit / PR / 任务流转）** | [MAINTENANCE.md](MAINTENANCE.md) |
+| 🆕 **新闻系统规划（铃铛承载的公告/数据看板/玩家动态）** | [NEWS-SYSTEM.md](NEWS-SYSTEM.md) |
 | 整体架构、数据流、目录、接入 checklist | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 从零装环境、跑测试、构建、打包 | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | 服务端/客户端部署、环境变量、运维 | [DEPLOY.md](DEPLOY.md) |
