@@ -248,13 +248,23 @@ export default function GameLobbyScreen({
 
       {/* ===== 主体两栏：左 32% 立绘 / 右 68% 内容 ===== */}
       <div className="lobby-layout">
-        {/* ==== 左侧立绘区(沿用) ==== */}
+        {/* ==== 左侧立绘区(用登录页立绘做背景) ==== */}
         <aside className="lobby-character">
           <div className="lobby-character-frame">
-            <div className="lobby-character-portrait">
-              <span className="lobby-character-glow" />
-              <span className="lobby-character-emoji" aria-hidden="true">🐊</span>
+            {/* 立绘做整框背景 */}
+            <div className="lobby-character-bg" aria-hidden="true">
+              <img
+                className="lobby-character-bg-img"
+                src={`${BASE}characters/character_girl_crocodile.png`}
+                alt=""
+                draggable={false}
+                loading="eager"
+                decoding="async"
+              />
+              <div className="lobby-character-bg-shade" />
             </div>
+
+            {/* 浮在立绘底部的信息块 */}
             <div className="lobby-character-info">
               <div className="lobby-character-tag">{tFmt('lobby.character.title', { id: '007' })}</div>
               <h2 className="lobby-character-name">{t('lobby.character.name')}</h2>

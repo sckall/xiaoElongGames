@@ -1015,66 +1015,75 @@ li:hover {
 }
 
 .lobby-character-frame {
+  position: relative;
   width: 100%;
-  background: var(--bg-surface);
-  backdrop-filter: blur(var(--blur-glass));
-  -webkit-backdrop-filter: blur(var(--blur-glass));
+  background: transparent;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
-  padding: 2vh 1.2vw;
+  padding: 0 1.2vw 1.6vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.4vh;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 1vh;
   box-shadow: var(--shadow-soft);
   min-height: 0;
+  overflow: hidden;
 }
 
-.lobby-character-portrait {
-  position: relative;
-  width: 70%;
-  max-width: 200px;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lobby-character-emoji {
-  font-size: clamp(64px, 12vh, 120px);
-  filter: drop-shadow(0 6px 20px rgba(212, 168, 83, 0.35));
-  z-index: 2;
-  position: relative;
-  animation: lobby-character-bob 4s ease-in-out infinite;
-}
-
-@keyframes lobby-character-bob {
-  0%, to { transform: translateY(0) rotate(0); }
-  50% { transform: translateY(-2%) rotate(-1deg); }
-}
-
-.lobby-character-glow {
+/* 立绘做整框背景 */
+.lobby-character-bg {
   position: absolute;
-  top: 12%; right: 12%; bottom: 12%; left: 12%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 215, 130, 0.55) 0%, rgba(255, 196, 156, 0.28) 50%, transparent 75%);
-  filter: blur(20px);
-  z-index: 1;
-  animation: lobby-glow-pulse 3s ease-in-out infinite alternate;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-@keyframes lobby-glow-pulse {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  to { transform: scale(1.05); opacity: 1; }
+.lobby-character-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 22%;
+  display: block;
+  /* 18s 微缩放动画，让立绘有"呼吸"感 */
+  animation: lobby-character-bg-breathe 18s ease-in-out infinite alternate;
 }
 
+@keyframes lobby-character-bg-breathe {
+  0%   { transform: scale(1.02); }
+  to   { transform: scale(1.08); }
+}
+
+/* 渐变蒙版：顶部亮（露出立绘）→ 底部米白半透明（保证文字可读） */
+.lobby-character-bg-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg,
+      rgba(247, 245, 240, 0.10) 0%,
+      rgba(247, 245, 240, 0.30) 45%,
+      rgba(247, 245, 240, 0.85) 80%,
+      rgba(247, 245, 240, 0.95) 100%
+    );
+}
+
+/* 浮在底部的信息块（玻璃态） */
 .lobby-character-info {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5vh;
   text-align: center;
-  width: 100%;
+  width: calc(100% + 2.4vw);
+  margin: 0 -1.2vw;
+  padding: 1.2vh 1.2vw 0.8vh;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border-top: 1px solid rgba(255, 255, 255, 0.6);
 }
 
 .lobby-character-tag {
@@ -1082,10 +1091,10 @@ li:hover {
   font-weight: 700;
   color: var(--accent-gold-dark);
   letter-spacing: 1.2px;
-  background: rgba(212, 168, 83, 0.12);
+  background: rgba(212, 168, 83, 0.18);
   padding: 0.3vh 0.8vw;
   border-radius: 999px;
-  border: 1px solid rgba(212, 168, 83, 0.35);
+  border: 1px solid rgba(212, 168, 83, 0.40);
 }
 
 .lobby-character-name {
@@ -1093,6 +1102,7 @@ li:hover {
   font-size: clamp(16px, 2.2vh, 22px);
   font-weight: 800;
   color: var(--text-title);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
 }
 
 .lobby-character-line {
@@ -1104,7 +1114,10 @@ li:hover {
 }
 
 .lobby-character-cta {
-  margin-top: 0.6vh;
+  position: relative;
+  z-index: 1;
+  margin: 0.4vh 0 0;
+  align-self: center;
   display: flex;
   align-items: center;
   gap: 0.4vw;
@@ -1116,13 +1129,13 @@ li:hover {
   font-size: clamp(11px, 1.3vh, 13px);
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(212, 168, 83, 0.35);
+  box-shadow: 0 6px 18px rgba(212, 168, 83, 0.45);
   transition: var(--transition-smooth);
 }
 
 .lobby-character-cta:hover {
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 10px 24px rgba(212, 168, 83, 0.5);
+  box-shadow: 0 10px 24px rgba(212, 168, 83, 0.6);
 }
 
 /* ---- 右栏：主舞台 ---- */
